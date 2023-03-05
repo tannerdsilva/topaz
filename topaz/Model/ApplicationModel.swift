@@ -24,6 +24,7 @@ extension RawRepresentable where Self:MDB_convertible, RawValue:MDB_convertible 
 struct ApplicationModel {
 	/// the main engine for the app and its data
 	class Metadata:ObservableObject {
+		// various states the app can be in
 		enum State:UInt8, MDB_convertible {
 			case welcomeFlow = 0
 			case onboarded = 1
@@ -36,6 +37,7 @@ struct ApplicationModel {
 		fileprivate enum Metadatas:String {
 			case appState = "appState"			// State
 			case currentUser = "currentUser"
+			case tosAcknowledged = "tosAcknlowledged?" // Bool
 		}
 
 		let logger = Topaz.makeDefaultLogger(label:"app-metadata")
@@ -58,7 +60,6 @@ struct ApplicationModel {
 		/// the public key of the current user of the app
 		@Published public var currentUserPublicKey:String? {
 			didSet {
-				print("is about to set")
 				do {
 					if let hasCurrentUser = currentUserPublicKey {
 						try self.app_metadata.setEntry(value:hasCurrentUser, forKey:Metadatas.currentUser.rawValue, tx:nil)
@@ -69,6 +70,18 @@ struct ApplicationModel {
 							self.logger.info("committed transaction to remove current user.", metadata:["user": "\(currentUserPublicKey ?? "nil")"])
 						} catch LMDBError.notFound {}
 					}
+				} catch let error {
+					self.logger.critical("could not commit database transaction.", metadata:["error": "\(error)"])
+				}
+			}
+		}
+
+		/// whether the user has acknowledged the terms of service
+		@Published public var isTOSAcknowledged:Bool {
+			didSet {
+				do {
+					try self.app_metadata.setEntry(value:isTOSAcknowledged, forKey:Metadatas.tosAcknowledged.rawValue, tx:nil)
+					self.logger.info("committed transaction to update TOS acknowledgement.", metadata:["acknowledged": "\(isTOSAcknowledged)"])
 				} catch let error {
 					self.logger.critical("could not commit database transaction.", metadata:["error": "\(error)"])
 				}
@@ -93,6 +106,12 @@ struct ApplicationModel {
 				_currentUserPublicKey = Published(wrappedValue:try self.app_metadata.getEntry(type:String.self, forKey:Metadatas.currentUser.rawValue, tx:subTrans)!)
 			} catch LMDBError.notFound {
 				_currentUserPublicKey = Published(wrappedValue:nil)
+			}
+			// load the TOS acknowledgement
+			do {
+				_isTOSAcknowledged = Published(wrappedValue:try self.app_metadata.getEntry(type:Bool.self, forKey:Metadatas.tosAcknowledged.rawValue, tx:subTrans)!)
+			} catch LMDBError.notFound {
+				_isTOSAcknowledged = Published(wrappedValue:false)
 			}
 			try subTrans.commit()
 		}

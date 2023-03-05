@@ -54,7 +54,14 @@ struct Topaz:App {
 
     var body: some Scene {
         WindowGroup {
-			ContentView(appData:localData)
+			if (localData.state == .onboarded) {
+				Text(verbatim: "IDK WHAT THIS SHOULD BE YET")
+				Button("Revert onboarding") {
+					localData.state = .welcomeFlow
+				}
+			} else {
+				OnboardingView(appData: Topaz().localData)
+			}
         }
     }
 }
