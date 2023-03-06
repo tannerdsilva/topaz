@@ -8,21 +8,17 @@
 import SwiftUI
 
 struct ContentView: View {
-	@State var appData:ApplicationModel.Metadata
+	@StateObject var appData:ApplicationModel
 	
     var body: some View {
-		VStack {
-			if (appData.state == .onboarded) {
-				Text("Thank you for acknowledging the TOS")
-			} else {
-				Text("Please acknowledge the TOS")
+		if (appData.state == .onboarded) {
+			Text(verbatim: "IDK WHAT THIS SHOULD BE YET")
+			Button("Revert onboarding") {
+				appData.state = .welcomeFlow
 			}
-			Button("OK I acknowledge", action: {
-				appData.state = .onboarded
-			}).foregroundColor(.blue)
+		} else {
+			OnboardingView(appData:appData)
 		}
-        
-		
     }
 }
 

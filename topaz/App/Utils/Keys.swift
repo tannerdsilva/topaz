@@ -22,21 +22,7 @@ struct KeyPair {
 	}
 	
 	func privkey_bech32() -> String {
-		return bech32_privkey(privkey)!
-	}
-}
-
-struct Keypair {
-	let pubkey: String
-	let privkey: String?
-	let pubkey_bech32: String
-	let privkey_bech32: String?
-	
-	init(pubkey: String, privkey: String?) {
-		self.pubkey = pubkey
-		self.privkey = privkey
-		self.pubkey_bech32 = bech32_pubkey(pubkey) ?? pubkey
-		self.privkey_bech32 = privkey.flatMap { bech32_privkey($0) }
+		return bech32_privkey(privkey) ?? pubkey
 	}
 }
 
@@ -45,8 +31,48 @@ enum Bech32Key {
 	case sec(String)
 }
 
-struct DamusKeychainConfiguration: KeychainConfiguration {
-	var serviceName = "damus"
+enum ParsedKey:Equatable {
+	case pub(String)
+	case priv(String)
+	case hex(String)
+	case nip05(String)
+
+	var is_pub: Bool {
+		if case .pub = self {
+			return true
+		}
+
+		if case .nip05 = self {
+			return true
+		}
+		return false
+	}
+
+	var is_hex: Bool {
+		if case .hex = self {
+			return true
+		}
+		return false
+	}
+	
+	static func == (lhs:ParsedKey, rhs:ParsedKey) -> Bool {
+		switch (lhs, rhs) {
+			case (.pub(let l), .pub(let r)):
+				return l == r
+			case (.priv(let l), .priv(let r)):
+				return l == r
+			case (.hex(let l), .hex(let r)):
+				return l == r
+			case (.nip05(let l), .nip05(let r)):
+				return l == r
+			default:
+				return false
+		}
+	}
+}
+
+struct DamusKeychainConfiguration:KeychainConfiguration {
+	var serviceName = "topaz"
 	var accessGroup: String? = nil
 	var accountName = "privkey"
 }
@@ -94,11 +120,11 @@ func bech32_note_id(_ evid: String) -> String? {
 	return bech32_encode(hrp: "note", bytes)
 }
 
-func generate_new_keypair() -> Keypair {
+func generate_new_keypair() -> KeyPair {
 	let key = try! secp256k1.Signing.PrivateKey()
 	let privkey = hex_encode(key.rawRepresentation)
 	let pubkey = hex_encode(Data(key.publicKey.xonly.bytes))
-	return Keypair(pubkey: pubkey, privkey: privkey)
+	return KeyPair(pubkey:pubkey, privkey:privkey)
 }
 
 func privkey_to_pubkey(privkey: String) -> String? {
@@ -137,13 +163,13 @@ func clear_keypair() throws {
 	clear_saved_pubkey()
 }
 
-func get_saved_keypair() -> Keypair? {
+func get_saved_keypair() -> KeyPair? {
 	do {
 		try removePrivateKeyFromUserDefaults()
 		
 		return get_saved_pubkey().flatMap { pubkey in
 			let privkey = get_saved_privkey()
-			return Keypair(pubkey: pubkey, privkey: privkey)
+			return KeyPair(pubkey: pubkey, privkey: privkey!)
 		}
 	} catch {
 		return nil
