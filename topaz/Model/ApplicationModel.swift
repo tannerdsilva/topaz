@@ -89,6 +89,7 @@ class ApplicationModel:ObservableObject {
 	/// the primary store for the application users and their private keys
 	@Published var userStore:UserStore
 
+	/// the primary store for the user sessions
 	init(_ docEnv:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction? = nil) throws {
 		self.env = docEnv
 		
@@ -119,15 +120,36 @@ class ApplicationModel:ObservableObject {
 	}
 	
 	/// installs a user in the application and ensures that the state of the app is updated
-	func installUser(publicKey:String, privateKey:String) throws {
-		let newTrans = try Transaction(self.env, readOnly:false, parent:nil)
+	func installUser(publicKey:String, privateKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
+		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
 		self.objectWillChange.send()
+		_state = Published(wrappedValue:.onboarded)
 		try self.userStore.addUser(publicKey, privateKey:privateKey, tx:newTrans)
 		try self.app_metadata.setEntry(value:State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
-		_state = Published(wrappedValue:.onboarded)
 		try newTrans.commit()
 	}
 
+
+	/// removes a user from the application and ensures that the state of the app is updated if there are no more users
+	func removeUser(publicKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
+		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:nil)
+		self.objectWillChange.send()
+		try self.userStore.removeUser(publicKey, tx:newTrans)
+		let allUsers = try self.userStore.allUsers(tx:newTrans)
+		if (allUsers.count == 0) {
+			_state = Published(wrappedValue:.welcomeFlow)
+			try self.app_metadata.setEntry(value:State.welcomeFlow, forKey:Metadatas.appState.rawValue, tx:newTrans)
+		} else {
+			
+		}
+	}
+	
+	func defaultUserExperience(tx someTrans:QuickLMDB.Transaction? = nil) -> UE {
+		let newTrans = try Transaction(self.env, readOnly:false, parent:someTrans)
+	}
+}
+
+extension ApplicationModel {
 	class UserStore:ObservableObject {
 		fileprivate enum Databases:String {
 			case app_users = "app_users"
@@ -161,7 +183,7 @@ class ApplicationModel:ObservableObject {
 		}
 
 		/// get a user's private key
-		func getUserPrivateKey(pubKey:String, tx someTrans:QuickLMDB.Transaction) throws -> String {
+		func getUserPrivateKey(pubKey:String, tx someTrans:QuickLMDB.Transaction) throws -> String? {
 			return try userDB.getEntry(type:String.self, forKey:pubKey, tx:someTrans)!
 		}
 
@@ -181,23 +203,6 @@ class ApplicationModel:ObservableObject {
 		func removeUser(_ publicKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
 			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
 			try self.userDB.deleteEntry(key:publicKey, tx:subTrans)
-			try subTrans.commit()
-		}
-	}
-
-	/// stores the relays that have been associated with any public key
-	class UserRelays {
-		enum Databases:String {
-			case pubkey_relays = "pubkey_relays"
-		}
-
-		let env:QuickLMDB.Environment
-		let pubkey_relays:Database
-
-		init(_ docEnv:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction? = nil) throws {
-			self.env = docEnv
-			let subTrans = try Transaction(docEnv, readOnly:false, parent:someTrans)
-			self.pubkey_relays = try docEnv.openDatabase(named:Databases.pubkey_relays.rawValue, flags:[.create], tx:subTrans)
 			try subTrans.commit()
 		}
 	}

@@ -12,10 +12,7 @@ struct ContentView: View {
 	
     var body: some View {
 		if (appData.state == .onboarded) {
-			Text(verbatim: "IDK WHAT THIS SHOULD BE YET")
-			Button("Revert onboarding") {
-				appData.state = .welcomeFlow
-			}
+			UserExperienceView(pubkey:"fuck you")
 		} else {
 			OnboardingView(appData:appData)
 		}

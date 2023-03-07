@@ -23,27 +23,28 @@ struct Topaz:App {
 	}
 	static let logger = makeDefaultLogger(label:"topaz-app")
 	
-	static func initializeMainEnvironment(url:URL, flags:QuickLMDB.Environment.Flags) -> Result<QuickLMDB.Environment, Error> {
+	static func initializeEnvironment(url:URL, flags:QuickLMDB.Environment.Flags = [.noTLS, .noSync, .noReadAhead]) -> Result<QuickLMDB.Environment, Error> {
 		do {
 			let homePath = url.appendingPathComponent("topaz-app", isDirectory:true)
 			if FileManager.default.fileExists(atPath: homePath.path) == false {
 				try FileManager.default.createDirectory(at:homePath, withIntermediateDirectories:true)
 			}
-			let env = try QuickLMDB.Environment(path:homePath.path, flags:flags, mapSize:size_t(5e9))
+			let env = try QuickLMDB.Environment(path:homePath.path, flags:flags, mapSize:size_t(5e8))
 			return .success(env)
 		} catch let error {
 			return .failure(error)
 		}
 	}
 	
-	let localData:ApplicationModel
+	@StateObject var localData:ApplicationModel
 	
 	init() {
 		do {
-			let localData = Topaz.initializeMainEnvironment(url:try! FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true), flags:[.noTLS, .noSync, .noReadAhead])
+			let localData = Topaz.initializeEnvironment(url:try! FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true), flags:[.noTLS, .noSync, .noReadAhead])
 			switch (localData) {
 			case (.success(let localData)):
-				self.localData = try ApplicationModel(localData, tx:nil)
+				let appModel = try ApplicationModel(localData, tx:nil)
+				_localData = StateObject(wrappedValue:appModel)
 			default:
 				fatalError("false")
 			}
