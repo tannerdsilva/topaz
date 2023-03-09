@@ -12,7 +12,7 @@ struct ContentView: View {
 	
     var body: some View {
 		if (appData.state == .onboarded) {
-			UserExperienceView(pubkey:"fuck you")
+			UserExperienceView(ue:appData.defaultUE!)
 		} else {
 			OnboardingView(appData:appData)
 		}

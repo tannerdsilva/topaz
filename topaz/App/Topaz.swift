@@ -12,6 +12,9 @@ import SystemPackage
 
 @main
 struct Topaz:App {
+	public static let bootstrap_relays = [
+		Relay("wss://relay.damus.io")
+	]
 	public static func makeDefaultLogger(label:String) -> Logger {
 		var logger = Logger(label:label)
 		#if DEBUG
@@ -23,14 +26,24 @@ struct Topaz:App {
 	}
 	static let logger = makeDefaultLogger(label:"topaz-app")
 	
-	static func initializeEnvironment(url:URL, flags:QuickLMDB.Environment.Flags = [.noTLS, .noSync, .noReadAhead]) -> Result<QuickLMDB.Environment, Error> {
+	fileprivate static func initializeEnvironment(url:URL, flags:QuickLMDB.Environment.Flags) -> Result<QuickLMDB.Environment, Error> {
 		do {
-			let homePath = url.appendingPathComponent("topaz-app", isDirectory:true)
-			if FileManager.default.fileExists(atPath: homePath.path) == false {
-				try FileManager.default.createDirectory(at:homePath, withIntermediateDirectories:true)
+			if FileManager.default.fileExists(atPath:url.path) == false {
+				try FileManager.default.createDirectory(at:url, withIntermediateDirectories:true)
 			}
-			let env = try QuickLMDB.Environment(path:homePath.path, flags:flags, mapSize:size_t(5e8))
+			let env = try QuickLMDB.Environment(path:url.path, flags:flags, mapSize:size_t(5e8))
+			Self.logger.debug("successfully opened LMDB environment.", metadata:["path":"\(url.path)"])
 			return .success(env)
+		} catch let error {
+			Self.logger.error("failed to open LMDB environment.", metadata:["error":"\(error)"])
+			return .failure(error)
+		}
+	}
+
+	static func openLMDBEnv(named:String, flags:QuickLMDB.Environment.Flags = [.noTLS, .noSync, .noReadAhead]) -> Result<QuickLMDB.Environment, Error> {
+		do {
+			let homePath = try FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true).appendingPathComponent(named, isDirectory:true)
+			return Self.initializeEnvironment(url: homePath, flags:flags)
 		} catch let error {
 			return .failure(error)
 		}
@@ -40,7 +53,7 @@ struct Topaz:App {
 	
 	init() {
 		do {
-			let localData = Topaz.initializeEnvironment(url:try! FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true), flags:[.noTLS, .noSync, .noReadAhead])
+			let localData = Topaz.openLMDBEnv(named:"topaz-app")
 			switch (localData) {
 			case (.success(let localData)):
 				let appModel = try ApplicationModel(localData, tx:nil)
@@ -60,3 +73,10 @@ struct Topaz:App {
         }
     }
 }
+
+
+/// returns the username that the calling process is running as
+public func getCurrentUser() -> String {
+	return String(validatingUTF8:getpwuid(geteuid()).pointee.pw_name)!
+}
+

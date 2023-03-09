@@ -5,7 +5,7 @@
 //  Created by Tanner Silva on 3/4/23.
 //
 
-import Foundation
+//import Foundation
 import SwiftUI
 import QuickLMDB
 
@@ -88,6 +88,8 @@ class ApplicationModel:ObservableObject {
 	
 	/// the primary store for the application users and their private keys
 	@Published var userStore:UserStore
+	
+	@Published var defaultUE:UE?
 
 	/// the primary store for the user sessions
 	init(_ docEnv:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction? = nil) throws {
@@ -116,7 +118,13 @@ class ApplicationModel:ObservableObject {
 			_isTOSAcknowledged = Published(wrappedValue:false)
 		}
 		self.userStore = try UserStore(docEnv, tx:subTrans)
+		let getUsers = try self.userStore.allUsers(tx:subTrans)
 		try subTrans.commit()
+		if getUsers.isEmpty {
+			_defaultUE = Published(wrappedValue:nil)
+		} else {
+			_defaultUE = Published(wrappedValue:try UE(publicKey:getUsers.randomElement()!, uuid:UUID().uuidString))
+		}
 	}
 	
 	/// installs a user in the application and ensures that the state of the app is updated
@@ -127,6 +135,7 @@ class ApplicationModel:ObservableObject {
 		try self.userStore.addUser(publicKey, privateKey:privateKey, tx:newTrans)
 		try self.app_metadata.setEntry(value:State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
 		try newTrans.commit()
+		_defaultUE = Published(wrappedValue:try UE(publicKey:publicKey))
 	}
 
 
@@ -142,10 +151,6 @@ class ApplicationModel:ObservableObject {
 		} else {
 			
 		}
-	}
-	
-	func defaultUserExperience(tx someTrans:QuickLMDB.Transaction? = nil) -> UE {
-		let newTrans = try Transaction(self.env, readOnly:false, parent:someTrans)
 	}
 }
 
@@ -188,14 +193,13 @@ extension ApplicationModel {
 		}
 
 		/// get all the users in the store
-		func allUsers(tx someTrans:QuickLMDB.Transaction? = nil) throws -> Set<String> {
-			let subTrans = try QuickLMDB.Transaction(env, readOnly:true, parent:someTrans)
-			let userCursor = try userDB.cursor(tx:subTrans)
+		/// - if there are no users, a set of zero items are returned
+		func allUsers(tx someTrans:QuickLMDB.Transaction) throws -> Set<String> {
+			let userCursor = try userDB.cursor(tx:someTrans)
 			var buildPubs = Set<String>()
 			for (curPub, _) in userCursor {
 				buildPubs.update(with:String(curPub)!)
 			}
-			try subTrans.commit()
 			return buildPubs
 		}
 		

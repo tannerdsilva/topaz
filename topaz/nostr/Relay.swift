@@ -5,8 +5,28 @@
 //  Created by Tanner Silva on 3/6/23.
 //
 
-struct Relay {
-	struct PermissionLevel:OptionSet, RawRepresentable {
+struct Relay:Codable {
+	let url:String
+	
+	init(_ url:String) {
+		self.url = url
+	}
+}
+
+extension Relay:Hashable {
+	func hash(into hasher:inout Hasher) {
+		hasher.combine(url)
+	}
+}
+
+extension Relay:Equatable {
+	static func == (lhs:Self, rhs:Self) -> Bool {
+		return lhs.url == rhs.url
+	}
+}
+
+extension Relay {
+	struct PermissionLevel:OptionSet, RawRepresentable, Codable {
 		init(rawValue:UInt8) {
 			self.rawValue = rawValue
 		}
@@ -20,7 +40,7 @@ struct Relay {
 		let payment_required:Bool?
 	}
 	struct Metadata:Codable {
-		let address:String?
+		let relay:Relay
 		let description:String?
 		let pubkey:String?
 		let contact:String?
@@ -29,19 +49,6 @@ struct Relay {
 		let version:String?
 		let limitations:String?
 		let payments_url:String?
-	}
-	let url:String
-	let permissions:PermissionLevel
-}
-
-extension Relay:Hashable {
-	func hash(into hasher:inout Hasher) {
-		hasher.combine(url)
-	}
-}
-
-extension Relay:Equatable {
-	static func == (lhs:Self, rhs:Self) -> Bool {
-		return lhs.url == rhs.url
+		let permissions:PermissionLevel
 	}
 }
