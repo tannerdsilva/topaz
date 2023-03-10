@@ -12,6 +12,10 @@ import Logging
 import SwiftBlake2
 
 class UE:ObservableObject {
+	enum AccessLevel {
+		case readWrite(KeyPair)
+		case readOnly(String)
+	}
 	enum Databases:String {
 		case userSettings = "-usersettings"
 		case userInfo = "-userinfo"
@@ -28,19 +32,12 @@ class UE:ObservableObject {
 	/// primary data for this UE instance
 	let logger:Logger
 	let env:QuickLMDB.Environment
-	let publicKey:String
-	func getPrivateKey() throws -> String? {
-		do {
-			return try self.am.userStore.getUserPrivateKey(pubKey:self.publicKey, tx:nil)!
-		} catch LMDBError.notFound {
-			return nil
-		}
-		
-	}
 	let uuid:String
 
 	enum UserInfo:String, MDB_convertible {
-		case relays = "user_relays" // [Relay] where index 0 is the primary relay
+		case relays = "user_relays" // [Relay]: where index 0 is the primary relay
+		case pubkey = "user_pub"	// String: the public key for this current user
+		case privkey = "user_pk"	// String?: the private key for this current user
 	}
 	let userInfo:Database
 
@@ -55,9 +52,10 @@ class UE:ObservableObject {
 	let eventsDB:UE.EventsDB
 
 	/// stores the primary root view that the user is currently viewing
-	enum ViewMode:UInt8, MDB_convertible {
+	enum ViewMode:Int, MDB_convertible {
+		case devView = -1
 		case timeline = 0
-		case devView = 1
+		case dmView = 1
 	}
 	
 	@Published var viewMode:ViewMode {
@@ -76,7 +74,7 @@ class UE:ObservableObject {
 
 	let profilesDB:QuickLMDB.Database
 
-	init(publicKey:String, uuid:String = UUID().uuidString) throws {
+	init(publicKey:String, privateKey:String?, uuid:String = UUID().uuidString) throws {
 		let makeLogger = Topaz.makeDefaultLogger(label:"user-environment")
 		self.logger = makeLogger
 		let makeEnv = Topaz.openLMDBEnv(named:"topaz-u-\(publicKey.prefix(8))")
@@ -86,6 +84,16 @@ class UE:ObservableObject {
 			let makeSettings = try env.openDatabase(named:Databases.userSettings.rawValue, flags:[.create], tx:newTrans)
 			self.userSettings = makeSettings
 			let makeUserInfo = try env.openDatabase(named:Databases.userInfo.rawValue, flags:[.create], tx:newTrans)
+			// public key always present
+			try makeUserInfo.setEntry(value:publicKey, forKey:UserInfo.pubkey.rawValue, tx:newTrans)
+			// private key may not be present
+			if let privKey = privateKey {
+				try makeUserInfo.setEntry(value:privKey, forKey:UserInfo.privkey.rawValue, tx:newTrans)
+			} else {
+				do {
+					try makeUserInfo.deleteEntry(key:UserInfo.privkey.rawValue, tx:newTrans)
+				} catch LMDBError.notFound {}
+			}
 			self.userInfo = makeUserInfo
 			
 			// initialize the view mode
@@ -101,7 +109,6 @@ class UE:ObservableObject {
 			// initialize the connected relays
 			var buildRelays = [Relay:RelayConnection]()
 			self.connectedRelays = buildRelays
-			self.publicKey = publicKey
 			self.uuid = uuid
 			self.env = env
 			
@@ -165,7 +172,6 @@ class UE:ObservableObject {
 
 extension UE:Hashable {
 	func hash(into hasher: inout Hasher) {
-		hasher.combine(uuid)
 		hasher.combine(publicKey)
 	}
 }
