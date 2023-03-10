@@ -71,10 +71,8 @@ enum ParsedKey:Equatable {
 	}
 }
 
-struct DamusKeychainConfiguration:KeychainConfiguration {
-	var serviceName = "topaz"
-	var accessGroup: String? = nil
-	var accountName = "privkey"
+func abbrev_pubkey(_ pubkey: String, amount: Int = 8) -> String {
+	return pubkey.prefix(amount) + ":" + pubkey.suffix(amount)
 }
 
 func decode_bech32_key(_ key: String) -> Bech32Key? {
@@ -137,45 +135,6 @@ func privkey_to_pubkey(privkey: String) -> String? {
 	return hex_encode(Data(key.publicKey.xonly.bytes))
 }
 
-func save_pubkey(pubkey: String) {
-	UserDefaults.standard.set(pubkey, forKey: "pubkey")
-}
-
-func save_privkey(privkey: String) throws {
-	try Vault.savePrivateKey(privkey, keychainConfiguration: DamusKeychainConfiguration())
-}
-
-func clear_saved_privkey() throws {
-	try Vault.deletePrivateKey(keychainConfiguration: DamusKeychainConfiguration())
-}
-
-func clear_saved_pubkey() {
-	UserDefaults.standard.removeObject(forKey: "pubkey")
-}
-
-func save_keypair(pubkey: String, privkey: String) throws {
-	save_pubkey(pubkey: pubkey)
-	try save_privkey(privkey: privkey)
-}
-
-func clear_keypair() throws {
-	try clear_saved_privkey()
-	clear_saved_pubkey()
-}
-
-func get_saved_keypair() -> KeyPair? {
-	do {
-		try removePrivateKeyFromUserDefaults()
-		
-		return get_saved_pubkey().flatMap { pubkey in
-			let privkey = get_saved_privkey()
-			return KeyPair(pubkey: pubkey, privkey: privkey!)
-		}
-	} catch {
-		return nil
-	}
-}
-
 func hexchar(_ val: UInt8) -> UInt8 {
 	if val < 10 {
 		return 48 + val;
@@ -211,14 +170,6 @@ func random_bytes(count: Int) -> Data {
 	}
 	return Data(bytes: bytes, count: count)
 }
-func get_saved_pubkey() -> String? {
-	return UserDefaults.standard.string(forKey: "pubkey")
-}
-
-func get_saved_privkey() -> String? {
-	let mkey = try? Vault.getPrivateKey(keychainConfiguration: DamusKeychainConfiguration());
-	return mkey.map { $0.trimmingCharacters(in: .whitespaces) }
-}
 
 /**
  Detects whether a string might contain an nsec1 prefixed private key.
@@ -232,10 +183,4 @@ func contentContainsPrivateKey(_ content: String) -> Bool {
 		return (regex.firstMatch(in: content, range: NSRange(location: 0, length: content.count)) != nil)
 	}
 
-}
-
-fileprivate func removePrivateKeyFromUserDefaults() throws {
-	guard let privKey = UserDefaults.standard.string(forKey: "privkey") else { return }
-	try save_privkey(privkey: privKey)
-	UserDefaults.standard.removeObject(forKey: "privkey")
 }

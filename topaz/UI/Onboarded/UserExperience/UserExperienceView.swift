@@ -23,7 +23,7 @@ struct UserExperienceView: View {
 				Spacer()
 				
 				if ue.viewMode == .timeline {
-					Text("TIMELINE")
+					TimelineView(ue:ue)
 				} else {
 					UEDevView(ue:ue)
 				}

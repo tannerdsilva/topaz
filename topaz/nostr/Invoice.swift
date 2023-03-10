@@ -7,6 +7,7 @@
 
 import Foundation
 typealias Invoice = LightningInvoice<Amount>
+typealias ZapInvoice = LightningInvoice<Int64>
 
 enum Amount:Equatable {
 	case any
@@ -23,13 +24,12 @@ enum Amount:Equatable {
 		}
 	}
 }
-
+enum LightningInvoiceDescription {
+	case string(String)
+	case hash(Data)
+}
 struct LightningInvoice<T> {
-	enum Description {
-		case string(String)
-		case hash(Data)
-	} 
-	let description:Description
+	let description:LightningInvoiceDescription
 	let amount:T
 	let string:String
 	let expiry:Date

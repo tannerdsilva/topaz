@@ -130,12 +130,12 @@ class ApplicationModel:ObservableObject {
 	/// installs a user in the application and ensures that the state of the app is updated
 	func installUser(publicKey:String, privateKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
 		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
-		self.objectWillChange.send()
 		_state = Published(wrappedValue:.onboarded)
 		try self.userStore.addUser(publicKey, privateKey:privateKey, tx:newTrans)
 		try self.app_metadata.setEntry(value:State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
 		try newTrans.commit()
 		_defaultUE = Published(wrappedValue:try UE(publicKey:publicKey))
+		self.objectWillChange.send()
 	}
 
 
@@ -188,7 +188,7 @@ extension ApplicationModel {
 		}
 
 		/// get a user's private key
-		func getUserPrivateKey(pubKey:String, tx someTrans:QuickLMDB.Transaction) throws -> String? {
+		func getUserPrivateKey(pubKey:String, tx someTrans:QuickLMDB.Transaction?) throws -> String? {
 			return try userDB.getEntry(type:String.self, forKey:pubKey, tx:someTrans)!
 		}
 

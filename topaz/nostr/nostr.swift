@@ -7,4 +7,5 @@
 
 import Foundation
 
-struct nostr {}
+struct nostr {
+}
