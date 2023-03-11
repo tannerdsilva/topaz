@@ -124,12 +124,12 @@ extension View {
 		}
 	}
 	
-	func event_context_menu(_ event:nostr.Event, keypair:KeyPair, target_pubkey: String, bookmarks: BookmarksManager) -> some View {
-		return self.contextMenu {
-			EventMenuContext(event: event, keypair: keypair, target_pubkey: target_pubkey, bookmarks: bookmarks)
-		}
-
-	}
+//	func event_context_menu(_ event:nostr.Event, keypair:KeyPair, target_pubkey: String, bookmarks: BookmarksManager) -> some View {
+//		return self.contextMenu {
+//			EventMenuContext(event: event, keypair: keypair, target_pubkey: target_pubkey, bookmarks: bookmarks)
+//		}
+//
+//	}
 }
 
 func format_relative_time(_ created_at: Int64) -> String
@@ -180,9 +180,4 @@ struct EventView_Previews: PreviewProvider {
 	}
 }
 
-let test_event =
-		NostrEvent(
-			content: "hello there https://jb55.com/s/Oct12-150217.png https://jb55.com/red-me.jpg cool",
-			pubkey: "pk",
-			createdAt: Int64(Date().timeIntervalSince1970 - 100)
-		)
+let test_event = nostr.Event.createTestPost()

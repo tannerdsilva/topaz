@@ -199,6 +199,21 @@ extension nostr {
 		let created:Date
 		let kind:Kind
 		let content:String
+		
+		static func createTestPost() -> Self {
+			return Self(uid:UUID().uuidString, sig:"", tags:[], boosted_by: nil, pubkey: "foo", created:Date(timeIntervalSinceNow: -300), kind:Kind.text_note, content: "oh jeez look here at all this content wowweee")
+		}
+		
+		fileprivate init(uid:String, sig:String, tags:[Tag], boosted_by:String?, pubkey:String, created:Date, kind:Kind, content:String) {
+			self.uid = uid
+			self.sig = sig
+			self.tags = tags
+			self.boosted_by = boosted_by
+			self.pubkey = pubkey
+			self.created = created
+			self.kind = kind
+			self.content = content
+		}
 
 		init(from decoder:Decoder) throws {
 			let container = try decoder.container(keyedBy: CodingKeys.self)

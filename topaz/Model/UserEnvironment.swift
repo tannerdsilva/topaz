@@ -121,7 +121,6 @@ class UE:ObservableObject {
 			// initialize the profiles database
 			let makeProfilesDB = try env.openDatabase(named:Databases.profile_core.rawValue, flags:[.create], tx:newTrans)
 			self.profilesDB = makeProfilesDB
-			self.am = app
 			self.keypair = keypair
 			
 			// connect to all the relays

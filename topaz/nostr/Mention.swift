@@ -193,7 +193,7 @@ func convert_invoice_block(_ b: invoice_block) -> nostr.Event.Block? {
 	let created_at = b11.timestamp
 	
 	tal_free(b.bolt11)
-	return .invoice(Invoice(description: description, amount: amount, string: invstr, expiry: Date(timeIntervalSince1970:TimeInterval(b11.expiry), payment_hash: payment_hash, created_on:created_at)))
+	return .invoice(Invoice(description: description, amount: amount, string: invstr, expiry: Date(timeIntervalSince1970:TimeInterval(b11.expiry)), payment_hash: payment_hash, created_on:created_at))
 }
 
 func convert_invoice_description(b11: bolt11) -> LightningInvoiceDescription? {
@@ -408,7 +408,7 @@ func parse_mention(_ p: Parser, tags: [[String]]) -> nostr.Mention? {
 	default: return nil
 	}
 	
-	guard let ref = tag_to_refid(tags[ind]) else {
+	guard let ref = try? nostr.Event.Tag(tags[ind]).toReference() else {
 		return nil
 	}
 	

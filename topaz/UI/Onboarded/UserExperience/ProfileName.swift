@@ -54,7 +54,8 @@ struct ProfileName: View {
 	}
 	
 	var friend_icon: String? {
-		return get_friend_icon(contacts: damus_state.contacts, pubkey: pubkey, show_confirmed: show_friend_confirmed)
+//		return get_friend_icon(contacts: damus_state.contacts, pubkey: pubkey, show_confirmed: show_friend_confirmed)
+		return nil
 	}
 	
 	var current_nip05: NIP05? {

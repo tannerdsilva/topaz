@@ -28,7 +28,7 @@ struct TextEvent: View {
 	
 	var body: some View {
 		HStack(alignment: .top) {
-			let profile = ue.lookup(id: pubkey)
+			let profile = ue.lookup(id:pubkey)
 		
 			let is_anon = event_is_anonymous(ev: event)
 			VStack {
@@ -40,7 +40,7 @@ struct TextEvent: View {
 			VStack(alignment: .leading) {
 				HStack(alignment: .center) {
 					let pk = is_anon ? "anon" : pubkey
-					EventProfileName(pubkey: pk, profile: profile, ue:ue, show_friend_confirmed: true, size: .normal)
+					EventProfileName(pubkey: pk, profile:profile, ue:ue, show_friend_confirmed: true, size: .normal)
 					
 					Text(verbatim: "\(format_relative_time(event.created_at))")
 						.foregroundColor(.gray)
@@ -50,7 +50,7 @@ struct TextEvent: View {
 				
 				EventBody(ue:ue, event: event, size: .normal)
 				
-				if let mention = first_eref_mention(ev: event, privkey: damus.keypair.privkey) {
+				if let mention = first_eref_mention(ev: event, privkey:ue.keypair.privkey) {
 					Text("Builder event view?")
 //					BuilderEventView(ue:ue, event_id: mention.ref.id)
 				}
@@ -58,24 +58,27 @@ struct TextEvent: View {
 				if has_action_bar {
 					Rectangle().frame(height: 2).opacity(0)
 					
-					EventActionBar(damus_state: damus, event: event)
-						.padding([.top], 4)
+					Text("Event Action Bar?")
+//					EventActionBar(ue:ue, event: event)
+//						.padding([.top], 4)
 				}
 			}
 			.padding([.leading], 2)
 		}
 		.contentShape(Rectangle())
-		.background(event_validity_color(event.validity))
+		.background(event_validity_color(event.validate()))
 		.id(event.id)
 		.frame(maxWidth: .infinity, minHeight: PFP_SIZE)
 		.padding([.bottom], 2)
-		.event_context_menu(event, keypair: damus.keypair, target_pubkey: pubkey, bookmarks: damus.bookmarks)
+//		.event_context_menu(event, keypair:ue.keypair, target_pubkey: pubkey, bookmarks: damus.bookmarks)
+		
+		Text("event context menu?")
 	}
 }
 
 struct TextEvent_Previews: PreviewProvider {
 	static var previews: some View {
-		TextEvent(damus: test_damus_state(), event: test_event, pubkey: "pk", options: [])
+		TextEvent(ue:try! UE(keypair:Topaz.tester_account), event:test_event, pubkey:"pk", options: [])
 	}
 }
 

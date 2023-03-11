@@ -13,7 +13,7 @@ struct UEDevView: View {
     var body: some View {
 		VStack {
 			Text("DEV VIEW").dynamicTypeSize(.xxxLarge)
-			Text(ue.publicKey)
+			Text(ue.keypair.pubkey)
 		}
 		
     }
@@ -21,6 +21,6 @@ struct UEDevView: View {
 
 struct UEDevView_Previews: PreviewProvider {
     static var previews: some View {
-		UEDevView(ue:try! UE(publicKey: "foo"))
+		UEDevView(ue:try! UE(keypair:Topaz.tester_account))
     }
 }

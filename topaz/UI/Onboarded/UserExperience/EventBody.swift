@@ -21,7 +21,7 @@ struct EventBody:View {
 	}
 	
 	var content: String {
-		event.getContent(ue.privkey)
+		event.getContent(privkey:ue.privkey)
 	}
 	
 	var body: some View {

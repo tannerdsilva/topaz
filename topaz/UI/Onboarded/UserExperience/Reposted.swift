@@ -28,6 +28,6 @@ struct Reposted: View {
 
 struct Reposted_Previews: PreviewProvider {
 	static var previews: some View {
-		Reposted(ue:try! UE(publicKey: "foo"), pubkey:"foo", profile:nostr.Profile.makeTestProfile())
+		Reposted(ue:try! UE(keypair:Topaz.tester_account), pubkey:"foo", profile:nostr.Profile.makeTestProfile())
 	}
 }
