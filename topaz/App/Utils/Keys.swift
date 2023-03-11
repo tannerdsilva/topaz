@@ -7,16 +7,21 @@
 
 import Foundation
 import secp256k1
-import Vault
 import Ctopaz
 
 let PUBKEY_HRP = "npub"
 let PRIVKEY_HRP = "nsec"
 
 struct KeyPair {
+	enum Error:Swift.Error {
+		case invalidError
+	}
 	let pubkey:String
 	let privkey:String
 	
+	init(nsec:String) throws {
+		
+	}
 	func pubkey_bech32() -> String {
 		return bech32_pubkey(pubkey)!
 	}

@@ -8,12 +8,12 @@
 import Foundation
 import Ctopaz
 
-public struct NoteZapTarget: Equatable {
-	public let note_id: String
-	public let author: String
+struct NoteZapTarget:Equatable, Codable, Hashable {
+	let note_id: String
+	let author: String
 }
 
-struct Zap {
+struct Zap:Codable {
 	enum Kind {
 		case pub
 		case anon
@@ -21,36 +21,10 @@ struct Zap {
 		case non_zap
 	}
 
-	public struct Request:Equatable {
+	struct Request:Equatable, Codable, Hashable {
 		let ev:nostr.Event
 	}
 	
-	public enum Target:Equatable {
-		case profile(String)
-		case note(NoteZapTarget)
-		
-		public static func note(id: String, author: String) -> Target {
-			return .note(NoteZapTarget(note_id: id, author: author))
-		}
-		
-		var pubkey: String {
-			switch self {
-			case .profile(let pk):
-				return pk
-			case .note(let note_target):
-				return note_target.author
-			}
-		}
-		
-		var id: String {
-			switch self {
-			case .note(let note_target):
-				return note_target.note_id
-			case .profile(let pk):
-				return pk
-			}
-		}
-	}
 	public let event:nostr.Event
 	public let invoice:LightningInvoice<Int64>
 	public let zapper:String /// zap authorizer
@@ -91,7 +65,11 @@ struct Zap {
 			return nil
 		}
 		
-		guard zap_req.validate() == .ok else {
+		do {
+			guard try zap_req.validate() == .ok else {
+				return nil
+			}
+		} catch {
 			return nil
 		}
 		
@@ -106,6 +84,76 @@ struct Zap {
 		let is_anon = private_request == nil && event_is_anonymous(ev: zap_req)
 		
 		return Zap(event: zap_ev, invoice: zap_invoice, zapper: zapper, target: target, request: Zap.Request(ev:zap_req), is_anon: is_anon, private_request: private_request)
+	}
+}
+
+extension Zap {
+	public enum Target:Equatable, Codable, Hashable {
+		enum Error:Swift.Error {
+			case unknownTargetType(Int)
+		}
+		case profile(String)
+		case note(NoteZapTarget)
+		
+		public static func note(id: String, author: String) -> Target {
+			return .note(NoteZapTarget(note_id: id, author: author))
+		}
+		
+		var pubkey: String {
+			switch self {
+			case .profile(let pk):
+				return pk
+			case .note(let note_target):
+				return note_target.author
+			}
+		}
+		
+		var id: String {
+			switch self {
+			case .note(let note_target):
+				return note_target.note_id
+			case .profile(let pk):
+				return pk
+			}
+		}
+
+		init(from decoder:Decoder) throws {
+			var container = try decoder.unkeyedContainer()
+			let type = try container.decode(Int.self)
+			switch type {
+				case 0: // profile
+					let profile_target = try container.decode(String.self)
+					self = .profile(profile_target)
+				case 1: // note
+					let note_target = try container.decode(NoteZapTarget.self)
+					self = .note(note_target)
+			default:
+				throw Error.unknownTargetType(type)
+			}
+		}
+
+		func encode(to encoder:Encoder) throws {
+			var container = encoder.unkeyedContainer()
+			switch self {
+				case .profile(let profile_target):
+					try container.encode(0)
+					try container.encode(profile_target)
+				case .note(let note_target):
+					try container.encode(1)
+					try container.encode(note_target)
+			}
+		}
+		
+		public func hash(into hasher: inout Hasher) {
+			switch self {
+			case .note(let noteInfo):
+				hasher.combine(1)
+				hasher.combine(noteInfo)
+			case .profile(let profInfo):
+				hasher.combine(0)
+				hasher.combine(profInfo)
+			}
+		}
 	}
 }
 

@@ -7,12 +7,6 @@
 
 import Foundation
 
-struct ReferenceID:Codable {
-	let ref_id:String
-	let relay_id:String
-	let key:String
-}
-
 extension ReferenceID:Hashable {
 	public func hash(into hasher:inout Hasher) {
 		hasher.combine(ref_id)

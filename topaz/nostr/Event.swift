@@ -13,6 +13,11 @@ import secp256k1_implementation
 import CryptoKit
 
 extension nostr {
+	enum EncEncoding {
+		case base64
+		case bech32
+	}
+
 	/// a reference to another event
 	struct Reference:Hashable, Equatable, Identifiable {
 		let ref_id:String
@@ -21,6 +26,14 @@ extension nostr {
 
 		var id:String {
 			return ref_id
+		}
+		
+		func toTag() throws -> Event.Tag {
+			var tag = [key, ref_id]
+			if let rid = relay_id {
+				tag.append(rid)
+			}
+			return try Event.Tag(tag)
 		}
 	}
 	
@@ -59,9 +72,13 @@ extension nostr {
 			case list = 40000
 			case zap = 9735
 			case zap_request = 9734
+			case private_zap = 9733 // I think?
 		}
 
 		struct Tag:Codable {
+			enum Error:Swift.Error {
+				case unknownTagKind
+			}
 			static let logger = Topaz.makeDefaultLogger(label:"nostr.Event.Tag")
 
 			enum Kind:String, Codable {
@@ -76,6 +93,14 @@ extension nostr {
 			
 			var count:Int {
 				return info.count + 1
+			}
+			
+			init(_ array:[String]) throws {
+				guard let makeKind = Kind(rawValue:array[0]) else {
+					throw Error.unknownTagKind
+				}
+				self.kind = makeKind
+				self.info = Array(array[array.startIndex.advanced(by: 1)..<array.count])
 			}
 
 			init(from decoder: Decoder) throws {
@@ -113,6 +138,21 @@ extension nostr {
 						return info[index-1]
 					}
 				}
+			}
+			
+			func toArray() -> [String] {
+				var buildArray = [kind.rawValue]
+				buildArray.append(contentsOf:info)
+				return buildArray
+			}
+			
+			func toReference() -> Reference {
+				var relay_id:String? = nil
+				if info.count > 2 {
+					relay_id = info[2]
+				}
+
+				return Reference(ref_id:info[1], relay_id:relay_id, key:self.kind.rawValue)
 			}
 		}
 
@@ -161,6 +201,7 @@ extension nostr {
 			try container.encode(kind.rawValue, forKey: .kind)
 			try container.encode(content, forKey: .content)
 		}
+		
 		func getReferencedIDs(_ key:String = "e") -> [Reference] {
 			return tags.reduce(into: []) { (acc, tag) in
 				if tag.count >= 2 && tag.kind.rawValue == key {
@@ -172,12 +213,13 @@ extension nostr {
 				}
 			}
 		}
-		var decrypted_content: String? = nil
-		func decrypted(privkey: String?) -> String? {
-			if let decrypted_content = decrypted_content {
-				return decrypted_content
+		func getContent(_ privkey:String?) -> String {
+			if self.kind == .dm {
+				return decrypted(privkey: privkey) ?? "*failed to decrypt content*"
 			}
-
+			return content
+		}
+		func decrypted(privkey: String?) -> String? {
 			guard let key = privkey else {
 				return nil
 			}
@@ -197,8 +239,6 @@ extension nostr {
 			}
 
 			let dec = decrypt_dm(key, pubkey: pubkey, content: self.content, encoding: .base64)
-			self.decrypted_content = dec
-
 			return dec
 		}
 
@@ -224,6 +264,7 @@ extension nostr.Event:Identifiable {
 }
 
 extension nostr.Event {
+	/// The result of validating an event.
 	func commitment() throws -> Data {
 		let encoder = JSONEncoder()
 		let tagsString = String(data:try encoder.encode(self.tags), encoding:.utf8)!
@@ -263,10 +304,44 @@ extension nostr.Event {
 		}
 		return nil
 	}
+	func lastEventTag() -> String? {
+		for tag in tags.reversed() {
+			if tag.kind == .event {
+				return tag.info[0]
+			}
+		}
+		return nil
+	}
+	func innerEvent() -> nostr.Event? {
+		if self.kind == .boost {
+			let jsonData = Data(self.content.utf8)
+			return try? JSONDecoder().decode(nostr.Event.self, from:jsonData)
+		}
+		return nil
+	}
+	func innterEventOrSelf() -> nostr.Event {
+		guard let inner_ev = innerEvent() else {
+			return self
+		}
+		return inner_ev
+	}
+	func firstErefMention(privkey:String?) -> nostr.Mention? {
+		return first_eref_mention(ev:self, privkey:privkey)
+	}
+	func blocks(_ privkey:String?) -> [Block] {
+		return parse_mentions(content:content, tags:self.tags)
+	}
+	
+	func getContent(privkey:String?) -> String {
+		if kind == .dm {
+			return decrypted(privkey:privkey) ?? "*failed*"
+		}
+		return content
+	}
 }
 
 extension KeyPair {
-	func getSharedSecret() throws -> [UInt8]? {
+	static func getSharedSecret(pubkey:String, privkey:String) throws -> [UInt8]? {
 		let privkey_bytes = try privkey.bytes
 		var pk_bytes = try pubkey.bytes
 		pk_bytes.insert(2, at: 0)
@@ -302,6 +377,30 @@ extension KeyPair {
 	}
 }
 
+func decrypt_dm(_ privkey: String?, pubkey: String, content:String, encoding:nostr.EncEncoding) -> String? {
+	guard let privkey = privkey else {
+		return nil
+	}
+	guard let shared_sec = try? KeyPair.getSharedSecret(pubkey:pubkey, privkey: privkey) else {
+		return nil
+	}
+	guard let dat = (encoding == .base64 ? decode_dm_base64(content) : decode_dm_bech32(content)) else {
+		return nil
+	}
+	guard let dat = aes_decrypt(data: dat.content, iv: dat.iv, shared_sec: shared_sec) else {
+		return nil
+	}
+	return String(data: dat, encoding: .utf8)
+}
+
+func decrypt_note(our_privkey: String, their_pubkey: String, enc_note: String, encoding: nostr.EncEncoding) -> nostr.Event? {
+	guard let dec = decrypt_dm(our_privkey, pubkey:their_pubkey, content: enc_note, encoding: encoding) else {
+		return nil
+	}
+	
+	return decode_nostr_event_json(json: dec)
+}
+
 func decrypt_private_zap(our_privkey: String, zapreq:nostr.Event, target:Zap.Target) -> nostr.Event? {
 	guard let anon_tag = zapreq.tags.first(where: { t in t.count >= 2 && t[0] == "anon" }) else {
 		return nil
@@ -313,7 +412,7 @@ func decrypt_private_zap(our_privkey: String, zapreq:nostr.Event, target:Zap.Tar
 	
 	// check to see if the private note was from us
 	if note == nil {
-		guard let our_private_keypair = generate_private_keypair(our_privkey: our_privkey, id: target.id, created_at: zapreq.created_at) else{
+		guard let our_private_keypair = generate_private_keypair(our_privkey: our_privkey, id: target.id, created_at: Int64(zapreq.created.timeIntervalSince1970)) else{
 			return nil
 		}
 		// use our private keypair and their pubkey to get the shared secret
@@ -323,29 +422,32 @@ func decrypt_private_zap(our_privkey: String, zapreq:nostr.Event, target:Zap.Tar
 	guard let note else {
 		return nil
 	}
-		
-	guard note.kind == 9733 else {
+	
+	guard note.kind == .private_zap else {
 		return nil
 	}
 	
-	let zr_etag = zapreq.referenced_ids.first
-	let note_etag = note.referenced_ids.first
+	let zr_etag = zapreq.getReferencedIDs("e").first
+	let note_etag = note.getReferencedIDs("e").first
 	
 	guard zr_etag == note_etag else {
 		return nil
 	}
 	
-	let zr_ptag = zapreq.referenced_pubkeys.first
-	let note_ptag = note.referenced_pubkeys.first
+	let zr_ptag = zapreq.getReferencedIDs("p").first
+	let note_ptag = note.getReferencedIDs("p").first
 	
 	guard let zr_ptag, let note_ptag, zr_ptag == note_ptag else {
 		return nil
 	}
 	
-	guard validate_event(ev: note) == .ok else {
+	do {
+		guard try zapreq.validate() == .ok else {
+			return nil
+		}
+	} catch {
 		return nil
 	}
-	
 	return note
 }
 
@@ -366,7 +468,7 @@ func encode_json<T: Encodable>(_ val: T) -> String? {
 	return (try? encoder.encode(val)).map { String(decoding: $0, as: UTF8.self) }
 }
 
-func decode_nostr_event_json(json: String) -> NostrEvent? {
+func decode_nostr_event_json(json: String) -> nostr.Event? {
 	return decode_json(json)
 }
 
@@ -383,4 +485,167 @@ func decode_data<T: Decodable>(_ data: Data) -> T? {
 	}
 
 	return nil
+}
+
+struct DirectMessageBase64 {
+	let content: [UInt8]
+	let iv: [UInt8]
+}
+
+func encode_dm_bech32(content: [UInt8], iv: [UInt8]) -> String {
+	let content_bech32 = bech32_encode(hrp: "pzap", content)
+	let iv_bech32 = bech32_encode(hrp: "iv", iv)
+	return content_bech32 + "_" + iv_bech32
+}
+
+func decode_dm_bech32(_ all: String) -> DirectMessageBase64? {
+	let parts = all.split(separator: "_")
+	guard parts.count == 2 else {
+		return nil
+	}
+	
+	let content_bech32 = String(parts[0])
+	let iv_bech32 = String(parts[1])
+	
+	guard let content_tup = try? bech32_decode(content_bech32) else {
+		return nil
+	}
+	guard let iv_tup = try? bech32_decode(iv_bech32) else {
+		return nil
+	}
+	guard content_tup.hrp == "pzap" else {
+		return nil
+	}
+	guard iv_tup.hrp == "iv" else {
+		return nil
+	}
+	
+	return DirectMessageBase64(content: content_tup.data.bytes, iv: iv_tup.data.bytes)
+}
+
+func encode_dm_base64(content: [UInt8], iv: [UInt8]) -> String {
+	let content_b64 = base64_encode(content)
+	let iv_b64 = base64_encode(iv)
+	return content_b64 + "?iv=" + iv_b64
+}
+
+func decode_dm_base64(_ all: String) -> DirectMessageBase64? {
+	let splits = Array(all.split(separator: "?"))
+
+	if splits.count != 2 {
+		return nil
+	}
+
+	guard let content = base64_decode(String(splits[0])) else {
+		return nil
+	}
+
+	var sec = String(splits[1])
+	if !sec.hasPrefix("iv=") {
+		return nil
+	}
+
+	sec = String(sec.dropFirst(3))
+	guard let iv = base64_decode(sec) else {
+		return nil
+	}
+
+	return DirectMessageBase64(content: content, iv: iv)
+}
+
+func base64_encode(_ content: [UInt8]) -> String {
+	return Data(content).base64EncodedString()
+}
+
+func base64_decode(_ content: String) -> [UInt8]? {
+	guard let dat = Data(base64Encoded: content) else {
+		return nil
+	}
+	return dat.bytes
+}
+
+func aes_decrypt(data: [UInt8], iv: [UInt8], shared_sec: [UInt8]) -> Data? {
+	return aes_operation(operation: CCOperation(kCCDecrypt), data: data, iv: iv, shared_sec: shared_sec)
+}
+
+func aes_encrypt(data: [UInt8], iv: [UInt8], shared_sec: [UInt8]) -> Data? {
+	return aes_operation(operation: CCOperation(kCCEncrypt), data: data, iv: iv, shared_sec: shared_sec)
+}
+
+func aes_operation(operation: CCOperation, data: [UInt8], iv: [UInt8], shared_sec: [UInt8]) -> Data? {
+	let data_len = data.count
+	let bsize = kCCBlockSizeAES128
+	let len = Int(data_len) + bsize
+	var decrypted_data = [UInt8](repeating: 0, count: len)
+
+	let key_length = size_t(kCCKeySizeAES256)
+	if shared_sec.count != key_length {
+		assert(false, "unexpected shared_sec len: \(shared_sec.count) != 32")
+		return nil
+	}
+
+	let algorithm: CCAlgorithm = UInt32(kCCAlgorithmAES128)
+	let options:   CCOptions   = UInt32(kCCOptionPKCS7Padding)
+
+	var num_bytes_decrypted :size_t = 0
+
+	let status = CCCrypt(operation,  /*op:*/
+						 algorithm,  /*alg:*/
+						 options,    /*options:*/
+						 shared_sec, /*key:*/
+						 key_length, /*keyLength:*/
+						 iv,         /*iv:*/
+						 data,       /*dataIn:*/
+						 data_len, /*dataInLength:*/
+						 &decrypted_data,/*dataOut:*/
+						 len,/*dataOutAvailable:*/
+						 &num_bytes_decrypted/*dataOutMoved:*/
+	)
+
+	if UInt32(status) != UInt32(kCCSuccess) {
+		return nil
+	}
+
+	return Data(bytes: decrypted_data, count: num_bytes_decrypted)
+
+}
+
+
+func first_eref_mention(ev:nostr.Event, privkey: String?) -> nostr.Mention? {
+	let blocks = ev.blocks(privkey).filter { block in
+		guard case .mention(let mention) = block else {
+			return false
+		}
+		
+		guard case .event = mention.type else {
+			return false
+		}
+		
+		if mention.ref.key != "e" {
+			return false
+		}
+		
+		return true
+	}
+	
+	/// MARK: - Preview
+	if let firstBlock = blocks.first, case .mention(let mention) = firstBlock, mention.ref.key == "e" {
+		return mention
+	}
+	
+	return nil
+}
+
+func generate_private_keypair(our_privkey: String, id: String, created_at: Int64) -> KeyPair? {
+	let to_hash = our_privkey + id + String(created_at)
+	guard let dat = to_hash.data(using: .utf8) else {
+		return nil
+	}
+	let privkey_bytes = sha256(dat)
+	let privkey = hex_encode(privkey_bytes)
+	guard let pubkey = privkey_to_pubkey(privkey: privkey) else {
+		return nil
+	}
+	
+	return KeyPair(pubkey: pubkey, privkey: privkey)
 }

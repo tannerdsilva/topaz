@@ -15,6 +15,7 @@ struct Topaz:App {
 	public static let bootstrap_relays = [
 		Relay("wss://relay.damus.io")
 	]
+	public static let testerKeypair = 
 	public static func makeDefaultLogger(label:String) -> Logger {
 		var logger = Logger(label:label)
 		#if DEBUG

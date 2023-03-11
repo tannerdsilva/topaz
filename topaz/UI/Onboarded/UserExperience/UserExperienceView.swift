@@ -15,7 +15,7 @@ struct UserExperienceView: View {
 			VStack {
 				VStack {
 					// Title Bar
-					Text(ue.publicKey)
+					Text(ue.uuid)
 						.fontWeight(.bold)
 						.padding(.top)
 				}.frame(height: 44).background(.green)

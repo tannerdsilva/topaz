@@ -9,7 +9,7 @@ extension nostr {
 		}
 		let index:Int
 		let type:Kind
-		let ref:ReferenceID
+		let ref:nostr.Reference
 	}
 }
 
@@ -36,7 +36,7 @@ func parse_textblock(str: String, from: Int, to: Int) -> nostr.Event.Block {
 	return .text(String(substring(str, start: from, end: to)))
 }
 
-func parse_mentions(content: String, tags: [[String]]) -> [nostr.Event.Block] {
+func parse_mentions(content: String, tags: [nostr.Event.Tag]) -> [nostr.Event.Block] {
 	var out = [nostr.Event.Block]()
 	var bs = blocks()
 	bs.num_blocks = 0;
@@ -53,7 +53,7 @@ func parse_mentions(content: String, tags: [[String]]) -> [nostr.Event.Block] {
 	while (i < bs.num_blocks) {
 		let block = bs.blocks[i]
 		
-		if let converted = convert_block(block, tags: tags) {
+		if let converted = convert_block(block, tags: tags.compactMap({ $0.toArray() })) {
 			out.append(converted)
 		}
 		
@@ -208,7 +208,7 @@ func convert_invoice_description(b11: bolt11) -> InvoiceDescription? {
 	return nil
 }
 
-func convert_mention_block(ind: Int32, tags: [[String]]) -> Block?
+func convert_mention_block(ind: Int32, tags: [[String]]) -> nostr.Event.Block?
 {
 	let ind = Int(ind)
 	
@@ -225,12 +225,12 @@ func convert_mention_block(ind: Int32, tags: [[String]]) -> Block?
 		return .text("#[\(ind)]")
 	}
 	
-	return .mention(Mention(index: ind, type: mention_type, ref: ref))
+	return .mention(nostr.Mention(index: ind, type: mention_type, ref: ref))
 }
 
-func parse_mentions_old(content: String, tags: [[String]]) -> [Block] {
+func parse_mentions_old(content: String, tags: [[String]]) -> [nostr.Event.Block] {
 	let p = Parser(pos: 0, str: content)
-	var blocks: [Block] = []
+	var blocks: [nostr.Event.Block] = []
 	var starting_from: Int = 0
 	
 	while p.pos < content.count {
@@ -371,7 +371,7 @@ func parse_hashtag(_ p: Parser) -> String? {
 	return str
 }
 
-func parse_mention(_ p: Parser, tags: [[String]]) -> Mention? {
+func parse_mention(_ p: Parser, tags: [[String]]) -> nostr.Mention? {
 	let start = p.pos
 	
 	if !parse_str(p, "#[") {
@@ -394,7 +394,7 @@ func parse_mention(_ p: Parser, tags: [[String]]) -> Mention? {
 		return nil
 	}
 	
-	var kind: MentionType = .pubkey
+	var kind:nostr.Mention.Kind = .pubkey
 	if ind > tags.count - 1 {
 		return nil
 	}
@@ -409,11 +409,11 @@ func parse_mention(_ p: Parser, tags: [[String]]) -> Mention? {
 	default: return nil
 	}
 	
-	guard let ref = tag_to_refid(tags[ind]) else {
+	guard let ref = tags[ind].toReference() else {
 		return nil
 	}
 	
-	return Mention(index: ind, type: kind, ref: ref)
+	return nostr.Mention(index: ind, type: kind, ref: ref)
 }
 
 func find_tag_ref(type: String, id: String, tags: [[String]]) -> Int? {
@@ -431,11 +431,11 @@ func find_tag_ref(type: String, id: String, tags: [[String]]) -> Int? {
 }
 
 struct PostTags {
-	let blocks: [Block]
+	let blocks: [nostr.Event.Block]
 	let tags: [[String]]
 }
 
-func parse_mention_type(_ c: String) -> MentionType? {
+func parse_mention_type(_ c: String) -> nostr.Mention.Kind? {
 	if c == "e" {
 		return .event
 	} else if c == "p" {
@@ -448,7 +448,7 @@ func parse_mention_type(_ c: String) -> MentionType? {
 /// Convert
 func make_post_tags(post_blocks: [PostBlock], tags: [[String]]) -> PostTags {
 	var new_tags = tags
-	var blocks: [Block] = []
+	var blocks: [nostr.Event.Block] = []
 	
 	for post_block in post_blocks {
 		switch post_block {
@@ -457,35 +457,23 @@ func make_post_tags(post_blocks: [PostBlock], tags: [[String]]) -> PostTags {
 				continue
 			}
 			if let ind = find_tag_ref(type: ref.key, id: ref.ref_id, tags: tags) {
-				let mention = Mention(index: ind, type: mention_type, ref: ref)
-				let block = Block.mention(mention)
+				let mention = nostr.Mention(index: ind, type: mention_type, ref: ref)
+				let block = nostr.Event.Block.mention(mention)
 				blocks.append(block)
 			} else {
 				let ind = new_tags.count
-				new_tags.append(refid_to_tag(ref))
-				let mention = Mention(index: ind, type: mention_type, ref: ref)
-				let block = Block.mention(mention)
+				new_tags.append(try! ref.toTag().toArray())
+				let mention = nostr.Mention(index: ind, type: mention_type, ref: ref)
+				let block = nostr.Event.Block.mention(mention)
 				blocks.append(block)
 			}
 		case .hashtag(let hashtag):
 			new_tags.append(["t", hashtag.lowercased()])
 			blocks.append(.hashtag(hashtag))
 		case .text(let txt):
-			blocks.append(Block.text(txt))
+			blocks.append(nostr.Event.Block.text(txt))
 		}
 	}
 	
 	return PostTags(blocks: blocks, tags: new_tags)
 }
-
-func post_to_event(post: NostrPost, privkey: String, pubkey: String) -> NostrEvent {
-	let tags = post.references.map(refid_to_tag)
-	let post_blocks = parse_post_blocks(content: post.content)
-	let post_tags = make_post_tags(post_blocks: post_blocks, tags: tags)
-	let content = render_blocks(blocks: post_tags.blocks)
-	let new_ev = NostrEvent(content: content, pubkey: pubkey, kind: post.kind.rawValue, tags: post_tags.tags)
-	new_ev.calculate_id()
-	new_ev.sign(privkey: privkey)
-	return new_ev
-}
-

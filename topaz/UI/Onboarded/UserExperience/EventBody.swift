@@ -21,7 +21,7 @@ struct EventBody:View {
 	}
 	
 	var content: String {
-		event.get_content(damus_state.keypair.privkey)
+		event.getContent(ue.privkey)
 	}
 	
 	var body: some View {

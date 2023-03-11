@@ -14,7 +14,7 @@ struct Reposted: View {
 	
 	var body: some View {
 		HStack(alignment: .center) {
-			Image(systemName: "arrow.2.squarepath")
+			Image(systemName:"arrow.2.squarepath")
 				.font(.footnote)
 				.foregroundColor(Color.gray)
 			ProfileName(pubkey: pubkey, profile: profile, ue:ue, show_friend_confirmed: true, show_nip5_domain: false)

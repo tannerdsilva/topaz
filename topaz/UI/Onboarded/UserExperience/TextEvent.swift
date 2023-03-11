@@ -51,7 +51,8 @@ struct TextEvent: View {
 				EventBody(ue:ue, event: event, size: .normal)
 				
 				if let mention = first_eref_mention(ev: event, privkey: damus.keypair.privkey) {
-					BuilderEventView(damus: damus, event_id: mention.ref.id)
+					Text("Builder event view?")
+//					BuilderEventView(ue:ue, event_id: mention.ref.id)
 				}
 				
 				if has_action_bar {
