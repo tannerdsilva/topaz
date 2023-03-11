@@ -123,7 +123,8 @@ class ApplicationModel:ObservableObject {
 		if getUsers.isEmpty {
 			_defaultUE = Published(wrappedValue:nil)
 		} else {
-			_defaultUE = Published(wrappedValue:try UE(publicKey:getUsers.randomElement()!, uuid:UUID().uuidString))
+			let getKeypair = try self.userStore.keypair(pubkey:getUsers.randomElement()!, tx:subTrans)
+			_defaultUE = Published(wrappedValue:try UE(keypair:getKeypair))
 		}
 	}
 	
@@ -134,7 +135,7 @@ class ApplicationModel:ObservableObject {
 		try self.userStore.addUser(publicKey, privateKey:privateKey, tx:newTrans)
 		try self.app_metadata.setEntry(value:State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
 		try newTrans.commit()
-		_defaultUE = Published(wrappedValue:try UE(publicKey:publicKey))
+		_defaultUE = Published(wrappedValue:try UE(keypair:KeyPair(pubkey:publicKey, privkey:privateKey)))
 		self.objectWillChange.send()
 	}
 
@@ -190,6 +191,11 @@ extension ApplicationModel {
 		/// get a user's private key
 		func getUserPrivateKey(pubKey:String, tx someTrans:QuickLMDB.Transaction?) throws -> String? {
 			return try userDB.getEntry(type:String.self, forKey:pubKey, tx:someTrans)!
+		}
+		
+		func keypair(pubkey:String, tx someTrans:QuickLMDB.Transaction?) throws -> KeyPair {
+			let privKey = try self.userDB.getEntry(type:String.self, forKey:pubkey, tx:someTrans)!
+			return KeyPair(pubkey:pubkey, privkey:privKey)
 		}
 
 		/// get all the users in the store

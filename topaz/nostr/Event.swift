@@ -23,7 +23,30 @@ extension nostr {
 		let ref_id:String
 		let relay_id:String?
 		let key:String
+		
+		init(ref_id:String, relay_id:String?, key:String) {
+			self.ref_id = ref_id
+			self.relay_id = relay_id
+			self.key = key
+		}
+		
+		init?(_ arr:[String]) {
+			if arr.count == 0 {
+				return nil
+			}
+			if arr.count == 1 {
+				return nil
+			}
 
+			var relay_id: String? = nil
+			if arr.count > 2 {
+				relay_id = arr[2]
+			}
+			self.ref_id = arr[1]
+			self.relay_id = relay_id
+			self.key = arr[0]
+		}
+		
 		var id:String {
 			return ref_id
 		}

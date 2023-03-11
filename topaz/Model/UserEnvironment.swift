@@ -22,8 +22,6 @@ class UE:ObservableObject {
 		case events_core = "-events-core"
 		case profile_core = "-profile-core"
 	}
-
-	fileprivate let am:ApplicationModel
 	
 	// for data serialization
 	let encoder = JSONEncoder()
@@ -75,7 +73,7 @@ class UE:ObservableObject {
 
 	let profilesDB:QuickLMDB.Database
 
-	init(_ app:ApplicationModel, keypair:KeyPair, uuid:String = UUID().uuidString) throws {
+	init(keypair:KeyPair, uuid:String = UUID().uuidString) throws {
 		let makeLogger = Topaz.makeDefaultLogger(label:"user-environment")
 		self.logger = makeLogger
 		let makeEnv = Topaz.openLMDBEnv(named:"topaz-u-\(keypair.pubkey.prefix(8))")

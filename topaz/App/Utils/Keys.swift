@@ -14,14 +14,27 @@ let PRIVKEY_HRP = "nsec"
 
 struct KeyPair {
 	enum Error:Swift.Error {
-		case invalidError
+		case invalidPrivateKey
 	}
+	
 	let pubkey:String
 	let privkey:String
 	
-	init(nsec:String) throws {
-		
+	static func from(nsec:String) throws -> KeyPair {
+		guard case let .sec(pk) = decode_bech32_key(nsec) else {
+			throw Error.invalidPrivateKey
+		}
+		guard let pubKey = privkey_to_pubkey(privkey:pk) else {
+			throw Error.invalidPrivateKey
+		}
+		return KeyPair(pubkey:pubKey, privkey:pk)
 	}
+	
+	init(pubkey:String, privkey:String) {
+		self.pubkey = pubkey
+		self.privkey = privkey
+	}
+	
 	func pubkey_bech32() -> String {
 		return bech32_pubkey(pubkey)!
 	}

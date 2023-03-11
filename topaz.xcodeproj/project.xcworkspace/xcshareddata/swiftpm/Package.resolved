@@ -32,8 +32,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tannerdsilva/Ctopaz.git",
       "state" : {
-        "branch" : "master",
-        "revision" : "5a6f038e94879dfd0302d2272a84cfbd438b9e8e"
+        "revision" : "775699630a8291a3968977bdcf9899610e954574"
       }
     },
     {
@@ -109,6 +108,15 @@
       }
     },
     {
+      "identity" : "swift-cmark",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-cmark.git",
+      "state" : {
+        "branch" : "gfm",
+        "revision" : "86aeb491675de6f077a3a6df6cbcac1a25dcbee1"
+      }
+    },
+    {
       "identity" : "swift-collections",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-collections.git",
@@ -133,6 +141,15 @@
       "state" : {
         "revision" : "32e8d724467f8fe623624570367e3d50c5638e46",
         "version" : "1.5.2"
+      }
+    },
+    {
+      "identity" : "swift-markdown",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-markdown",
+      "state" : {
+        "branch" : "main",
+        "revision" : "4cbd46eab22cbeef307095d17958b6ed23b5f38f"
       }
     },
     {
@@ -223,15 +240,6 @@
       "state" : {
         "revision" : "f4ff20b158f5635925f22d14c3887184f332e844",
         "version" : "0.0.3"
-      }
-    },
-    {
-      "identity" : "vault",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/SparrowTek/Vault",
-      "state" : {
-        "revision" : "87db56c3c8b6421c65b0745f73e08b0dc56f79d4",
-        "version" : "1.0.3"
       }
     }
   ],

@@ -193,23 +193,22 @@ func convert_invoice_block(_ b: invoice_block) -> nostr.Event.Block? {
 	let created_at = b11.timestamp
 	
 	tal_free(b.bolt11)
-	return .invoice(Invoice(description: description, amount: amount, string: invstr, expiry: b11.expiry, payment_hash: payment_hash, created_at: created_at))
+	return .invoice(Invoice(description: description, amount: amount, string: invstr, expiry: Date(timeIntervalSince1970:TimeInterval(b11.expiry), payment_hash: payment_hash, created_on:created_at)))
 }
 
-func convert_invoice_description(b11: bolt11) -> InvoiceDescription? {
+func convert_invoice_description(b11: bolt11) -> LightningInvoiceDescription? {
 	if let desc = b11.description {
-		return .description(String(cString: desc))
+		return .string(String(cString: desc))
 	}
 	
 	if var deschash = maybe_pointee(b11.description_hash) {
-		return .description_hash(Data(bytes: &deschash, count: 32))
+		return .hash(Data(bytes: &deschash, count: 32))
 	}
 	
 	return nil
 }
 
-func convert_mention_block(ind: Int32, tags: [[String]]) -> nostr.Event.Block?
-{
+func convert_mention_block(ind: Int32, tags: [[String]]) -> nostr.Event.Block? {
 	let ind = Int(ind)
 	
 	if ind < 0 || (ind + 1 > tags.count) || tags[ind].count < 2 {
@@ -221,7 +220,7 @@ func convert_mention_block(ind: Int32, tags: [[String]]) -> nostr.Event.Block?
 		return .text("#[\(ind)]")
 	}
 	
-	guard let ref = tag_to_refid(tag) else {
+	guard let ref = try? nostr.Event.Tag(tag).toReference() else {
 		return .text("#[\(ind)]")
 	}
 	
@@ -409,7 +408,7 @@ func parse_mention(_ p: Parser, tags: [[String]]) -> nostr.Mention? {
 	default: return nil
 	}
 	
-	guard let ref = tags[ind].toReference() else {
+	guard let ref = tag_to_refid(tags[ind]) else {
 		return nil
 	}
 	

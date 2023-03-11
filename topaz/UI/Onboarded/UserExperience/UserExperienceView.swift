@@ -53,6 +53,6 @@ struct UserExperienceView: View {
 
 struct UserExperienceView_Previews: PreviewProvider {
     static var previews: some View {
-		UserExperienceView(ue:try! UE(publicKey:"foo"))
+		UserExperienceView(ue:try! UE(keypair:Topaz.tester_account))
     }
 }
