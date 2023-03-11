@@ -48,7 +48,7 @@ struct TextEvent: View {
 					Spacer()
 				}
 				
-				EventBody(ue:ue, event: event, size: .normal)
+				EventBody(ue:ue, event: event, size:.normal)
 				
 				if let mention = first_eref_mention(ev: event, privkey:ue.keypair.privkey) {
 					Text("Builder event view?")

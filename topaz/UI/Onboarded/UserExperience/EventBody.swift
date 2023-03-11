@@ -21,11 +21,12 @@ struct EventBody:View {
 	}
 	
 	var content: String {
-		event.getContent(privkey:ue.privkey)
+		event.getContent(privkey:ue.keypair.privkey)
 	}
 	
 	var body: some View {
-		if event_is_reply(event, privkey: damus_state.keypair.privkey) {
+		event.ref
+		if event_is_reply(event, privkey: ue.keypair.privkey) {
 			ReplyDescription(event: event, profiles: damus_state.profiles)
 		}
 

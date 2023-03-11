@@ -19,7 +19,7 @@ extension nostr {
 	}
 
 	/// a reference to another event
-	struct Reference:Hashable, Equatable, Identifiable {
+	struct ReferenceID:Hashable, Equatable, Identifiable {
 		let ref_id:String
 		let relay_id:String?
 		let key:String
@@ -169,13 +169,13 @@ extension nostr {
 				return buildArray
 			}
 			
-			func toReference() -> Reference {
+			func toReference() -> ReferenceID {
 				var relay_id:String? = nil
 				if info.count > 2 {
 					relay_id = info[2]
 				}
 
-				return Reference(ref_id:info[1], relay_id:relay_id, key:self.kind.rawValue)
+				return ReferenceID(ref_id:info[1], relay_id:relay_id, key:self.kind.rawValue)
 			}
 		}
 
@@ -240,14 +240,14 @@ extension nostr {
 			try container.encode(content, forKey: .content)
 		}
 		
-		func getReferencedIDs(_ key:String = "e") -> [Reference] {
+		func getReferencedIDs(_ key:String = "e") -> [ReferenceID] {
 			return tags.reduce(into: []) { (acc, tag) in
 				if tag.count >= 2 && tag.kind.rawValue == key {
 					var relay_id: String? = nil
 					if tag.count >= 3 {
 						relay_id = tag[2]
 					}
-					acc.append(Reference(ref_id: tag[1], relay_id:relay_id, key: key))
+					acc.append(ReferenceID(ref_id: tag[1], relay_id:relay_id, key: key))
 				}
 			}
 		}
@@ -369,12 +369,14 @@ extension nostr.Event {
 	func blocks(_ privkey:String?) -> [Block] {
 		return parse_mentions(content:content, tags:self.tags)
 	}
-	
-	func getContent(privkey:String?) -> String {
+	func getContent(privkey:String) -> String {
 		if kind == .dm {
 			return decrypted(privkey:privkey) ?? "*failed*"
 		}
 		return content
+	}
+	func getEventReferences(privkey:String) -> [EventReference] {
+		return interpret_event_refs(blocks:self.blocks(privkey), tags:self.tags.compactMap({ $0.toArray() }))
 	}
 }
 
@@ -686,4 +688,28 @@ func generate_private_keypair(our_privkey: String, id: String, created_at: Int64
 	}
 	
 	return KeyPair(pubkey: pubkey, privkey: privkey)
+}
+
+func interpret_event_refs(blocks:[nostr.Event.Block], tags:[[String]]) -> [EventReference] {
+	if tags.count == 0 {
+		return []
+	}
+	
+	/// build a set of indices for each event mention
+	let mention_indices = build_mention_indices(blocks, type: .event)
+	
+	/// simpler case with no mentions
+	if mention_indices.count == 0 {
+		let ev_refs = get_referenced_ids(tags: tags, key: "e")
+		return interp_event_refs_without_mentions(ev_refs)
+	}
+	
+	return interp_event_refs_with_mentions(tags: tags, mention_indices: mention_indices)
+}
+
+
+func event_is_reply(_ ev:nostr.Event, privkey: String?) -> Bool {
+	return ev.event_refs(privkey).contains { evref in
+		return evref.is_reply != nil
+	}
 }

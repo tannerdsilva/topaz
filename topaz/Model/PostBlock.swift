@@ -9,7 +9,7 @@ import Foundation
 
 enum PostBlock {
 	case text(String)
-	case ref(nostr.Reference)
+	case ref(nostr.ReferenceID)
 	case hashtag(String)
 	
 	var is_text: String? {
@@ -26,7 +26,7 @@ enum PostBlock {
 		return nil
 	}
 	
-	var is_ref: nostr.Reference? {
+	var is_ref: nostr.ReferenceID? {
 		if case .ref(let ref) = self {
 			return ref
 		}

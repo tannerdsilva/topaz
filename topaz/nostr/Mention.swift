@@ -9,7 +9,7 @@ extension nostr {
 		}
 		let index:Int
 		let type:Kind
-		let ref:nostr.Reference
+		let ref:nostr.ReferenceID
 	}
 }
 

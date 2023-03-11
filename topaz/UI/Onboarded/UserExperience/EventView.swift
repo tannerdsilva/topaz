@@ -8,13 +8,7 @@
 import Foundation
 import SwiftUI
 
-enum EventViewKind {
-	case small
-	case normal
-	case selected
-}
-
-func eventviewsize_to_font(_ size: EventViewKind) -> Font {
+func eventviewsize_to_font(_ size: EventView.Kind) -> Font {
 	switch size {
 	case .small:
 		return .body
@@ -26,6 +20,11 @@ func eventviewsize_to_font(_ size: EventViewKind) -> Font {
 }
 
 struct EventView: View {
+	enum Kind {
+		case small
+		case normal
+		case selected
+	}
 	let event:nostr.Event
 	let options:nostr.Event.ViewOptions
 	let ue:UE
@@ -78,6 +77,7 @@ struct EventView: View {
 				} else {
 					EmptyView()
 				}*/
+				EmptyView()
 			} else {
 				TextEvent(ue:ue, event: event, pubkey: pubkey, options: options)
 					.padding([.top], 6)
@@ -87,17 +87,27 @@ struct EventView: View {
 }
 
 // blame the porn bots for this code
-func should_show_images(contacts:Contacts, ev:nostr.Event, our_pubkey: String, booster_pubkey: String? = nil) -> Bool {
+func should_show_images(ue:UE, ev:nostr.Event, our_pubkey: String, booster_pubkey: String? = nil) -> Bool {
 	if ev.pubkey == our_pubkey {
 		return true
 	}
-	if contacts.is_in_friendosphere(ev.pubkey) {
-		return true
+	do {
+		let openTrans = try Transaction(self.env, readOnly:true)
+		defer {
+			try? openTrans.commit()
+		}
+		if ue.contactsDB.isInFriendosphere(pubkey:ev.pubkey, tx: openTrans) {
+			return true
+		}
+		if booster_pubkey != nil {
+			if try ue.contactsDB.isInFriendosphere(pubkey:booster_pubkey!, tx:openTrans) {
+				return true
+			}
+		}
+		return false
+	} catch _ {
+		return false
 	}
-	if let boost_key = booster_pubkey, contacts.is_in_friendosphere(boost_key) {
-		return true
-	}
-	return false
 }
 
 func event_validity_color(_ validation:nostr.Event.ValidationResult) -> some View {
@@ -145,7 +155,7 @@ func format_date(_ created_at: Int64) -> String {
 	return dateFormatter.string(from: date)
 }
 
-func make_actionbar_model(ev: String, damus: DamusState) -> ActionBarModel {
+func make_actionbar_model(ev: String, ue:UE) -> ActionBarModel {
 	let likes = damus.likes.counts[ev]
 	let boosts = damus.boosts.counts[ev]
 	let zaps = damus.zaps.event_counts[ev]
