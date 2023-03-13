@@ -119,24 +119,24 @@ class ApplicationModel:ObservableObject {
 		}
 		self.userStore = try UserStore(docEnv, tx:subTrans)
 		let getUsers = try self.userStore.allUsers(tx:subTrans)
-		try subTrans.commit()
 		if getUsers.isEmpty {
 			_defaultUE = Published(wrappedValue:nil)
 		} else {
 			let getKeypair = try self.userStore.keypair(pubkey:getUsers.randomElement()!, tx:subTrans)
 			_defaultUE = Published(wrappedValue:try UE(keypair:getKeypair))
 		}
+		try subTrans.commit()
 	}
 	
 	/// installs a user in the application and ensures that the state of the app is updated
 	func installUser(publicKey:String, privateKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
 		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
+		self.objectWillChange.send()
 		_state = Published(wrappedValue:.onboarded)
 		try self.userStore.addUser(publicKey, privateKey:privateKey, tx:newTrans)
 		try self.app_metadata.setEntry(value:State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
 		try newTrans.commit()
 		_defaultUE = Published(wrappedValue:try UE(keypair:KeyPair(pubkey:publicKey, privkey:privateKey)))
-		self.objectWillChange.send()
 	}
 
 

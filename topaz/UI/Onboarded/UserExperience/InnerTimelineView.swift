@@ -33,12 +33,3 @@ struct InnerTimelineView: View {
 		
 	}
 }
-//
-//
-//struct InnerTimelineView_Previews: PreviewProvider {
-//	static var previews: some View {
-//		InnerTimelineView(events: test_event_holder, damus: test_damus_state(), show_friend_icon: true, filter: { _ in true }, nav_target: nil, navigating: false)
-//			.frame(width: 300, height: 500)
-//			.border(Color.red)
-//	}
-//}

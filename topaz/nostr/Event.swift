@@ -200,8 +200,9 @@ extension nostr {
 		let kind:Kind
 		let content:String
 		
+		// used to render the UI during development
 		static func createTestPost() -> Self {
-			return Self(uid:UUID().uuidString, sig:"", tags:[], boosted_by: nil, pubkey: "foo", created:Date(timeIntervalSinceNow: -300), kind:Kind.text_note, content: "oh jeez look here at all this content wowweee")
+			return Self(uid:UUID().uuidString, sig:"", tags:[], boosted_by: nil, pubkey: "foo", created:Date(timeIntervalSinceNow:-300), kind:Kind.text_note, content:"oh jeez look here at all this content wowweee")
 		}
 		
 		fileprivate init(uid:String, sig:String, tags:[Tag], boosted_by:String?, pubkey:String, created:Date, kind:Kind, content:String) {
@@ -709,7 +710,7 @@ func interpret_event_refs(blocks:[nostr.Event.Block], tags:[[String]]) -> [Event
 
 
 func event_is_reply(_ ev:nostr.Event, privkey: String?) -> Bool {
-	return ev.event_refs(privkey).contains { evref in
+	return ev.getEventReferences(privkey:privkey!).contains { evref in
 		return evref.is_reply != nil
 	}
 }

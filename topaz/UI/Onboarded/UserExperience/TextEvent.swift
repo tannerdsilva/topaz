@@ -26,9 +26,19 @@ struct TextEvent: View {
 		!options.contains(.no_action_bar)
 	}
 	
+	func getProfileFromUE() -> nostr.Profile? {
+		let profile:nostr.Profile?
+		do {
+			profile = try ue.profilesDB.getPublicKeys(publicKeys:Set([pubkey])).first!.value
+		} catch _ {
+			profile = nil
+		}
+		return profile
+	}
+	
 	var body: some View {
 		HStack(alignment: .top) {
-			let profile = ue.lookup(id:pubkey)
+			let profile = getProfileFromUE()
 		
 			let is_anon = event_is_anonymous(ev: event)
 			VStack {
@@ -42,7 +52,7 @@ struct TextEvent: View {
 					let pk = is_anon ? "anon" : pubkey
 					EventProfileName(pubkey: pk, profile:profile, ue:ue, show_friend_confirmed: true, size: .normal)
 					
-					Text(verbatim: "\(format_relative_time(event.created_at))")
+					Text(verbatim:"\(event.created.relativeShortTimeString())")
 						.foregroundColor(.gray)
 					
 					Spacer()
@@ -66,7 +76,7 @@ struct TextEvent: View {
 			.padding([.leading], 2)
 		}
 		.contentShape(Rectangle())
-		.background(event_validity_color(event.validate()))
+		.background(event_validity_color((try? event.validate()) ?? .bad_sig))
 		.id(event.id)
 		.frame(maxWidth: .infinity, minHeight: PFP_SIZE)
 		.padding([.bottom], 2)

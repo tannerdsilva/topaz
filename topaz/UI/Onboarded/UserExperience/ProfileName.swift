@@ -23,7 +23,8 @@ func get_friend_icon(ue:UE, pubkey: String, show_confirmed: Bool) -> String? {
 		if try ue.contactsDB.isFriendOfFriend(pubkey:pubkey, tx:newTransaction) {
 			return "person.fill.and.arrow.left.and.arrow.right"
 		}
-	} catch let error {
+		return nil
+	} catch _ {
 		return nil
 	}
 }
@@ -64,11 +65,11 @@ struct ProfileName: View {
 	}
 	
 	var current_nip05: NIP05? {
-		nip05 ?? damus_state.profiles.is_validated(pubkey)
+		return nil
 	}
 	
 	var nip05_color: Color {
-		return get_nip05_color(pubkey: pubkey, contacts: damus_state.contacts)
+		return Color.blue
 	}
 	
 	var body: some View {

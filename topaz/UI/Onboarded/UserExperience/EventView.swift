@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 func eventviewsize_to_font(_ size: EventView.Kind) -> Font {
 	switch size {
@@ -55,33 +56,33 @@ struct EventView: View {
 
 	var body: some View {
 		VStack {
-			if event.known_kind == .boost {
-				if let inner_ev = event.inner_event {
-					VStack(alignment: .leading) {
-						let prof = try ue.getProfileInfo(publicKeys: Set([event.pubkey]))
-						let booster_profile = ProfileView(ue:ue, pubkey: event.pubkey)
-						
-						NavigationLink(destination: booster_profile) {
-							Reposted(ue:ue, pubkey: event.pubkey, profile: prof)
-						}
-						.buttonStyle(PlainButtonStyle())
-						TextEvent(ue:ue, event:inner_ev, pubkey: inner_ev.pubkey, options: options)
-							.padding([.top], 1)
-					}
-				} else {
-					EmptyView()
-				}
-			} else if event.known_kind == .zap {
-				/*if let zap = damus.zaps.zaps[event.id] {
-					ZapEvent(damus: damus, zap: zap)
-				} else {
-					EmptyView()
-				}*/
-				EmptyView()
-			} else {
+//			if event.known_kind == .boost {
+//				if let inner_ev = event.inner_event {
+//					VStack(alignment: .leading) {
+//						let prof = try ue.getProfileInfo(publicKeys: Set([event.pubkey]))
+//						let booster_profile = ProfileView(ue:ue, pubkey: event.pubkey)
+//
+//						NavigationLink(destination: booster_profile) {
+//							Reposted(ue:ue, pubkey: event.pubkey, profile: prof)
+//						}
+//						.buttonStyle(PlainButtonStyle())
+//						TextEvent(ue:ue, event:inner_ev, pubkey: inner_ev.pubkey, options: options)
+//							.padding([.top], 1)
+//					}
+//				} else {
+//					EmptyView()
+//				}
+//			} else if event.known_kind == .zap {
+//				/*if let zap = damus.zaps.zaps[event.id] {
+//					ZapEvent(damus: damus, zap: zap)
+//				} else {
+//					EmptyView()
+//				}*/
+////				EmptyView()
+//			} else {
 				TextEvent(ue:ue, event: event, pubkey: pubkey, options: options)
 					.padding([.top], 6)
-			}
+//			}
 		}
 	}
 }
@@ -92,11 +93,11 @@ func should_show_images(ue:UE, ev:nostr.Event, our_pubkey: String, booster_pubke
 		return true
 	}
 	do {
-		let openTrans = try Transaction(self.env, readOnly:true)
+		let openTrans = try ue.transact(readOnly:true)
 		defer {
 			try? openTrans.commit()
 		}
-		if ue.contactsDB.isInFriendosphere(pubkey:ev.pubkey, tx: openTrans) {
+		if try ue.contactsDB.isInFriendosphere(pubkey:ev.pubkey, tx: openTrans) {
 			return true
 		}
 		if booster_pubkey != nil {
@@ -126,11 +127,11 @@ func event_validity_color(_ validation:nostr.Event.ValidationResult) -> some Vie
 extension View {
 	func pubkey_context_menu(bech32_pubkey: String) -> some View {
 		return self.contextMenu {
-			Button {
-					UIPasteboard.general.string = bech32_pubkey
-			} label: {
-				Label(NSLocalizedString("Copy Account ID", comment: "Context menu option for copying the ID of the account that created the note."), systemImage: "doc.on.doc")
-			}
+//			Button {
+//				UIPasteboard.general.string.setValue(bech32_pubkey, forPasteboardType: UTType.plainText.identifier)
+//			} label: {
+//				Label(NSLocalizedString("Copy Account ID", comment: "Context menu option for copying the ID of the account that created the note."), systemImage: "doc.on.doc")
+//			}
 		}
 	}
 	
@@ -142,11 +143,6 @@ extension View {
 //	}
 }
 
-func format_relative_time(_ created_at: Int64) -> String
-{
-	return time_ago_since(Date(timeIntervalSince1970: Double(created_at)))
-}
-
 func format_date(_ created_at: Int64) -> String {
 	let date = Date(timeIntervalSince1970: TimeInterval(created_at))
 	let dateFormatter = DateFormatter()
@@ -155,22 +151,22 @@ func format_date(_ created_at: Int64) -> String {
 	return dateFormatter.string(from: date)
 }
 
-func make_actionbar_model(ev: String, ue:UE) -> ActionBarModel {
-	let likes = damus.likes.counts[ev]
-	let boosts = damus.boosts.counts[ev]
-	let zaps = damus.zaps.event_counts[ev]
-	let zap_total = damus.zaps.event_totals[ev]
-	let our_like = damus.likes.our_events[ev]
-	let our_boost = damus.boosts.our_events[ev]
-	let our_zap = damus.zaps.our_zaps[ev]
+func make_actionbar_model(ev:String, ue:UE) -> ActionBarModel {
+//	let likes = damus.likes.counts[ev]
+//	let boosts = damus.boosts.counts[ev]
+//	let zaps = damus.zaps.event_counts[ev]
+//	let zap_total = damus.zaps.event_totals[ev]
+	let our_like:nostr.Event? = nil
+	let our_boost:nostr.Event? = nil
+	let our_zap:Zap? = nil
 
-	return ActionBarModel(likes: likes ?? 0,
-						  boosts: boosts ?? 0,
-						  zaps: zaps ?? 0,
-						  zap_total: zap_total ?? 0,
+	return ActionBarModel(likes: 0,
+						  boosts: 0,
+						  zaps: 0,
+						  zap_total: 0,
 						  our_like: our_like,
 						  our_boost: our_boost,
-						  our_zap: our_zap?.first
+						  our_zap:our_zap
 	)
 }
 
@@ -184,7 +180,7 @@ struct EventView_Previews: PreviewProvider {
 			EventView(damus: test_damus_state(), event: NostrEvent(content: "hello there https://jb55.com/s/Oct12-150217.png https://jb55.com/red-me.jb55 cool", pubkey: "pk"), show_friend_icon: true, size: .big)
 			
 			 */
-			EventView( damus: test_damus_state(), event: test_event )
+			EventView(ue:try! UE(keypair:Topaz.tester_account), event: test_event )
 		}
 		.padding()
 	}

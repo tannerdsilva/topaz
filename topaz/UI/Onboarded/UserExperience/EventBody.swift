@@ -7,13 +7,14 @@
 
 import SwiftUI
 
+
 struct EventBody:View {
 	let ue:UE
 	let event:nostr.Event
-	let size:nostr.Event.ViewOptions
+	let size:EventView.Kind
 	let should_show_img: Bool
 	
-	init(ue:UE, event:nostr.Event, size:nostr.Event.ViewOptions, should_show_img: Bool? = nil) {
+	init(ue:UE, event:nostr.Event, size:EventView.Kind, should_show_img: Bool? = nil) {
 		self.ue = ue
 		self.event = event
 		self.size = size
@@ -25,12 +26,10 @@ struct EventBody:View {
 	}
 	
 	var body: some View {
-		event.ref
 		if event_is_reply(event, privkey: ue.keypair.privkey) {
-			ReplyDescription(event: event, profiles: damus_state.profiles)
+			ReplyDescription(ue:ue, event: event)
 		}
-
-		NoteContentView(damus_state: damus_state, event: event, show_images: should_show_img, size: size, artifacts: .just_content(content), truncate: true)
-			.frame(maxWidth: .infinity, alignment: .leading)
+		Text("Note content view")
+//		NoteContentView(ue:ue, event: event, show_images: should_show_img, size: size, artifacts: .just_content(content), truncate: true).frame(maxWidth: .infinity, alignment: .leading)
 	}
 }

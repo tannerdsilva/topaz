@@ -13,6 +13,51 @@ import SwiftBlake2
 
 // FRIENDS:
 // a user may be considered a friend to the current user if the current user is following them
+extension UE {
+	class Profiles:ObservableObject {
+		enum Databases:String {
+			case profile_main = "_profiles-core"
+		}
+
+		let env:QuickLMDB.Environment
+		fileprivate let decoder = JSONDecoder()
+		
+		let profilesDB:Database  // [String:Pofile] where the key is the pubkey
+
+		init(_ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
+			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
+			self.env = env
+			self.profilesDB = try env.openDatabase(named:Databases.profile_main.rawValue, flags:[.create], tx:subTrans)
+			try subTrans.commit()
+		}
+
+		/// gets a profile from the database
+		func getPublicKeys(publicKeys:Set<String>) throws -> [String:nostr.Profile] {
+			let newTrans = try QuickLMDB.Transaction(self.env, readOnly:true)
+			let getCursor = try self.profilesDB.cursor(tx:newTrans)
+			var profiles = [String:nostr.Profile]()
+			for curID in publicKeys {
+				let getProfile = Data(try getCursor.getEntry(.set, key:curID).value)!
+				let decoded = try self.decoder.decode(nostr.Profile.self, from:getProfile)
+				profiles[curID] = decoded
+			}
+			try newTrans.commit()
+			return profiles
+		}
+
+		/// set a profile in the database
+		func setPublicKeys(_ profiles:[String:nostr.Profile]) throws {
+			let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false)
+			let encoder = JSONEncoder()
+			let profileCursor = try self.profilesDB.cursor(tx:newTrans)
+			for (pubkey, curProfile) in profiles {
+				let encoded = try encoder.encode(curProfile)
+				try profileCursor.setEntry(value:encoded, forKey:pubkey)
+			}
+			try newTrans.commit()
+		}
+	}
+}
 
 class UE:ObservableObject {
 	enum AccessLevel {
@@ -20,6 +65,7 @@ class UE:ObservableObject {
 		case readOnly(String)
 	}
 
+	// the databases 
 	enum Databases:String {
 		case userSettings = "-usersettings"
 		case userInfo = "-userinfo"
@@ -78,7 +124,7 @@ class UE:ObservableObject {
 	/// this is the pool of connected relays that the user has
 	@State var connectedRelays:[Relay:RelayConnection]
 
-	let profilesDB:QuickLMDB.Database
+	let profilesDB:Profiles
 
 	init(keypair:KeyPair, uuid:String = UUID().uuidString) throws {
 		let makeLogger = Topaz.makeDefaultLogger(label:"user-environment")
@@ -130,10 +176,12 @@ class UE:ObservableObject {
 			self.contactsDB = makeContactsDB
 			
 			// initialize the profiles database
-			let makeProfilesDB = try env.openDatabase(named:Databases.profile_core.rawValue, flags:[.create], tx:newTrans)
+			let makeProfilesDB = try Profiles(env, tx:newTrans)
 			self.profilesDB = makeProfilesDB
 			self.keypair = keypair
 			
+			
+			try newTrans.commit()
 			// connect to all the relays
 			for relay in allRelays {
 				buildRelays[relay] = RelayConnection(url:relay.url) { [weak self, log = logger] someEvent in
@@ -142,8 +190,6 @@ class UE:ObservableObject {
 					return
 				}
 			}
-			
-			try newTrans.commit()
 			self.logger.info("instance initialized.", metadata:["public_key":"\(keypair.pubkey)"])
 		case let .failure(err):
 			throw err
@@ -153,30 +199,6 @@ class UE:ObservableObject {
 	/// opens a new transaction for the user environment
 	func transact(readOnly:Bool) throws -> QuickLMDB.Transaction {
 		return try QuickLMDB.Transaction(self.env, readOnly:readOnly)
-	}
-
-	func getProfileInfo(publicKeys:Set<String>) throws -> [String:nostr.Profile] {
-		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:true)
-		let getCursor = try self.profilesDB.cursor(tx:newTrans)
-		var profiles = [String:nostr.Profile]()
-		for curID in publicKeys {
-			let getProfile = Data(try getCursor.getEntry(.set, key:curID).value)!
-			let decoded = try self.decoder.decode(nostr.Profile.self, from:getProfile)
-			profiles[curID] = decoded
-		}
-		try newTrans.commit()
-		return profiles
-	}
-
-	func setProfileInfo(_ profiles:[String:nostr.Profile]) throws {
-		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false)
-		let encoder = JSONEncoder()
-		let profileCursor = try self.profilesDB.cursor(tx:newTrans)
-		for (pubkey, curProfile) in profiles {
-			let encoded = try encoder.encode(curProfile)
-			try profileCursor.setEntry(value:encoded, forKey:pubkey)
-		}
-		try newTrans.commit()
 	}
 }
 
@@ -514,7 +536,6 @@ extension UE {
 
 
 extension UE {
-
 	class ZapsDB:ObservableObject {
 		static let logger = Topaz.makeDefaultLogger(label:"zaps-db")
 		enum Databases:String {
@@ -537,6 +558,7 @@ extension UE {
 			self.zap_totals = try env.openDatabase(named:Databases.zap_totals.rawValue, flags:[.create], tx:subTrans)
 			self.my_zaps = try env.openDatabase(named:Databases.my_zaps.rawValue, flags:[.create, .dupSort], tx:subTrans)
 			try subTrans.commit()
+			Self.logger.info("instance successfully initialized.")
 		}
 
 		/// adds a series of zaps into the databsae
