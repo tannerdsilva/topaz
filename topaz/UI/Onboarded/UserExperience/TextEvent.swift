@@ -62,7 +62,7 @@ struct TextEvent: View {
 				
 				if let mention = first_eref_mention(ev: event, privkey:ue.keypair.privkey) {
 					Text("Builder event view?")
-//					BuilderEventView(ue:ue, event_id: mention.ref.id)
+					BuilderEventView(ue:ue, event_id: mention.ref.id)
 				}
 				
 				if has_action_bar {

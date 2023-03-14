@@ -29,6 +29,8 @@ extension nostr {
 		var since:Date?
 		var until:Date?
 		var limit:UInt32?
+
+		/// The public keys of the authors of the messages to be returned.
 		var authors:[String]?
 		var hashtag:[String]?
 		var parameter:[String]?
