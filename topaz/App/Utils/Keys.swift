@@ -1,10 +1,3 @@
-//
-//  Keys.swift
-//  damus
-//
-//  Created by William Casarin on 2022-05-21.
-//
-
 import Foundation
 import secp256k1
 import Ctopaz

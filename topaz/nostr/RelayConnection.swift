@@ -119,10 +119,12 @@ final actor RelayConnection:ObservableObject {
     /// connects to the relay. this will attempt to reconnect to the relay if the connection fails, unless `retryLaterIfFailed` is false
     /// - will only connect if the connection is in the ``State/disconnected`` state
     func connect(retryLaterIfFailed:Bool = true) async throws {
+        // a connection can only be initiated if the connection is in the disconnected state
 		guard case State.disconnected = self.state else {
 			self.logger.error("unable to connect to relay - state was not 'disconnected'.", metadata:["state":"\(self.state)"])
 			throw Error.invalidState
 		}
+        // define the stream event type. this is an internal type used to handle the information as it is read from the websocket
         enum StreamEvent {
             case data(Data)
             case pingPong
@@ -132,9 +134,11 @@ final actor RelayConnection:ObservableObject {
             self.state = .connecting
             let newURL = HBURL(self.url)
 			let newWS = try await HBWebSocketClient.connect(url:newURL, configuration: HBWebSocketClient.Configuration(), on:loopGroup.next())
-			newWS.initiateAutoPing(interval:.seconds(Int64.random(in:7..<12)))   // ensure the state of the connection is always checked
 			self.state = .connected
-			let mainStream = AsyncStream(StreamEvent.self) { streamCont in
+			newWS.initiateAutoPing(interval:.seconds(Int64.random(in:7..<12)))   // ensure the state of the connection is always checked
+			
+            // launch the main async stream that takes the data from the websocket and passes it to the relay connection handler
+            let mainStream = AsyncStream(StreamEvent.self) { streamCont in
 				self.logger.trace("async stream initialized.")
 				// handle reading
 				newWS.onRead { [sc = streamCont] readInfo, _ in
@@ -162,12 +166,14 @@ final actor RelayConnection:ObservableObject {
 				}
 			}
 			
+            // cancel the reconnection task if it exists
             if let hasReconnectionTask = self.reconnectionTask {
                 hasReconnectionTask.cancel()
                 self.reconnectionTask = nil
             }
             self.websocket = newWS
             
+            // launch the task that handles the data as it comes off the async stream
 			Task.detached { [weak self, chan = self.outChannel, ms = mainStream, reconn = retryLaterIfFailed] in
 				guard let self = self else {
 					return

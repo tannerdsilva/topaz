@@ -42,7 +42,6 @@ struct TextEvent: View {
 		
 			let is_anon = event_is_anonymous(ev: event)
 			VStack {
-//				MaybeAnonPfpView(state: damus, is_anon: is_anon, pubkey: pubkey)
 				Text("TODO: Maybe anon view?")
 				Spacer()
 			}
@@ -62,7 +61,7 @@ struct TextEvent: View {
 				
 				if let mention = first_eref_mention(ev: event, privkey:ue.keypair.privkey) {
 					Text("Builder event view?")
-					BuilderEventView(ue:ue, event_id: mention.ref.id)
+//					BuilderEventView(ue:ue, event_id: mention.ref.id)
 				}
 				
 				if has_action_bar {

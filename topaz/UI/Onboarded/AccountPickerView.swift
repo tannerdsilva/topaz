@@ -8,15 +8,40 @@
 import SwiftUI
 
 struct AccountPickerView: View {
-	@ObservedObject var users:ApplicationModel.UserStore
+	@ObservedObject var ue:UE
 	
     var body: some View {
-		  Text(verbatim:"")
+		VStack {
+			// Title Bar
+			CustomTitleBar()
+			
+			Spacer()
+			
+			switch ue.viewMode {
+			case .home:
+				HomeView(ue:ue)
+			case .notifications:
+				MentionsView()
+			case .dms:
+				MessagesView(isUnread:$ue.badgeStatus.dmsBadge)
+			case .search:
+				SearchView()
+			case .profile:
+				PV()
+			}
+
+			Spacer()
+
+			// Navigation Bar
+			HStack {
+				CustomTabBar(viewMode:$ue.viewMode, badgeStatus:$ue.badgeStatus)
+			}
+		}.background(.gray).frame(maxWidth:.infinity)
     }
 }
 
 struct AccountPickerView_Previews: PreviewProvider {
   static var previews: some View {
-    AccountPickerView(users:Topaz().localData.userStore)
+	  AccountPickerView(ue:try! UE(keypair: Topaz.tester_account))
   }
 }

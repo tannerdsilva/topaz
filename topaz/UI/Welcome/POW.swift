@@ -1,10 +1,3 @@
-//
-//  ProofOfWork.swift
-//  damus
-//
-//  Created by William Casarin on 2022-04-11.
-//
-
 import Foundation
 
 

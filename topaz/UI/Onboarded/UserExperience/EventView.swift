@@ -56,33 +56,8 @@ struct EventView: View {
 
 	var body: some View {
 		VStack {
-//			if event.known_kind == .boost {
-//				if let inner_ev = event.inner_event {
-//					VStack(alignment: .leading) {
-//						let prof = try ue.getProfileInfo(publicKeys: Set([event.pubkey]))
-//						let booster_profile = ProfileView(ue:ue, pubkey: event.pubkey)
-//
-//						NavigationLink(destination: booster_profile) {
-//							Reposted(ue:ue, pubkey: event.pubkey, profile: prof)
-//						}
-//						.buttonStyle(PlainButtonStyle())
-//						TextEvent(ue:ue, event:inner_ev, pubkey: inner_ev.pubkey, options: options)
-//							.padding([.top], 1)
-//					}
-//				} else {
-//					EmptyView()
-//				}
-//			} else if event.known_kind == .zap {
-//				/*if let zap = damus.zaps.zaps[event.id] {
-//					ZapEvent(damus: damus, zap: zap)
-//				} else {
-//					EmptyView()
-//				}*/
-////				EmptyView()
-//			} else {
-				TextEvent(ue:ue, event: event, pubkey: pubkey, options: options)
+			TextEvent(ue:ue, event: event, pubkey: pubkey, options: options)
 					.padding([.top], 6)
-//			}
 		}
 	}
 }
@@ -152,10 +127,6 @@ func format_date(_ created_at: Int64) -> String {
 }
 
 func make_actionbar_model(ev:String, ue:UE) -> ActionBarModel {
-//	let likes = damus.likes.counts[ev]
-//	let boosts = damus.boosts.counts[ev]
-//	let zaps = damus.zaps.event_counts[ev]
-//	let zap_total = damus.zaps.event_totals[ev]
 	let our_like:nostr.Event? = nil
 	let our_boost:nostr.Event? = nil
 	let our_zap:Zap? = nil
@@ -174,12 +145,6 @@ func make_actionbar_model(ev:String, ue:UE) -> ActionBarModel {
 struct EventView_Previews: PreviewProvider {
 	static var previews: some View {
 		VStack {
-			/*
-			EventView(damus: test_damus_state(), event: NostrEvent(content: "hello there https://jb55.com/s/Oct12-150217.png https://jb55.com/red-me.jb55 cool", pubkey: "pk"), show_friend_icon: true, size: .small)
-			EventView(damus: test_damus_state(), event: NostrEvent(content: "hello there https://jb55.com/s/Oct12-150217.png https://jb55.com/red-me.jb55 cool", pubkey: "pk"), show_friend_icon: true, size: .normal)
-			EventView(damus: test_damus_state(), event: NostrEvent(content: "hello there https://jb55.com/s/Oct12-150217.png https://jb55.com/red-me.jb55 cool", pubkey: "pk"), show_friend_icon: true, size: .big)
-			
-			 */
 			EventView(ue:try! UE(keypair:Topaz.tester_account), event: test_event )
 		}
 		.padding()

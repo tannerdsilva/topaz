@@ -7,6 +7,8 @@
 
 import Foundation
 import QuickLMDB
+import AsyncAlgorithms
+
 
 // allows users to register a subscription to a relay.
 actor RelayRegistrar {
@@ -23,8 +25,11 @@ actor RelayRegistrar {
 
 	let env:QuickLMDB.Environment
 	
+	let mainChannel:AsyncChannel<RelayConnection.Event>
+	
 	init(_ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
 		self.env = env
+		self.mainChannel = AsyncChannel<RelayConnection.Event>()
 	}
 	
 	fileprivate func handleEvent() {
@@ -38,12 +43,7 @@ actor RelayRegistrar {
 			// if the relay url is not already registered
 			if url_relay[relay_url] == nil {
 				// create a new relay connection
-				let relay = try RelayConnection(url:relay_url) { [weak self] _ in
-					guard let self = self else {
-						return
-					}
-					await self.handleEvent()
-				}
+				let relay = RelayConnection(url:relay_url, channel:mainChannel)
 				// store the relay connection
 				url_relay[relay_url] = relay
 				// store the pending messages
@@ -67,7 +67,7 @@ actor RelayRegistrar {
 			// if there are pending messages
 			if let pending = url_pending[relay_url] {
 				// send the pending messages
-				url_relay[relay_url]!.send(.subscribe(.init(filters: pending, sub_id: "registrar")), to: Array(url_registrars[relay_url]!))
+//				url_relay[relay_url]!.send(.subscribe(.init(filters: pending, sub_id: "registrar")), to: Array(url_registrars[relay_url]!))
 				// clear the pending messages
 				url_pending[relay_url] = nil
 			}

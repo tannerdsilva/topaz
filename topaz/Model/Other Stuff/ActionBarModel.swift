@@ -1,10 +1,3 @@
-//
-//  ActionBarModel.swift
-//  damus
-//
-//  Created by William Casarin on 2022-04-30.
-//
-
 import Foundation
 
 class ActionBarModel:ObservableObject {

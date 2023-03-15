@@ -60,13 +60,10 @@ extension UE {
 }
 
 class UE:ObservableObject {
-	enum AccessLevel {
-		case readWrite(KeyPair)
-		case readOnly(String)
-	}
 
 	// the databases 
 	enum Databases:String {
+		case userContext = "-usercontext"
 		case userSettings = "-usersettings"
 		case userInfo = "-userinfo"
 		case events_core = "-events-core"
@@ -82,6 +79,12 @@ class UE:ObservableObject {
 	let env:QuickLMDB.Environment
 	let uuid:String
 	let keypair:KeyPair
+
+	enum UserContext:String, MDB_convertible {
+		case badgeStatus = "badge_status" // ViewBadgeStatus
+	}
+	let userContext:Database
+
 
 	enum UserInfo:String, MDB_convertible {
 		case relays = "user_relays" // [Relay]: where index 0 is the primary relay
@@ -105,9 +108,31 @@ class UE:ObservableObject {
 
 	/// stores the primary root view that the user is currently viewing
 	enum ViewMode:Int, MDB_convertible {
-		case devView = -1
-		case timeline = 0
-		case dmView = 1
+		case home
+		case notifications
+		case dms
+		case search
+		case profile
+	}
+	
+	// stores the primary tab viwe badge status for the user
+	struct ViewBadgeStatus:Codable {
+		var homeBadge:Bool
+		var notificationsBadge:Bool
+		var dmsBadge:Bool
+		var searchBadge:Bool
+		var profileBadge:Bool
+	}
+	@Published var badgeStatus:ViewBadgeStatus {
+		didSet {
+			do {
+				let jsonData = try encoder.encode(badgeStatus)
+				try self.userContext.setEntry(value:jsonData, forKey:UserContext.badgeStatus.rawValue, tx:nil)
+				self.logger.info("badge status modified.", metadata:["new_value": "\(badgeStatus)"])
+			} catch let error {
+				self.logger.error("failed to update badge status in database.", metadata:["error": "\(error)"])
+			}
+		}
 	}
 	
 	@Published var viewMode:ViewMode {
@@ -120,10 +145,6 @@ class UE:ObservableObject {
 			}
 		}
 	}
-
-	/// this is the pool of connected relays that the user has
-	@State var connectedRelays:[Relay:RelayConnection]
-
 	let profilesDB:Profiles
 
 	init(keypair:KeyPair, uuid:String = UUID().uuidString) throws {
@@ -137,7 +158,8 @@ class UE:ObservableObject {
 			self.userSettings = makeSettings
 			let makeUserInfo = try env.openDatabase(named:Databases.userInfo.rawValue, flags:[.create], tx:newTrans)
 			self.userInfo = makeUserInfo
-			
+			let uc = try env.openDatabase(named:Databases.userContext.rawValue, flags:[.create], tx:newTrans)
+			self.userContext = uc
 			// public key always present
 			try makeUserInfo.setEntry(value:keypair.pubkey, forKey:UserInfo.pubkey.rawValue, tx:newTrans)
 			try makeUserInfo.setEntry(value:keypair.privkey, forKey:UserInfo.privkey.rawValue, tx:newTrans)
@@ -148,13 +170,12 @@ class UE:ObservableObject {
 				_viewMode = Published(wrappedValue:getViewMode)
 			} catch LMDBError.notFound {
 				// this is the first launch, place a default value
-				try self.userSettings.setEntry(value:ViewMode.timeline, forKey:Settings.viewMode.rawValue, tx:newTrans)
-				_viewMode = Published(wrappedValue:.timeline)
+				try self.userSettings.setEntry(value:ViewMode.home, forKey:Settings.viewMode.rawValue, tx:newTrans)
+				_viewMode = Published(wrappedValue:.home)
 			}
 
 			// initialize the connected relays
 			var buildRelays = [Relay:RelayConnection]()
-			self.connectedRelays = buildRelays
 			self.uuid = uuid
 			self.env = env
 			
@@ -165,6 +186,17 @@ class UE:ObservableObject {
 			} catch LMDBError.notFound {
 				allRelays = Topaz.bootstrap_relays
 				try makeUserInfo.setEntry(value:Topaz.bootstrap_relays, forKey:UserInfo.relays.rawValue, tx:newTrans)
+			}
+
+			// build the view badge status
+			do {
+				let getBadgeStatus = try JSONDecoder().decode(ViewBadgeStatus.self, from: try uc.getEntry(type:Data.self, forKey:UserContext.badgeStatus.rawValue, tx:newTrans)!)
+				_badgeStatus = Published(wrappedValue:getBadgeStatus)
+			} catch LMDBError.notFound {
+				// this is the first launch, place a default value
+				let defaultBadgeStatus = ViewBadgeStatus(homeBadge:false, notificationsBadge:false, dmsBadge:true, searchBadge:false, profileBadge:false)
+				try uc.setEntry(value:try JSONEncoder().encode(defaultBadgeStatus), forKey:UserContext.badgeStatus.rawValue, tx:newTrans)
+				_badgeStatus = Published(wrappedValue:defaultBadgeStatus)
 			}
 
 			// initialize the events database
@@ -182,14 +214,6 @@ class UE:ObservableObject {
 			
 			
 			try newTrans.commit()
-			// connect to all the relays
-			for relay in allRelays {
-				buildRelays[relay] = RelayConnection(url:relay.url) { [weak self, log = logger] someEvent in
-					log.info("relay connection info found.", metadata: ["info":"\(someEvent)"])
-					guard let self = self else { return }
-					return
-				}
-			}
 			self.logger.info("instance initialized.", metadata:["public_key":"\(keypair.pubkey)"])
 		case let .failure(err):
 			throw err
