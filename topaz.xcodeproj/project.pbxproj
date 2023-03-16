@@ -32,9 +32,16 @@
 		AE2C0EF229BA7C9E00C0B87C /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE2C0EF129BA7C9E00C0B87C /* Constants.swift */; };
 		AE39020B29B912D600F9D40C /* Delta.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE39020A29B912D600F9D40C /* Delta.swift */; };
 		AE421C6D29BC433B009CB737 /* PostBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C6C29BC433B009CB737 /* PostBlock.swift */; };
+		AE421C7129BC7EED009CB737 /* RelayRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7029BC7EED009CB737 /* RelayRegistrar.swift */; };
+		AE421C7329BD095B009CB737 /* EventReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7229BD095B009CB737 /* EventReference.swift */; };
+		AE421C7529BD1ED4009CB737 /* ReplyDescription.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7429BD1ED4009CB737 /* ReplyDescription.swift */; };
+		AE421C7729BD1FB5009CB737 /* ReplyDesc.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7629BD1FB5009CB737 /* ReplyDesc.swift */; };
+		AE421C7A29BE30DE009CB737 /* Date.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7929BE30DE009CB737 /* Date.swift */; };
 		AE5C8A6A29B9D1C000306779 /* InnerTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5C8A6929B9D1C000306779 /* InnerTimelineView.swift */; };
 		AE5C8A6C29B9D35100306779 /* EventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5C8A6B29B9D35100306779 /* EventView.swift */; };
 		AE5C8A6E29B9D3B100306779 /* TextEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5C8A6D29B9D3B000306779 /* TextEvent.swift */; };
+		AE717AC229C014F7002D6A52 /* HomeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE717AC129C014F7002D6A52 /* HomeModel.swift */; };
+		AE717AC529C0344B002D6A52 /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = AE717AC429C0344B002D6A52 /* AsyncAlgorithms */; };
 		AE771EAF29B5166A0019EDA1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE771EAE29B5166A0019EDA1 /* ContentView.swift */; };
 		AE7FE80029BAB2800060DCE3 /* Reposted.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7FE7FF29BAB2800060DCE3 /* Reposted.swift */; };
 		AE7FE83929BBB7F80060DCE3 /* Parser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7FE83829BBB7F80060DCE3 /* Parser.swift */; };
@@ -53,7 +60,6 @@
 		AEB899A629B4F81E004361B8 /* QuickLMDB in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899A529B4F81E004361B8 /* QuickLMDB */; };
 		AEB899AA29B4F84C004361B8 /* HummingbirdWSClient in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899A929B4F84C004361B8 /* HummingbirdWSClient */; };
 		AEB899AC29B4F84C004361B8 /* HummingbirdWSCore in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899AB29B4F84C004361B8 /* HummingbirdWSCore */; };
-		AEB899AF29B4F87E004361B8 /* Algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899AE29B4F87E004361B8 /* Algorithms */; };
 		AEB899B229B4F89A004361B8 /* AsyncHTTPClient in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899B129B4F89A004361B8 /* AsyncHTTPClient */; };
 		AEB899B529B4F8A6004361B8 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899B429B4F8A6004361B8 /* Logging */; };
 		AEB899B829B4F8BA004361B8 /* secp256k1 in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899B729B4F8BA004361B8 /* secp256k1 */; };
@@ -116,9 +122,15 @@
 		AE2C0EF129BA7C9E00C0B87C /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		AE39020A29B912D600F9D40C /* Delta.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Delta.swift; sourceTree = "<group>"; };
 		AE421C6C29BC433B009CB737 /* PostBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostBlock.swift; sourceTree = "<group>"; };
+		AE421C7029BC7EED009CB737 /* RelayRegistrar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayRegistrar.swift; sourceTree = "<group>"; };
+		AE421C7229BD095B009CB737 /* EventReference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventReference.swift; sourceTree = "<group>"; };
+		AE421C7429BD1ED4009CB737 /* ReplyDescription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyDescription.swift; sourceTree = "<group>"; };
+		AE421C7629BD1FB5009CB737 /* ReplyDesc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyDesc.swift; sourceTree = "<group>"; };
+		AE421C7929BE30DE009CB737 /* Date.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Date.swift; sourceTree = "<group>"; };
 		AE5C8A6929B9D1C000306779 /* InnerTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InnerTimelineView.swift; sourceTree = "<group>"; };
 		AE5C8A6B29B9D35100306779 /* EventView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventView.swift; sourceTree = "<group>"; };
 		AE5C8A6D29B9D3B000306779 /* TextEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextEvent.swift; sourceTree = "<group>"; };
+		AE717AC129C014F7002D6A52 /* HomeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeModel.swift; sourceTree = "<group>"; };
 		AE771EAE29B5166A0019EDA1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AE7FE7FF29BAB2800060DCE3 /* Reposted.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reposted.swift; sourceTree = "<group>"; };
 		AE7FE83829BBB7F80060DCE3 /* Parser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Parser.swift; sourceTree = "<group>"; };
@@ -148,7 +160,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AEB899B529B4F8A6004361B8 /* Logging in Frameworks */,
-				AEB899AF29B4F87E004361B8 /* Algorithms in Frameworks */,
+				AE717AC529C0344B002D6A52 /* AsyncAlgorithms in Frameworks */,
 				AEB899B229B4F89A004361B8 /* AsyncHTTPClient in Frameworks */,
 				AEB899BE29B4F8E5004361B8 /* SwiftBlake2 in Frameworks */,
 				AEB899C129B4F91A004361B8 /* Ctopaz in Frameworks */,
@@ -192,6 +204,7 @@
 				AED9D13129BA97E5004AE0AE /* ProfileName.swift */,
 				AED9D13529BA99BE004AE0AE /* EventBody.swift */,
 				AE7FE7FF29BAB2800060DCE3 /* Reposted.swift */,
+				AE421C7429BD1ED4009CB737 /* ReplyDescription.swift */,
 			);
 			path = UserExperience;
 			sourceTree = "<group>";
@@ -228,6 +241,7 @@
 		AE26C07629B4F77600B85600 /* topaz */ = {
 			isa = PBXGroup;
 			children = (
+				AE421C7829BE3050009CB737 /* Extensions */,
 				AEB39B7229B5401F00F3C92E /* App */,
 				AEB39B7129B5400000F3C92E /* nostr */,
 				AEB899EF29B4FE4E004361B8 /* Model */,
@@ -267,9 +281,19 @@
 		AE2C0EEC29BA712D00C0B87C /* Other Stuff */ = {
 			isa = PBXGroup;
 			children = (
+				AE421C6C29BC433B009CB737 /* PostBlock.swift */,
+				AE421C7629BD1FB5009CB737 /* ReplyDesc.swift */,
 				AE2C0EED29BA71B100C0B87C /* ActionBarModel.swift */,
 			);
 			path = "Other Stuff";
+			sourceTree = "<group>";
+		};
+		AE421C7829BE3050009CB737 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				AE421C7929BE30DE009CB737 /* Date.swift */,
+			);
+			path = Extensions;
 			sourceTree = "<group>";
 		};
 		AEB39B7129B5400000F3C92E /* nostr */ = {
@@ -286,6 +310,7 @@
 				AE1A59D229B7E85200D21AA0 /* Filter.swift */,
 				AE2C0EEA29BA6E8700C0B87C /* Profile.swift */,
 				AED9D13329BA9828004AE0AE /* NIP05.swift */,
+				AE421C7029BC7EED009CB737 /* RelayRegistrar.swift */,
 			);
 			path = nostr;
 			sourceTree = "<group>";
@@ -352,7 +377,8 @@
 				AE2C0EEC29BA712D00C0B87C /* Other Stuff */,
 				AEB899F029B4FE4E004361B8 /* ApplicationModel.swift */,
 				AEB39B7F29B5C2E700F3C92E /* UserEnvironment.swift */,
-				AE421C6C29BC433B009CB737 /* PostBlock.swift */,
+				AE421C7229BD095B009CB737 /* EventReference.swift */,
+				AE717AC129C014F7002D6A52 /* HomeModel.swift */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -377,7 +403,6 @@
 				AEB899A529B4F81E004361B8 /* QuickLMDB */,
 				AEB899A929B4F84C004361B8 /* HummingbirdWSClient */,
 				AEB899AB29B4F84C004361B8 /* HummingbirdWSCore */,
-				AEB899AE29B4F87E004361B8 /* Algorithms */,
 				AEB899B129B4F89A004361B8 /* AsyncHTTPClient */,
 				AEB899B429B4F8A6004361B8 /* Logging */,
 				AEB899B729B4F8BA004361B8 /* secp256k1 */,
@@ -385,6 +410,7 @@
 				AEB899C029B4F91A004361B8 /* Ctopaz */,
 				AEB899FA29B50602004361B8 /* Markdown */,
 				AEB899FD29B50720004361B8 /* SystemPackage */,
+				AE717AC429C0344B002D6A52 /* AsyncAlgorithms */,
 			);
 			productName = topaz;
 			productReference = AE26C07429B4F77600B85600 /* topaz.app */;
@@ -461,7 +487,6 @@
 			packageReferences = (
 				AEB899A429B4F81E004361B8 /* XCRemoteSwiftPackageReference "QuickLMDB" */,
 				AEB899A829B4F84C004361B8 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */,
-				AEB899AD29B4F87E004361B8 /* XCRemoteSwiftPackageReference "swift-algorithms" */,
 				AEB899B029B4F89A004361B8 /* XCRemoteSwiftPackageReference "async-http-client" */,
 				AEB899B329B4F8A6004361B8 /* XCRemoteSwiftPackageReference "swift-log" */,
 				AEB899B629B4F8BA004361B8 /* XCRemoteSwiftPackageReference "secp256k1" */,
@@ -469,6 +494,7 @@
 				AEB899BF29B4F91A004361B8 /* XCRemoteSwiftPackageReference "Ctopaz" */,
 				AEB899F929B50602004361B8 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				AEB899FC29B50720004361B8 /* XCRemoteSwiftPackageReference "swift-system" */,
+				AE717AC329C0344B002D6A52 /* XCRemoteSwiftPackageReference "swift-async-algorithms" */,
 			);
 			productRefGroup = AE26C07529B4F77600B85600 /* Products */;
 			projectDirPath = "";
@@ -520,6 +546,7 @@
 				AE1A59CA29B7B26200D21AA0 /* ReferenceID.swift in Sources */,
 				AE5C8A6E29B9D3B100306779 /* TextEvent.swift in Sources */,
 				AE1A59BB29B6ED2000D21AA0 /* UEDevView.swift in Sources */,
+				AE421C7529BD1ED4009CB737 /* ReplyDescription.swift in Sources */,
 				AEB39B8029B5C2E700F3C92E /* UserEnvironment.swift in Sources */,
 				AE7FE80029BAB2800060DCE3 /* Reposted.swift in Sources */,
 				AED9D13229BA97E5004AE0AE /* ProfileName.swift in Sources */,
@@ -528,6 +555,7 @@
 				AE2C0EF029BA725A00C0B87C /* Zap.swift in Sources */,
 				AEB39B7529B5403900F3C92E /* npub.swift in Sources */,
 				AEB39B7829B5406A00F3C92E /* Keys.swift in Sources */,
+				AE421C7729BD1FB5009CB737 /* ReplyDesc.swift in Sources */,
 				AEB39B7E29B59C5B00F3C92E /* AccountPickerView.swift in Sources */,
 				AE1A59C829B7B1EA00D21AA0 /* Mention.swift in Sources */,
 				AE1A59BD29B6EEA400D21AA0 /* MDBEnvStats.swift in Sources */,
@@ -542,9 +570,12 @@
 				AE2C0EE629BA50BD00C0B87C /* EventHolder.swift in Sources */,
 				AE1A59C629B7B0EA00D21AA0 /* Invoice.swift in Sources */,
 				AEB39B8229B5C37800F3C92E /* Relay.swift in Sources */,
+				AE421C7129BC7EED009CB737 /* RelayRegistrar.swift in Sources */,
 				AED9D13429BA9828004AE0AE /* NIP05.swift in Sources */,
+				AE421C7329BD095B009CB737 /* EventReference.swift in Sources */,
 				AE2C0EF229BA7C9E00C0B87C /* Constants.swift in Sources */,
 				AEB39B6E29B52D5900F3C92E /* Topaz.swift in Sources */,
+				AE421C7A29BE30DE009CB737 /* Date.swift in Sources */,
 				AE2C0EE429BA3DC600C0B87C /* ProfilePicView.swift in Sources */,
 				AED9D12F29BA9730004AE0AE /* LocalizationHelp.swift in Sources */,
 				AE421C6D29BC433B009CB737 /* PostBlock.swift in Sources */,
@@ -555,6 +586,7 @@
 				AEB39B7929B5406A00F3C92E /* Bech32.swift in Sources */,
 				AE1A59C429B7A3E400D21AA0 /* nostr.swift in Sources */,
 				AE39020B29B912D600F9D40C /* Delta.swift in Sources */,
+				AE717AC229C014F7002D6A52 /* HomeModel.swift in Sources */,
 				AE1A59C029B70F9200D21AA0 /* TimelineView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -647,6 +679,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				STRIP_INSTALLED_PRODUCT = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -700,6 +733,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				STRIP_INSTALLED_PRODUCT = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 			};
@@ -907,6 +941,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		AE717AC329C0344B002D6A52 /* XCRemoteSwiftPackageReference "swift-async-algorithms" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-async-algorithms";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.0;
+			};
+		};
 		AEB899A429B4F81E004361B8 /* XCRemoteSwiftPackageReference "QuickLMDB" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/tannerdsilva/QuickLMDB";
@@ -918,14 +960,6 @@
 		AEB899A829B4F84C004361B8 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/hummingbird-project/hummingbird-websocket.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
-			};
-		};
-		AEB899AD29B4F87E004361B8 /* XCRemoteSwiftPackageReference "swift-algorithms" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/swift-algorithms.git";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 1.0.0;
@@ -968,7 +1002,7 @@
 			repositoryURL = "https://github.com/tannerdsilva/Ctopaz.git";
 			requirement = {
 				kind = revision;
-				revision = 775699630a8291a3968977bdcf9899610e954574;
+				revision = 427db2fa0ada05e4a9de76035b7fbcf126db8350;
 			};
 		};
 		AEB899F929B50602004361B8 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
@@ -990,6 +1024,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		AE717AC429C0344B002D6A52 /* AsyncAlgorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE717AC329C0344B002D6A52 /* XCRemoteSwiftPackageReference "swift-async-algorithms" */;
+			productName = AsyncAlgorithms;
+		};
 		AEB899A529B4F81E004361B8 /* QuickLMDB */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = AEB899A429B4F81E004361B8 /* XCRemoteSwiftPackageReference "QuickLMDB" */;
@@ -1004,11 +1043,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AEB899A829B4F84C004361B8 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */;
 			productName = HummingbirdWSCore;
-		};
-		AEB899AE29B4F87E004361B8 /* Algorithms */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AEB899AD29B4F87E004361B8 /* XCRemoteSwiftPackageReference "swift-algorithms" */;
-			productName = Algorithms;
 		};
 		AEB899B129B4F89A004361B8 /* AsyncHTTPClient */ = {
 			isa = XCSwiftPackageProductDependency;

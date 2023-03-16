@@ -55,22 +55,26 @@ struct OnboardingView: View {
 	}
 	
 	struct ExistingLoginView: View {
-		@StateObject var appData:ApplicationModel
-		@Binding var progress:OnboardingProgress
-		@State var nsecKey:String = ""
-		
-		@State var parsedKey:ParsedKey? = nil
-		@State var tfDisabled:Bool = false
-		
-		@FocusState var tfFocus:Bool
-		
+		@StateObject var appData: ApplicationModel // data store
+		@Binding var progress: OnboardingProgress // will always equal `.existingInput` in this view
+		@State var nsecKey: String = ""    // private key
+
+		@State var parsedKey: ParsedKey? = nil // the private key that was successfully parsed from the user input from `nsecKey`
+		@State var tfDisabled: Bool = false
+
+		@FocusState var tfFocus: Bool
+
 		var body: some View {
 			VStack {
 				if case .priv(_) = parsedKey {
 					Text(verbatim: "This key is validated!")
+						.font(.headline)
+						.foregroundColor(Color.green)
 						.padding(.bottom)
 				} else {
 					Text(verbatim: "Please enter your private key...")
+						.font(.headline)
+						.foregroundColor(Color.primary)
 						.padding(.bottom)
 				}
 				HStack {
@@ -79,8 +83,12 @@ struct OnboardingView: View {
 							tfDisabled = false
 							tfFocus = true
 						}
+						.padding()
+						.background(Color.blue)
+						.foregroundColor(Color.white)
+						.cornerRadius(8)
 					}
-					TextField("nsec.........", text:$nsecKey).onChange(of:nsecKey, perform: { newValue in
+					TextField("nsec.........", text: $nsecKey).onChange(of: nsecKey, perform: { newValue in
 						if let hasParsedItem = parse_key(newValue) {
 							if hasParsedItem != parsedKey {
 								parsedKey = hasParsedItem
@@ -91,27 +99,36 @@ struct OnboardingView: View {
 						} else if parsedKey != nil {
 							parsedKey = nil
 						}
-					}).disabled(tfDisabled).focused($tfFocus)
+					})
+					.padding()
+					.background(Color(.systemGray6))
+					.cornerRadius(8)
+					.disabled(tfDisabled)
+					.focused($tfFocus)
 				}.padding(.horizontal, 16.0)
 				if case let .priv(pk) = parsedKey {
-					if let getPub = privkey_to_pubkey(privkey:pk) {
+					if let getPub = privkey_to_pubkey(privkey: pk) {
 						Button("Login") { [getPK = pk, gPub = getPub] in
 							do {
-								try appData.installUser(publicKey:gPub, privateKey:getPK)
+								try appData.installUser(publicKey: gPub, privateKey: getPK)
 							} catch let error {
 								print(error)
 							}
 						}
+						.padding()
+						.background(Color.blue)
+						.foregroundColor(Color.white)
+						.cornerRadius(8)
 					} else {
 						Text("There was a problem getting the private key")
+							.font(.callout)
+							.foregroundColor(Color.red)
 					}
-
 				}
-				
 			}
 		}
 	}
-
+	
     var body: some View {
 		switch progress {
 		case .hello:

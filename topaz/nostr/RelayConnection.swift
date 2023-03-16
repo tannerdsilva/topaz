@@ -12,6 +12,7 @@ import HummingbirdWSClient
 import NIO
 import Logging
 import AsyncAlgorithms
+import QuickLMDB
 
 /// Primary interface for interacting with a nostr relay
 final actor RelayConnection:ObservableObject {
@@ -22,6 +23,9 @@ final actor RelayConnection:ObservableObject {
 
         /// kinda stupid to have this here but it is here nonetheless
         case encodingError
+
+        /// the connection was canceled
+        case connectionCanceled
 	}
 
     /// the default event loop group used for all relay connections (unless otherwise specified for a particular connection)
@@ -43,7 +47,7 @@ final actor RelayConnection:ObservableObject {
     }
 
     /// The various states that a relay connection can be in
-	public enum State {
+	public enum State:UInt8, MDB_convertible {
         /// There is no connection to the relay
 		case disconnected
         /// There is a connection attempt in progress
@@ -82,7 +86,9 @@ final actor RelayConnection:ObservableObject {
     /// initialize a new relay connection. the connection will be started immediately.
     init(url:String, channel:AsyncChannel<Event>) {
         self.url = url
-        self.logger = Logger(label: "relay-ctx")
+        var logger = Logger(label: "relay-ctx")
+		logger.logLevel = .trace
+		self.logger = logger
         self.outChannel = channel
         // connect to the relay in the background
 		self.reconnectionTask = Task.detached { [weak self] in
@@ -95,7 +101,7 @@ final actor RelayConnection:ObservableObject {
     fileprivate func websocketWasClosed(retry:Bool = true) {
         // ensure that the connection is in the correct state
 		guard case .connected = self.state else { return }
-        self.logger.debug("disconnected from relay.", metadata: ["url": "\(url)"])
+        self.logger.info("disconnected from relay.", metadata: ["url": "\(url)"])
         
         // update the state to reflect the disconnection
         self.websocket = nil
@@ -134,9 +140,16 @@ final actor RelayConnection:ObservableObject {
             self.state = .connecting
             let newURL = HBURL(self.url)
 			let newWS = try await HBWebSocketClient.connect(url:newURL, configuration: HBWebSocketClient.Configuration(), on:loopGroup.next())
+            // cancel the connection if the state was changed during the connection attempt
+            guard case .connecting = self.state else {
+                self.logger.debug("connection attempt canceled.", metadata:["url":"\(self.url)"])
+                try await newWS.close().get()
+                return
+            }
 			self.state = .connected
 			newWS.initiateAutoPing(interval:.seconds(Int64.random(in:7..<12)))   // ensure the state of the connection is always checked
-			
+			self.logger.info("successfully connected to relay.", metadata:["url":"\(self.url)"])
+
             // launch the main async stream that takes the data from the websocket and passes it to the relay connection handler
             let mainStream = AsyncStream(StreamEvent.self) { streamCont in
 				self.logger.trace("async stream initialized.")
@@ -236,14 +249,23 @@ final actor RelayConnection:ObservableObject {
 
     /// forces a closure of the connection to the relay and will ensure that the connection is not re-established
     func forceClosure() async throws {
-        // validate the state
-		guard case .connected = self.state, let hasSocket = self.websocket else {
-            self.logger.error("unable to force close connection - not currently connected.", metadata:["state":"\(self.state)"])
-            throw Error.invalidState
+        switch self.state {
+        case .disconnected:
+            self.logger.debug("unable to force close connection - already disconnected.", metadata:["url":"\(self.url)"])
+            return
+        case .connecting:
+            self.state = .disconnected
+            self.logger.debug("connection attempt canceled.", metadata:["url":"\(self.url)"])
+            return
+        case .connected:
+            guard let hasSocket = self.websocket else {
+                self.logger.error("unable to force close connection - not currently connected.", metadata:["state":"\(self.state)"])
+                throw Error.invalidState
+            }
+            self.reconnectOverride = true
+            // close the connection
+			try await hasSocket.close().get()
         }
-        self.reconnectOverride = true
-        // close the connection
-        try await hasSocket.close().get()
     }
 }
 

@@ -12,9 +12,9 @@ import SystemPackage
 
 @main
 struct Topaz:App {
-	public static let bootstrap_relays = [
+	public static let defaultRelays:Set<Relay> = Set([
 		Relay("wss://relay.damus.io")
-	]
+	])
 	
 	public static let tester_account = try! KeyPair.from(nsec:"nsec1s23j6z0x4w2y35c5zkf6le539sdmkmw4r7mm9jj22gnltrllqxzqjnh2wm")
 	
@@ -52,7 +52,7 @@ struct Topaz:App {
 		}
 	}
 	
-	@StateObject var localData:ApplicationModel
+	@ObservedObject var localData:ApplicationModel
 	
 	init() {
 		do {
@@ -60,7 +60,7 @@ struct Topaz:App {
 			switch (localData) {
 			case (.success(let localData)):
 				let appModel = try ApplicationModel(localData, tx:nil)
-				_localData = StateObject(wrappedValue:appModel)
+				_localData = ObservedObject(wrappedValue: appModel)
 			default:
 				fatalError("false")
 			}

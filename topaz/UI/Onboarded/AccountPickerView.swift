@@ -13,29 +13,14 @@ struct AccountPickerView: View {
     var body: some View {
 		VStack {
 			// Title Bar
-			CustomTitleBar()
+			CustomTitleBar(ue:ue)
 			
 			Spacer()
 			
-			switch ue.viewMode {
-			case .home:
-				HomeView(ue:ue)
-			case .notifications:
-				MentionsView()
-			case .dms:
-				MessagesView(isUnread:$ue.badgeStatus.dmsBadge)
-			case .search:
-				SearchView()
-			case .profile:
-				PV()
-			}
+			Text("this is the account picker")
 
 			Spacer()
 
-			// Navigation Bar
-			HStack {
-				CustomTabBar(viewMode:$ue.viewMode, badgeStatus:$ue.badgeStatus)
-			}
 		}.background(.gray).frame(maxWidth:.infinity)
     }
 }

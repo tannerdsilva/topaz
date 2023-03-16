@@ -8,11 +8,11 @@
 import SwiftUI
 
 struct ContentView: View {
-	@StateObject var appData:ApplicationModel
+	@ObservedObject var appData:ApplicationModel
 	
     var body: some View {
 		if (appData.state == .onboarded) {
-			UserExperienceView(ue:appData.defaultUE!).background(.yellow)
+			UserExperienceView(ue: appData.defaultUE!).background(.yellow)
 		} else {
 			OnboardingView(appData:appData)
 		}

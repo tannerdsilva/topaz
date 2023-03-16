@@ -10,6 +10,7 @@ import SwiftUI
 import QuickLMDB
 import Logging
 import SwiftBlake2
+import AsyncAlgorithms
 
 // FRIENDS:
 // a user may be considered a friend to the current user if the current user is following them
@@ -59,7 +60,120 @@ extension UE {
 	}
 }
 
+extension UE {
+	// user context
+	// - stores information about the current state of the user environment. this includes things such as notification badges, sync times with relays, etc
+	// - the stuff that is stored in here is not metadata that a user should ever be concerned with managing directly. this is mostly a place for the topaz app to store relevant information about the user's current state
+	class Context:ObservableObject {
+		static let logger = Topaz.makeDefaultLogger(label:"ue-context")
+		enum Contexts:String, MDB_convertible {
+			case badgeStatus = "badge_status" // ViewBadgeStatus
+			case viewMode = "view_mode" // ViewMode
+		}
+
+		// tab bar related items
+		@Published var badgeStatus:ViewBadgeStatus {
+			didSet {
+				let encoder = JSONEncoder()
+				let encoded = try! encoder.encode(self.badgeStatus)
+				try! self.userContext.setEntry(value:encoded, forKey:Contexts.badgeStatus, tx:nil)
+				Self.logger.debug("successfully updated badge status.", metadata:["badgeStatus": "\(self.badgeStatus)"])
+			}
+		}
+
+		@Published var viewMode:ViewMode {
+			didSet {
+				let encoder = JSONEncoder()
+				let encoded = try! encoder.encode(self.viewMode)
+				try! self.userContext.setEntry(value:encoded, forKey:Contexts.viewMode, tx:nil)
+				Self.logger.debug("successfully updated view mode.", metadata:["viewMode": "\(self.viewMode)"])
+			}
+		}
+		
+		fileprivate let env:QuickLMDB.Environment
+		fileprivate let encoder:JSONEncoder
+		fileprivate let decoder:JSONDecoder
+		fileprivate let userContext:Database
+
+		// initializes the user context database with a valid read/write transaction
+		init(_ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
+			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
+			self.env = env
+			let context = try env.openDatabase(named:Databases.userContext.rawValue, flags:[.create], tx:subTrans)
+			self.userContext = context
+			let encoder = JSONEncoder()
+			let decoder = JSONDecoder()
+			self.encoder = encoder
+			self.decoder = decoder
+
+			// get the badge status
+			do {
+				let decoded = try decoder.decode(ViewBadgeStatus.self, from:try context.getEntry(type:Data.self, forKey:Contexts.badgeStatus, tx:subTrans)!)
+				_badgeStatus = Published(wrappedValue:decoded)
+			} catch LMDBError.notFound {
+				let newBadgeStatus = ViewBadgeStatus.defaultViewBadgeStatus()
+				_badgeStatus = Published(wrappedValue:newBadgeStatus)
+				try context.setEntry(value:try encoder.encode(newBadgeStatus), forKey:Contexts.badgeStatus, tx:subTrans)
+			}
+
+			// get the view mode
+			do {
+				let decoded = try decoder.decode(ViewMode.self, from:try context.getEntry(type:Data.self, forKey:Contexts.viewMode, tx:subTrans)!)
+				_viewMode = Published(initialValue:decoded)
+			} catch LMDBError.notFound {
+				let newViewMode:ViewMode = .home
+				_viewMode = Published(initialValue:newViewMode)
+				try context.setEntry(value:encoder.encode(newViewMode), forKey:Contexts.viewMode, tx:subTrans)
+			}
+			try subTrans.commit()
+		}
+	}
+	
+}
+
+extension UE {
+	// UserSettings
+	// - stores information about the user's preferences
+	class Settings:ObservableObject {
+		
+		// initializes the settings database with a valid read/write transaction
+		init(_ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
+			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
+			try subTrans.commit()
+		}
+	}
+}
+
 class UE:ObservableObject {
+	/// stores the primary root view that the user is currently viewing
+	enum ViewMode:Int, MDB_convertible, Codable {
+		case home = 0
+		case notifications = 1
+		case dms = 2
+		case search = 3
+		case profile = 4
+	}
+	
+	// stores the primary tab viwe badge status for the user
+	struct ViewBadgeStatus:Codable {
+		var homeBadge:Bool
+		var notificationsBadge:Bool
+		var dmsBadge:Bool
+		var searchBadge:Bool
+		var profileBadge:Bool
+		
+		fileprivate init(homeBadge:Bool, notificationsBadge:Bool, dmsBadge:Bool, searchBadge:Bool, profileBadge:Bool) {
+			self.homeBadge = homeBadge
+			self.notificationsBadge = notificationsBadge
+			self.dmsBadge = dmsBadge
+			self.searchBadge = searchBadge
+			self.profileBadge = profileBadge
+		}
+		
+		static func defaultViewBadgeStatus() -> ViewBadgeStatus {
+			return Self(homeBadge:false, notificationsBadge: false, dmsBadge: false, searchBadge: false, profileBadge: false)
+		}
+	}
 
 	// the databases 
 	enum Databases:String {
@@ -80,24 +194,12 @@ class UE:ObservableObject {
 	let uuid:String
 	let keypair:KeyPair
 
-	enum UserContext:String, MDB_convertible {
-		case badgeStatus = "badge_status" // ViewBadgeStatus
-	}
-	let userContext:Database
-
-
 	enum UserInfo:String, MDB_convertible {
 		case relays = "user_relays" // [Relay]: where index 0 is the primary relay
 		case pubkey = "user_pub"	// String: the public key for this current user
 		case privkey = "user_pk"	// String?: the private key for this current user
 	}
 	let userInfo:Database
-
-	/// user settings
-	enum Settings:String, MDB_convertible {
-		///idek what goes here yet
-		case viewMode = "viewMode"	// ViewMode
-	}
 	let userSettings:Database
 
 	// event info
@@ -106,46 +208,13 @@ class UE:ObservableObject {
 	// contacts db
 	let contactsDB:UE.Contacts
 
-	/// stores the primary root view that the user is currently viewing
-	enum ViewMode:Int, MDB_convertible {
-		case home
-		case notifications
-		case dms
-		case search
-		case profile
-	}
-	
-	// stores the primary tab viwe badge status for the user
-	struct ViewBadgeStatus:Codable {
-		var homeBadge:Bool
-		var notificationsBadge:Bool
-		var dmsBadge:Bool
-		var searchBadge:Bool
-		var profileBadge:Bool
-	}
-	@Published var badgeStatus:ViewBadgeStatus {
-		didSet {
-			do {
-				let jsonData = try encoder.encode(badgeStatus)
-				try self.userContext.setEntry(value:jsonData, forKey:UserContext.badgeStatus.rawValue, tx:nil)
-				self.logger.info("badge status modified.", metadata:["new_value": "\(badgeStatus)"])
-			} catch let error {
-				self.logger.error("failed to update badge status in database.", metadata:["error": "\(error)"])
-			}
-		}
-	}
-	
-	@Published var viewMode:ViewMode {
-		didSet {
-			do {
-				try self.userSettings.setEntry(value:viewMode, forKey:Settings.viewMode.rawValue, tx:nil)
-				self.logger.info("view mode modified.", metadata:["new_value": "\(viewMode)"])
-			} catch let error {
-				self.logger.error("failed to update view mode in database.", metadata:["error": "\(error)"])
-			}
-		}
-	}
 	let profilesDB:Profiles
+	
+	// context
+	var contextDB:UE.Context
+
+	// relays
+	let relaysDB:UE.Contacts.RelaysDB
 
 	init(keypair:KeyPair, uuid:String = UUID().uuidString) throws {
 		let makeLogger = Topaz.makeDefaultLogger(label:"user-environment")
@@ -153,62 +222,37 @@ class UE:ObservableObject {
 		let makeEnv = Topaz.openLMDBEnv(named:"topaz-u-\(keypair.pubkey.prefix(8))")
 		switch makeEnv {
 		case let .success(env):
-			let newTrans = try QuickLMDB.Transaction(env, readOnly:false)
-			let makeSettings = try env.openDatabase(named:Databases.userSettings.rawValue, flags:[.create], tx:newTrans)
+			let newTrans = try! QuickLMDB.Transaction(env, readOnly:false)
+			let makeSettings = try! env.openDatabase(named:Databases.userSettings.rawValue, flags:[.create], tx:newTrans)
 			self.userSettings = makeSettings
-			let makeUserInfo = try env.openDatabase(named:Databases.userInfo.rawValue, flags:[.create], tx:newTrans)
+			let makeUserInfo = try! env.openDatabase(named:Databases.userInfo.rawValue, flags:[.create], tx:newTrans)
 			self.userInfo = makeUserInfo
-			let uc = try env.openDatabase(named:Databases.userContext.rawValue, flags:[.create], tx:newTrans)
-			self.userContext = uc
+
 			// public key always present
 			try makeUserInfo.setEntry(value:keypair.pubkey, forKey:UserInfo.pubkey.rawValue, tx:newTrans)
 			try makeUserInfo.setEntry(value:keypair.privkey, forKey:UserInfo.privkey.rawValue, tx:newTrans)
-			
-			// initialize the view mode
-			do {
-				let getViewMode = try self.userSettings.getEntry(type:ViewMode.self, forKey:Settings.viewMode.rawValue, tx:newTrans)!
-				_viewMode = Published(wrappedValue:getViewMode)
-			} catch LMDBError.notFound {
-				// this is the first launch, place a default value
-				try self.userSettings.setEntry(value:ViewMode.home, forKey:Settings.viewMode.rawValue, tx:newTrans)
-				_viewMode = Published(wrappedValue:.home)
-			}
 
-			// initialize the connected relays
-			var buildRelays = [Relay:RelayConnection]()
 			self.uuid = uuid
 			self.env = env
-			
-			// build the relays (this must be done after self is initialized so relayconnections can reference self)
-			let allRelays:[Relay]
-			do {
-				allRelays = try makeUserInfo.getEntry(type:[Relay].self, forKey:UserInfo.relays.rawValue, tx:newTrans)!
-			} catch LMDBError.notFound {
-				allRelays = Topaz.bootstrap_relays
-				try makeUserInfo.setEntry(value:Topaz.bootstrap_relays, forKey:UserInfo.relays.rawValue, tx:newTrans)
-			}
-
-			// build the view badge status
-			do {
-				let getBadgeStatus = try JSONDecoder().decode(ViewBadgeStatus.self, from: try uc.getEntry(type:Data.self, forKey:UserContext.badgeStatus.rawValue, tx:newTrans)!)
-				_badgeStatus = Published(wrappedValue:getBadgeStatus)
-			} catch LMDBError.notFound {
-				// this is the first launch, place a default value
-				let defaultBadgeStatus = ViewBadgeStatus(homeBadge:false, notificationsBadge:false, dmsBadge:true, searchBadge:false, profileBadge:false)
-				try uc.setEntry(value:try JSONEncoder().encode(defaultBadgeStatus), forKey:UserContext.badgeStatus.rawValue, tx:newTrans)
-				_badgeStatus = Published(wrappedValue:defaultBadgeStatus)
-			}
 
 			// initialize the events database
-			let makeEventsDB = try UE.EventsDB(env:env, tx:newTrans)
+			let makeEventsDB = try! UE.EventsDB(env:env, tx:newTrans)
 			self.eventsDB = makeEventsDB
 
 			// initialize the contacts database
-			let makeContactsDB = try UE.Contacts(publicKey:keypair.pubkey, env:env, tx:newTrans)
+			let makeContactsDB = try! UE.Contacts(publicKey:keypair.pubkey, env:env, tx:newTrans)
 			self.contactsDB = makeContactsDB
 			
+			let makeContextDB = try! UE.Context(env, tx:newTrans)
+			self.contextDB = makeContextDB
+			
 			// initialize the profiles database
-			let makeProfilesDB = try Profiles(env, tx:newTrans)
+			let makeProfilesDB = try! Profiles(env, tx:newTrans)
+
+			// initialize the relays database
+			let makeRelaysDB = try! UE.Contacts.RelaysDB(pubkey:keypair.pubkey, env:env, tx:newTrans)
+			self.relaysDB = makeRelaysDB
+
 			self.profilesDB = makeProfilesDB
 			self.keypair = keypair
 			
@@ -426,15 +470,203 @@ extension UE {
 
 		// relay related
 		/// this database stores the list of relays that the user has listed in their profile
-		struct RelaysDB {
+		class RelaysDB:ObservableObject {
 			static func produceRelayHash<B>(url:B) throws -> Data where B:ContiguousBytes {
-				var newHasher = try Blake2bHasher(outputLength:16)
+				var newHasher = try Blake2bHasher(outputLength:8)
 				try newHasher.update(url)
 				return try newHasher.export()
 			}
+
+			enum Databases:String {
+				case pubkey_relayHash = "pubkey-relayHash"
+				case relayHash_relayString = "relayHash-relayString"
+				case relayHash_pubKey = "relayHash-pubKey"
+				case relayHash_connectionStatus = "relayHash-connectionStatus"
+			}
+			
+			fileprivate let logger:Logger
+			fileprivate let env:QuickLMDB.Environment
+			let myPubkey:String
+
 			let pubkey_relayHash:Database		// stores the list of relay hashes that the user has listed in their profile	[String:String] * DUP *
 			let relayHash_relayString:Database	// stores the full relay URL for a given relay hash								[String:String]
 			let relayHash_pubKey:Database		// stores the public key for a given relay hash									[String:String] * DUP *
+
+			@Published public private(set) var allConnections = [String:RelayConnection]()
+			@Published public private(set) var allRelays = [String:Relay]()
+
+			fileprivate let mainChannel:AsyncChannel<RelayConnection.Event>
+			let relayHash_connectionStatus:Database	// stores the connection status for a given relay hash						[String:RelayConnection.Status]
+			
+			var digestTask:Task<Void, Never>? = nil
+			init(pubkey:String, env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
+				self.env = env
+				self.myPubkey = pubkey
+				let newLogger = Topaz.makeDefaultLogger(label:"relay-db")
+				let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
+				let pubRelaysDB = try env.openDatabase(named:Databases.pubkey_relayHash.rawValue, flags:[.create, .dupSort], tx:subTrans)
+				let relayStringDB = try env.openDatabase(named:Databases.relayHash_relayString.rawValue, flags:[.create], tx:subTrans)
+				let pubRelaysCursor = try pubRelaysDB.cursor(tx:subTrans)
+				let relayStringCursor = try relayStringDB.cursor(tx:subTrans)
+				let mainC = AsyncChannel<RelayConnection.Event>()
+				self.mainChannel = mainC
+				self.pubkey_relayHash = pubRelaysDB
+				self.relayHash_relayString = relayStringDB
+				self.relayHash_pubKey = try env.openDatabase(named:Databases.relayHash_pubKey.rawValue, flags:[.create, .dupSort], tx:subTrans)
+				let connectionStatus = try env.openDatabase(named:Databases.relayHash_connectionStatus.rawValue, flags:[.create], tx:subTrans)
+				try connectionStatus.deleteAllEntries(tx:subTrans)
+				self.relayHash_connectionStatus = connectionStatus
+				let getRelays:Set<String>
+				do {
+					let iterator = try pubRelaysCursor.makeDupIterator(key: pubkey)
+					var buildStrings = Set<String>()
+
+					for (_, curRelayHash) in iterator {
+						let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
+						buildStrings.update(with:String(relayString)!)
+					}
+					getRelays = buildStrings
+				} catch LMDBError.notFound {
+					let relays = Set(Topaz.defaultRelays.compactMap({ $0.url }))
+					for curRelay in relays {
+						let relayHash = try RelaysDB.produceRelayHash(url:Data(curRelay.utf8))
+						try relayStringCursor.setEntry(value:curRelay, forKey:relayHash)
+						try pubRelaysCursor.setEntry(value:relayHash, forKey:pubkey)
+						try self.relayHash_pubKey.setEntry(value:pubkey, forKey:relayHash, tx:subTrans)
+					}
+					getRelays = relays
+				}
+				let relayStatus = try connectionStatus.cursor(tx:subTrans)
+				var buildConnections = [String:RelayConnection]()
+				for curRelay in getRelays {
+					let relayHash = try RelaysDB.produceRelayHash(url:Data(curRelay.utf8))
+					let newConnection = RelayConnection(url:curRelay, channel:mainC)
+					buildConnections[curRelay] = newConnection
+					try relayStatus.setEntry(value:RelayConnection.State.disconnected, forKey:relayHash)
+				}
+				self.allConnections = buildConnections
+				self.logger = newLogger
+				try subTrans.commit()
+				self.digestTask = Task.detached { [chanMan = mainC, newEnv = env, logThing = newLogger] in
+					for await curItem in chanMan {
+						do {
+							switch curItem {
+							case let .event(conn, ev):
+								break;
+							case let .stateChange(conn, state):
+								let newTrans = try Transaction(newEnv, readOnly:false)
+								let relayHash = try RelaysDB.produceRelayHash(url:Data(conn.url.utf8))
+								try self.relayHash_connectionStatus.setEntry(value:state, forKey:relayHash, tx:newTrans)
+								try newTrans.commit()
+							default:
+								break;
+							}
+						} catch let error {
+							logThing.error("error in relay connection.", metadata:["error": "\(error)"])
+						}
+					}
+				}
+			}
+
+			func getRelayConnectionStatus(pubkey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws -> [String:RelayConnection.State] {
+				let newTrans = try Transaction(self.env, readOnly:true, parent:someTrans)
+				var buildRelays = [String:RelayConnection.State]()
+				let relayHashCursor = try self.pubkey_relayHash.cursor(tx:newTrans)
+				let relayStringCursor = try self.relayHash_relayString.cursor(tx:newTrans)
+				let relayStatusCursor = try self.relayHash_connectionStatus.cursor(tx:newTrans)
+				for (_, curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
+					let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
+					let relayStatus = RelayConnection.State(try relayStatusCursor.getEntry(.set, key:curRelayHash).value) ?? .disconnected
+					buildRelays[String(relayString)!] = relayStatus
+				}
+				return buildRelays
+			}
+
+			// gets the relays for a given pubkey
+			//  - throws LMDBError.notFound if the pubkey is not found
+			func getRelays(pubkey:String, tx someTrans:QuickLMDB.Transaction) throws -> Set<String> {
+				let newTrans = try Transaction(self.env, readOnly:true, parent:someTrans)
+				var buildRelays = Set<String>()
+				let relayHashCursor = try self.pubkey_relayHash.cursor(tx:newTrans)
+				let relayStringCursor = try self.relayHash_relayString.cursor(tx:newTrans)
+				for (_, curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
+					let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
+					buildRelays.update(with:String(relayString)!)
+				}
+				return buildRelays
+			}
+
+			// sets the relays for a given pubkey
+			//  - if the relay information is already in the database, it will be updated silently and any keys that existed previously will be dropped
+			func setRelays(_ relays:Set<String>, pubkey:String, tx someTrans:QuickLMDB.Transaction) throws {
+				let newTrans = try Transaction(self.env, readOnly:false, parent:someTrans)
+				let relayHashCursor = try self.pubkey_relayHash.cursor(tx:newTrans)
+				let relayStringCursor = try self.relayHash_relayString.cursor(tx:newTrans)
+				let relayHashPubKeyCursor = try self.relayHash_pubKey.cursor(tx:newTrans)
+				var assignRelays = relays
+				do {
+					// iterate through all existing entries and determine if they need to be removed from the database
+					for (_ , curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
+						// check if the relay is still in the list of relays that we are setting
+						let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
+						if !assignRelays.contains(String(relayString)!) {
+							// check if there are any other public keys that are using this relay
+							do {
+								try relayHashPubKeyCursor.getEntry(.getBoth, key:curRelayHash, value:pubkey)
+								let relayHashPubKeyCount = try relayHashPubKeyCursor.dupCount()
+								if relayHashPubKeyCount == 1 {
+									// this is the only public key that is using this relay, so we can remove it from the database
+									try relayHashPubKeyCursor.deleteEntry()
+									try relayStringCursor.deleteEntry()
+									try relayHashCursor.deleteEntry()
+								} else {
+									// there are other public keys that are using this relay, so we can just remove the public key from the list of public keys that are using this relay
+									try relayHashPubKeyCursor.deleteEntry()
+								}
+							} catch LMDBError.notFound {
+								// this should never happen, but if it does, we can just remove the relay from the database
+								try relayHashPubKeyCursor.deleteEntry()
+								try relayStringCursor.deleteEntry()
+								try relayHashCursor.deleteEntry()
+							}
+						} else {
+							// remove the relay from the list of relays that we are setting
+							assignRelays.remove(String(relayString)!)
+						}
+					}
+				} catch LMDBError.notFound {}
+
+				// iterate through the list of relays that we are setting and add them to the database
+				for curRelay in assignRelays {
+					let curRelayHash = try RelaysDB.produceRelayHash(url:Data(curRelay.utf8))
+					try relayHashCursor.setEntry(value:curRelayHash, forKey:pubkey)
+					try relayStringCursor.setEntry(value:curRelay, forKey:curRelayHash)
+					try relayHashPubKeyCursor.setEntry(value:pubkey, forKey:curRelayHash)
+				}
+
+
+				if pubkey == myPubkey {
+					
+					let existingRelays = Set(self.allConnections.keys)
+					var editConnections = self.allConnections
+					let newRelays = relays
+					let compare = Delta(start:existingRelays, end:newRelays)
+					for curDrop in compare.exclusiveStart {
+						if let hasItem = editConnections.removeValue(forKey:curDrop) {
+							Task.detached { [item = hasItem] in
+								try await item.forceClosure()
+							}
+						}
+					}
+					for curAdd in compare.exclusiveEnd {
+						let newConn = RelayConnection(url:curAdd, channel:mainChannel)
+						editConnections[curAdd] = newConn
+					}
+					self.objectWillChange.send()
+					self._allConnections = Published(wrappedValue:editConnections)
+				}
+				try newTrans.commit()
+			}
 		}
 	}
 }
@@ -445,8 +677,8 @@ extension UE {
 			static let logger:Logger = Logger(label:"com.nostr.eventsdb")
 
 			enum Databases:String, MDB_convertible {
-				case uid_kind = "uid-kind"
-				case kind_uid = "kind-uid"
+				case uid_kind = "_event_uid-kind"
+				case kind_uid = "_event_kind-uid"
 			}
 
 			let env:QuickLMDB.Environment
@@ -517,7 +749,6 @@ extension UE {
 		}
 
 		fileprivate let encoder = JSONEncoder()
-
 
 		let env:QuickLMDB.Environment
 		

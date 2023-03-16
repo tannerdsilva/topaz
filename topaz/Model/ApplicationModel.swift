@@ -136,7 +136,7 @@ class ApplicationModel:ObservableObject {
 		try self.userStore.addUser(publicKey, privateKey:privateKey, tx:newTrans)
 		try self.app_metadata.setEntry(value:State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
 		try newTrans.commit()
-		_defaultUE = Published(wrappedValue:try UE(keypair:KeyPair(pubkey:publicKey, privkey:privateKey)))
+		_defaultUE = Published(wrappedValue:try! UE(keypair:KeyPair(pubkey:publicKey, privkey:privateKey)))
 	}
 
 
