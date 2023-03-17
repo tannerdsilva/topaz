@@ -175,67 +175,50 @@ struct PV: View {
 
 struct ConnectionStatusIndicator: View {
 	@ObservedObject var relays: UE.Contacts.RelaysDB
-	
-	func renderData() -> Result<[RelayConnection.State], Swift.Error> {
-		do {
-			return .success(try relays.getRelayConnectionStatus(pubkey:relays.myPubkey).sorted(by: { $0.key < $1.key }).compactMap({ $0.value }))
-		} catch let error {
-			return .failure(error)
-		}
-	}
-	
+	@State private var isTextVisible = false
+
 	var body: some View {
-		
 		GeometryReader { geometry in
 			let circleSize: CGFloat = 6
 			let spacing: CGFloat = 4
 			let maxCircles = Int((geometry.size.width - spacing) / (circleSize + spacing))
-			switch renderData() {
-			case let .success(succ):
-				let connCount = succ.filter { $0 == .connected }
+			let succ = relays.userRelayConnectionStates.sorted(by: { $0.key < $1.key }).compactMap({ $0.value })
+			let connCount = succ.filter { $0 == .connected }
+
+			VStack {
 				if succ.count <= maxCircles {
-					VStack {
-						HStack(spacing: spacing) {
-							List(succ.indices, id: \.self) { index in
-								Circle()
-									.fill(colorForConnectionState(succ[index]))
-									.frame(width: circleSize, height: circleSize)
-							}
-						}
-						Text("\(connCount.count)/\(succ.count)")
-							.font(.system(size: 12))
-							.foregroundColor(.white)
-					}
-					.frame(width: geometry.size.width, height: geometry.size.height)
+					ConnectionDotView(spacing:spacing, circleSize:circleSize, status:succ)
 				} else {
-					VStack {
-						ProgressRing(progress: Double(connCount.count) / Double(succ.count))
-							.stroke(Color.green, lineWidth: 4)
-							.frame(width: 22, height: 22)
-						Text("\(connCount.count)/\(succ.count)")
-							.font(.system(size: 12))
-							.foregroundColor(.white)
-					}
-					.frame(width: geometry.size.width, height: geometry.size.height)
+					ProgressRing(progress: Double(connCount.count) / Double(succ.count))
+						.stroke(Color.green, lineWidth: 4)
+						.frame(width: 22, height: 22)
 				}
-			case let .failure(err):
-				Spacer()
-				Text("Error with database: \(String(describing:err))")
-				Spacer()
+
+				if isTextVisible {
+					Text("\(connCount.count)/\(succ.count)")
+						.font(.system(size: 12))
+						.foregroundColor(.white)
+						.transition(.opacity)
+				}
 			}
+			.frame(width: geometry.size.width, height: geometry.size.height)
 		}
 		.frame(width: 45, height: 30)
-	}
+		.onTapGesture {
+			withAnimation(.easeInOut(duration: 0.3)) {
+				isTextVisible.toggle()
+			}
 
-	
-	private func colorForConnectionState(_ state: RelayConnection.State) -> Color {
-		switch state {
-		case .disconnected:
-			return Color.red
-		case .connecting:
-			return Color.yellow
-		case .connected:
-			return Color.green
+			if isTextVisible {
+				Task.detached {
+					try await Task.sleep(nanoseconds:5_000_000_000)
+					await MainActor.run { () -> Void in
+						withAnimation(.easeInOut(duration:0.25)) {
+							isTextVisible = true
+						}
+					}
+				}
+			}
 		}
 	}
 }
@@ -251,6 +234,32 @@ struct ProgressRing: Shape {
 					endAngle: .degrees(-90 + 360 * progress),
 					clockwise: false)
 		return path
+	}
+}
+
+struct ConnectionDotView:View {
+	let spacing:CGFloat
+	let circleSize:CGFloat
+	let status:[RelayConnection.State]
+	var body: some View {
+		HStack(spacing: spacing) {
+			ForEach(status.indices, id: \.self) { index in
+				Circle()
+					.fill(Self.colorForConnectionState(status[index]))
+					.frame(width:circleSize, height:circleSize)
+			}
+		}
+	}
+	
+	fileprivate static func colorForConnectionState(_ state: RelayConnection.State) -> Color {
+		switch state {
+		case .disconnected:
+			return Color.red
+		case .connecting:
+			return Color.yellow
+		case .connected:
+			return Color.green
+		}
 	}
 }
 

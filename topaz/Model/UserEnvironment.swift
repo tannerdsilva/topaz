@@ -73,20 +73,20 @@ extension UE {
 
 		// tab bar related items
 		@Published var badgeStatus:ViewBadgeStatus {
-			didSet {
+			willSet {
 				let encoder = JSONEncoder()
-				let encoded = try! encoder.encode(self.badgeStatus)
+				let encoded = try! encoder.encode(newValue)
 				try! self.userContext.setEntry(value:encoded, forKey:Contexts.badgeStatus, tx:nil)
-				Self.logger.debug("successfully updated badge status.", metadata:["badgeStatus": "\(self.badgeStatus)"])
+				Self.logger.debug("successfully updated badge status.", metadata:["badgeStatus": "\(newValue)"])
 			}
 		}
 
 		@Published var viewMode:ViewMode {
-			didSet {
+			willSet {
 				let encoder = JSONEncoder()
-				let encoded = try! encoder.encode(self.viewMode)
+				let encoded = try! encoder.encode(newValue)
 				try! self.userContext.setEntry(value:encoded, forKey:Contexts.viewMode, tx:nil)
-				Self.logger.debug("successfully updated view mode.", metadata:["viewMode": "\(self.viewMode)"])
+				Self.logger.debug("successfully updated view mode.", metadata:["viewMode": "\(newValue)"])
 			}
 		}
 		
@@ -476,12 +476,89 @@ extension UE {
 				try newHasher.update(url)
 				return try newHasher.export()
 			}
+			
+			actor EventHolder:AsyncSequence {
+				
+				nonisolated func makeAsyncIterator() -> EventHolderEventStream {
+					return EventHolderEventStream(holder:self)
+				}
+				
+				typealias AsyncIterator = EventHolderEventStream
+				typealias Element = [nostr.Event]
+				struct EventHolderEventStream:AsyncIteratorProtocol {
+					let holder:EventHolder
+					func next() async throws -> [nostr.Event]? {
+						await holder.waitForNext()
+					}
+					
+					typealias Element = [nostr.Event]
+				}
+				
+				private var events = [nostr.Event]()
+				
+				init(holdInterval:TimeInterval) {
+					self.holdInterval = holdInterval
+				}
+				func append(event:nostr.Event) {
+					self.events.append(event)
+					if self.hasTimeThresholdPassed() == true && waiters.count > 0 {
+						for curFlush in self.waiters {
+							curFlush.resume(returning:self.events)
+						}
+						self.waiters.removeAll()
+						self.events.removeAll()
+					}
+				}
+				
+				let holdInterval:TimeInterval
+				var lastFlush:Date? = nil
+				private var waiters = [UnsafeContinuation<[nostr.Event]?, Never>]()
+				private func hasTimeThresholdPassed() -> Bool {
+					if (abs(lastFlush!.timeIntervalSinceNow) > holdInterval) {
+						return true
+					} else {
+						return false
+					}
+				}
+				private func waitForNext() async -> [nostr.Event]? {
+					func flushIt() -> [nostr.Event]? {
+						defer {
+							self.events.removeAll()
+							self.lastFlush = Date()
+						}
+						return self.events
+					}
+					func waitItOut() async -> [nostr.Event]? {
+						return await withUnsafeContinuation({ waitCont in
+							self.waiters.append(waitCont)
+						})
+					}
+					if lastFlush == nil {
+						// time limit does not apply
+						if (self.events.count > 0) {
+							return flushIt()
+						} else {
+							return await waitItOut()
+						}
+					} else {
+						switch self.hasTimeThresholdPassed() {
+						case true:
+							if self.events.count > 0 {
+								return flushIt()
+							} else {
+								return await waitItOut()
+							}
+						case false:
+							return await waitItOut()
+						}
+					}
+				}
+			}
 
 			enum Databases:String {
 				case pubkey_relayHash = "pubkey-relayHash"
 				case relayHash_relayString = "relayHash-relayString"
 				case relayHash_pubKey = "relayHash-pubKey"
-				case relayHash_connectionStatus = "relayHash-connectionStatus"
 			}
 			
 			fileprivate let logger:Logger
@@ -492,30 +569,36 @@ extension UE {
 			let relayHash_relayString:Database	// stores the full relay URL for a given relay hash								[String:String]
 			let relayHash_pubKey:Database		// stores the public key for a given relay hash									[String:String] * DUP *
 
-			@Published public private(set) var allConnections = [String:RelayConnection]()
-			@Published public private(set) var allRelays = [String:Relay]()
+			@Published public private(set) var userRelayConnections:[String:RelayConnection]
+			@Published public private(set) var userRelayConnectionStates:[String:RelayConnection.State]
 
-			fileprivate let mainChannel:AsyncChannel<RelayConnection.Event>
-			let relayHash_connectionStatus:Database	// stores the connection status for a given relay hash						[String:RelayConnection.Status]
 			
+			/// this is the channel that is used to read state change tasks from the relay connections
+			fileprivate let stateChannel:AsyncChannel<RelayConnection.StateChangeEvent>
+			// fileprivate let stateContinuation:AsyncStream<Void>.Continuation
+			fileprivate let eventChannel:AsyncChannel<RelayConnection.EventCapture>
+			// fileprivate let eventContinuation:AsyncStream<Void>.Continuation
+			
+			fileprivate var eventHolder:[nostr.Event]
+
 			var digestTask:Task<Void, Never>? = nil
 			init(pubkey:String, env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
 				self.env = env
 				self.myPubkey = pubkey
-				let newLogger = Topaz.makeDefaultLogger(label:"relay-db")
+				self.eventHolder = [nostr.Event]()
+				let newLogger = Logger(label:"relay-db")
 				let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
 				let pubRelaysDB = try env.openDatabase(named:Databases.pubkey_relayHash.rawValue, flags:[.create, .dupSort], tx:subTrans)
 				let relayStringDB = try env.openDatabase(named:Databases.relayHash_relayString.rawValue, flags:[.create], tx:subTrans)
 				let pubRelaysCursor = try pubRelaysDB.cursor(tx:subTrans)
 				let relayStringCursor = try relayStringDB.cursor(tx:subTrans)
-				let mainC = AsyncChannel<RelayConnection.Event>()
-				self.mainChannel = mainC
+				let eventC = AsyncChannel<RelayConnection.EventCapture>()
+				let stateC = AsyncChannel<RelayConnection.StateChangeEvent>()
+				self.stateChannel = stateC
+				self.eventChannel = eventC
 				self.pubkey_relayHash = pubRelaysDB
 				self.relayHash_relayString = relayStringDB
 				self.relayHash_pubKey = try env.openDatabase(named:Databases.relayHash_pubKey.rawValue, flags:[.create, .dupSort], tx:subTrans)
-				let connectionStatus = try env.openDatabase(named:Databases.relayHash_connectionStatus.rawValue, flags:[.create], tx:subTrans)
-				try connectionStatus.deleteAllEntries(tx:subTrans)
-				self.relayHash_connectionStatus = connectionStatus
 				let getRelays:Set<String>
 				do {
 					let iterator = try pubRelaysCursor.makeDupIterator(key: pubkey)
@@ -536,50 +619,51 @@ extension UE {
 					}
 					getRelays = relays
 				}
-				let relayStatus = try connectionStatus.cursor(tx:subTrans)
 				var buildConnections = [String:RelayConnection]()
+				var buildStates = [String:RelayConnection.State]()
 				for curRelay in getRelays {
-					let relayHash = try RelaysDB.produceRelayHash(url:Data(curRelay.utf8))
-					let newConnection = RelayConnection(url:curRelay, channel:mainC)
+					let newConnection = RelayConnection(url:curRelay, stateChannel:stateC, eventChannel: eventC)
 					buildConnections[curRelay] = newConnection
-					try relayStatus.setEntry(value:RelayConnection.State.disconnected, forKey:relayHash)
+					buildStates[curRelay] = .disconnected
 				}
-				self.allConnections = buildConnections
+				_userRelayConnections = Published(wrappedValue:buildConnections)
+				_userRelayConnectionStates = Published(initialValue:buildStates)
 				self.logger = newLogger
 				try subTrans.commit()
-				self.digestTask = Task.detached { [chanMan = mainC, newEnv = env, logThing = newLogger] in
-					for await curItem in chanMan {
-						do {
-							switch curItem {
-							case let .event(conn, ev):
-								break;
-							case let .stateChange(conn, state):
+				
+				self.digestTask = Task.detached { [weak self, sc = stateC, ec = eventC, newEnv = env, logThing = newLogger] in
+					await withThrowingTaskGroup(of:Void.self, body: { [weak self, sc = sc, ec = ec, newEnv = newEnv] tg in
+						// status
+						tg.addTask { [weak self, sc = sc, newEnv = newEnv] in
+							guard let self = self else { return }
+							for await (curChanger, newState) in sc {
 								let newTrans = try Transaction(newEnv, readOnly:false)
-								let relayHash = try RelaysDB.produceRelayHash(url:Data(conn.url.utf8))
-								try self.relayHash_connectionStatus.setEntry(value:state, forKey:relayHash, tx:newTrans)
+								await self.relayConnectionStatusUpdated(relay:curChanger.url, state:newState)
+								logThing.info("successfully updated relay connection state \(newState)")
 								try newTrans.commit()
-							default:
-								break;
 							}
-						} catch let error {
-							logThing.error("error in relay connection.", metadata:["error": "\(error)"])
 						}
-					}
+						// events intake into internal holder
+						tg.addTask { [weak self, ec = ec] in
+							guard let self = self else { return }
+							for await (_, newEvent) in ec {
+								self.relayConnectionProduced(event:newEvent)
+								logThing.info("an event was found in the relay stream")
+							}
+						}
+					})
 				}
 			}
-
-			func getRelayConnectionStatus(pubkey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws -> [String:RelayConnection.State] {
-				let newTrans = try Transaction(self.env, readOnly:true, parent:someTrans)
-				var buildRelays = [String:RelayConnection.State]()
-				let relayHashCursor = try self.pubkey_relayHash.cursor(tx:newTrans)
-				let relayStringCursor = try self.relayHash_relayString.cursor(tx:newTrans)
-				let relayStatusCursor = try self.relayHash_connectionStatus.cursor(tx:newTrans)
-				for (_, curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
-					let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
-					let relayStatus = RelayConnection.State(try relayStatusCursor.getEntry(.set, key:curRelayHash).value) ?? .disconnected
-					buildRelays[String(relayString)!] = relayStatus
-				}
-				return buildRelays
+			
+			// an internal function that an instance calls upon itself to update the relay connection state
+			fileprivate func relayConnectionStatusUpdated(relay:String, state:RelayConnection.State) async {
+				await MainActor.run(body: {
+					self.userRelayConnectionStates[relay] = state
+				})
+			}
+			// an internal function that an instance calls upon itself to store an event
+			fileprivate func relayConnectionProduced(event:nostr.Event) {
+				self.eventHolder.append(event)
 			}
 
 			// gets the relays for a given pubkey
@@ -644,11 +728,10 @@ extension UE {
 					try relayHashPubKeyCursor.setEntry(value:pubkey, forKey:curRelayHash)
 				}
 
-
+				// if these are the relays that belong to the current user, manage the current connections so that they can become an updated list of connections
 				if pubkey == myPubkey {
-					
-					let existingRelays = Set(self.allConnections.keys)
-					var editConnections = self.allConnections
+					let existingRelays = Set(self.userRelayConnections.keys)
+					var editConnections = self.userRelayConnections
 					let newRelays = relays
 					let compare = Delta(start:existingRelays, end:newRelays)
 					for curDrop in compare.exclusiveStart {
@@ -659,11 +742,11 @@ extension UE {
 						}
 					}
 					for curAdd in compare.exclusiveEnd {
-						let newConn = RelayConnection(url:curAdd, channel:mainChannel)
+						let newConn = RelayConnection(url:curAdd, stateChannel:stateChannel, eventChannel:eventChannel)
 						editConnections[curAdd] = newConn
 					}
 					self.objectWillChange.send()
-					self._allConnections = Published(wrappedValue:editConnections)
+					self._userRelayConnections = Published(wrappedValue:editConnections)
 				}
 				try newTrans.commit()
 			}

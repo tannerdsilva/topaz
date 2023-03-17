@@ -16,6 +16,10 @@ import QuickLMDB
 
 /// Primary interface for interacting with a nostr relay
 final actor RelayConnection:ObservableObject {
+    /// the type of tuple that is passed to the state change event handler
+    public typealias StateChangeEvent = (RelayConnection, State)
+    /// the type of tuple that is passed to the event handler
+	public typealias EventCapture = (String, nostr.Event)
     /// the errors that can be thrown by a relay connection interface
 	enum Error:Swift.Error {
         /// the interface was in an invalid state for the requested operation
@@ -33,18 +37,6 @@ final actor RelayConnection:ObservableObject {
 
     /// the logger used by all relay connections
     public let logger:Logger
-
-    /// the events that can be passed to the relay connection handler
-	public enum Event {
-        /// the connection state has changed
-        case stateChange(RelayConnection, RelayConnection.State)
-        /// the connection has received a valid handshake message
-        case pingPong(RelayConnection)
-        /// the connection has received a nostr message
-        case event(RelayConnection, nostr.Event)
-        /// the connection received a message that could not be parsed
-		case garbage(RelayConnection, Data, Swift.Error)
-    }
 
     /// The various states that a relay connection can be in
 	public enum State:UInt8, MDB_convertible {
@@ -72,7 +64,8 @@ final actor RelayConnection:ObservableObject {
     /// the state of the relay connection
     @Published public private(set) var state:State = .disconnected
 
-	fileprivate let outChannel:AsyncChannel<Event>
+    fileprivate let stateChannel:AsyncChannel<StateChangeEvent>
+	fileprivate let eventChannel:AsyncChannel<EventCapture>
 
     /// whether or not the instance should ignore user requests to reconnect to the relay
     /// - when `true`, the connection will NEVER reconnect to the relay after a connection is closed
@@ -84,12 +77,13 @@ final actor RelayConnection:ObservableObject {
 	fileprivate let encoder = JSONEncoder()
 
     /// initialize a new relay connection. the connection will be started immediately.
-    init(url:String, channel:AsyncChannel<Event>) {
+	init(url:String, stateChannel:AsyncChannel<StateChangeEvent>, eventChannel:AsyncChannel<EventCapture>) {
         self.url = url
         var logger = Logger(label: "relay-ctx")
 		logger.logLevel = .trace
 		self.logger = logger
-        self.outChannel = channel
+        self.eventChannel = eventChannel
+		self.stateChannel = stateChannel
         // connect to the relay in the background
 		self.reconnectionTask = Task.detached { [weak self] in
             guard let self = self else { return }
@@ -98,7 +92,7 @@ final actor RelayConnection:ObservableObject {
     }
 
     /// called internally when the websocket connection is closed. this will attempt to reconnect to the relay after a delay
-    fileprivate func websocketWasClosed(retry:Bool = true) {
+    fileprivate func websocketWasClosed(retry:Bool = true) async {
         // ensure that the connection is in the correct state
 		guard case .connected = self.state else { return }
         self.logger.info("disconnected from relay.", metadata: ["url": "\(url)"])
@@ -106,10 +100,11 @@ final actor RelayConnection:ObservableObject {
         // update the state to reflect the disconnection
         self.websocket = nil
         self.state = .disconnected
-        if let hasReconnectionTask = self.reconnectionTask {
-            hasReconnectionTask.cancel()
-            self.reconnectionTask = nil
-        }
+		if let hasReconnectionTask = self.reconnectionTask {
+			hasReconnectionTask.cancel()
+			self.reconnectionTask = nil
+		}
+		await stateChannel.send((self, .disconnected))
         // launch a task to reconnect to the relay if specified to do so
         guard reconnectOverride == true || retry == true else { return }
         self.reconnectionTask = Task.detached { [weak self, time = reconnectionDelayTimeNanoseconds, reconn = retry] in
@@ -138,15 +133,29 @@ final actor RelayConnection:ObservableObject {
         do {
             // attempt to connect
             self.state = .connecting
+			await self.stateChannel.send((self, .connecting))
             let newURL = HBURL(self.url)
 			let newWS = try await HBWebSocketClient.connect(url:newURL, configuration: HBWebSocketClient.Configuration(), on:loopGroup.next())
             // cancel the connection if the state was changed during the connection attempt
-            guard case .connecting = self.state else {
+			let shouldExit:Bool
+			switch self.state {
+			case .connecting:
+				if (Task.isCancelled == true) {
+					shouldExit = true
+				} else {
+					shouldExit = false
+				}
+			default:
+				shouldExit = true
+			}
+			guard shouldExit == false else {
                 self.logger.debug("connection attempt canceled.", metadata:["url":"\(self.url)"])
-                try await newWS.close().get()
+                try? await newWS.close().get()
+				await self.websocketWasClosed(retry:false)
                 return
             }
 			self.state = .connected
+			await self.stateChannel.send((self, .connected))
 			newWS.initiateAutoPing(interval:.seconds(Int64.random(in:7..<12)))   // ensure the state of the connection is always checked
 			self.logger.info("successfully connected to relay.", metadata:["url":"\(self.url)"])
 
@@ -187,7 +196,7 @@ final actor RelayConnection:ObservableObject {
             self.websocket = newWS
             
             // launch the task that handles the data as it comes off the async stream
-			Task.detached { [weak self, chan = self.outChannel, ms = mainStream, reconn = retryLaterIfFailed] in
+			Task.detached { [weak self, chan = self.eventChannel, ms = mainStream, reconn = retryLaterIfFailed] in
 				guard let self = self else {
 					return
 				}
@@ -197,12 +206,13 @@ final actor RelayConnection:ObservableObject {
 					case let .data(capData):
 						do {
 							let decoded = try decoder.decode(nostr.Event.self, from:capData)
-							await chan.send(.event(self, decoded))
+							await chan.send((self.url, decoded))
 						} catch let error {
 							self.logger.error("unable to parse nostr event.", metadata:["error":"\(error)"])
 						}
 					case .pingPong:
-						await chan.send(.pingPong(self))
+						break;
+//						await chan.send(.pingPong(self))
 					}
 				}
 				await self.websocketWasClosed(retry:reconn)
