@@ -28,11 +28,11 @@ class ApplicationModel:ObservableObject {
 		case onboarded = 1
 	}
 	
-	fileprivate enum Databases:String {
+	private enum Databases:String {
 		case app_metadata = "app_metadata"
 	}
 
-	fileprivate enum Metadatas:String {
+	private enum Metadatas:String {
 		case appState = "appState"					// State
 		case currentUser = "currentUser"
 		case tosAcknowledged = "tosAcknlowledged?"	// Bool
@@ -49,25 +49,6 @@ class ApplicationModel:ObservableObject {
 			do {
 				try self.app_metadata.setEntry(value:state, forKey:Metadatas.appState.rawValue, tx:nil)
 				self.logger.info("committed transaction to update state.", metadata:["state": "\(state)"])
-			} catch let error {
-				self.logger.critical("could not commit database transaction.", metadata:["error": "\(error)"])
-			}
-		}
-	}
-	
-	/// the public key of the current user of the app
-	@Published public var currentUserPublicKey:String? {
-		didSet {
-			do {
-				if let hasCurrentUser = currentUserPublicKey {
-					try self.app_metadata.setEntry(value:hasCurrentUser, forKey:Metadatas.currentUser.rawValue, tx:nil)
-					self.logger.info("committed transaction to update current user.", metadata:["user": "\(hasCurrentUser)"])
-				} else {
-					do {
-						try self.app_metadata.deleteEntry(key:Metadatas.currentUser.rawValue, tx:nil)
-						self.logger.info("committed transaction to remove current user.", metadata:["user": "\(currentUserPublicKey ?? "nil")"])
-					} catch LMDBError.notFound {}
-				}
 			} catch let error {
 				self.logger.critical("could not commit database transaction.", metadata:["error": "\(error)"])
 			}
@@ -105,12 +86,6 @@ class ApplicationModel:ObservableObject {
 		} catch LMDBError.notFound {
 			_state = Published(wrappedValue:.welcomeFlow)
 		}
-		// load the current user
-		do {
-			_currentUserPublicKey = Published(wrappedValue:try self.app_metadata.getEntry(type:String.self, forKey:Metadatas.currentUser.rawValue, tx:subTrans)!)
-		} catch LMDBError.notFound {
-			_currentUserPublicKey = Published(wrappedValue:nil)
-		}
 		// load the TOS acknowledgement
 		do {
 			_isTOSAcknowledged = Published(wrappedValue:try self.app_metadata.getEntry(type:Bool.self, forKey:Metadatas.tosAcknowledged.rawValue, tx:subTrans)!)
@@ -129,7 +104,7 @@ class ApplicationModel:ObservableObject {
 	}
 	
 	/// installs a user in the application and ensures that the state of the app is updated
-	func installUser(publicKey:String, privateKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
+	@MainActor func installUser(publicKey:String, privateKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
 		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
 		self.objectWillChange.send()
 		_state = Published(wrappedValue:.onboarded)
@@ -181,7 +156,7 @@ extension ApplicationModel {
 		}
 		
 		/// add a user to the store
-		fileprivate func addUser(_ publicKey:String, privateKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
+		@MainActor fileprivate func addUser(_ publicKey:String, privateKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
 			let subTrans = try QuickLMDB.Transaction(env, readOnly:false, parent:someTrans)
 			self.objectWillChange.send()
 			try userDB.setEntry(value:privateKey, forKey:publicKey, tx:subTrans)

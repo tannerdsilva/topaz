@@ -174,7 +174,7 @@ struct PV: View {
 }
 
 struct ConnectionStatusIndicator: View {
-	@ObservedObject var relays: UE.Contacts.RelaysDB
+	@ObservedObject var relays: UE.RelaysDB
 	@State private var isTextVisible = false
 
 	var body: some View {
@@ -186,7 +186,7 @@ struct ConnectionStatusIndicator: View {
 			let connCount = succ.filter { $0 == .connected }
 
 			VStack {
-				if succ.count <= maxCircles {
+				if succ.count <= ConnectionDotView.maxCirclesInFrame(maxWidth:geometry.size.width, maxHeight:geometry.size.height, circleSize:circleSize, spacing:spacing) {
 					ConnectionDotView(spacing:spacing, circleSize:circleSize, status:succ)
 				} else {
 					ProgressRing(progress: Double(connCount.count) / Double(succ.count))
@@ -237,17 +237,30 @@ struct ProgressRing: Shape {
 	}
 }
 
-struct ConnectionDotView:View {
-	let spacing:CGFloat
-	let circleSize:CGFloat
-	let status:[RelayConnection.State]
+struct ConnectionDotView: View {
+	let spacing: CGFloat
+	let circleSize: CGFloat
+	let status: [RelayConnection.State]
+	
 	var body: some View {
-		HStack(spacing: spacing) {
-			ForEach(status.indices, id: \.self) { index in
-				Circle()
-					.fill(Self.colorForConnectionState(status[index]))
-					.frame(width:circleSize, height:circleSize)
+		GeometryReader { geometry in
+			let numberOfColumns = Int((geometry.size.width - spacing) / (circleSize + spacing))
+			let numberOfRows = Int((geometry.size.height - spacing) / (circleSize + spacing))
+			let columns = Array(repeating: GridItem(.fixed(circleSize), spacing: spacing), count: numberOfColumns)
+			
+			let horizontalPadding = (geometry.size.width - CGFloat(min(numberOfColumns, status.count)) * (circleSize + spacing) + spacing) / 2
+			let usedRows = max(1, Int(ceil(Double(status.count) / Double(numberOfColumns))))
+			let verticalPadding = (geometry.size.height - CGFloat(usedRows) * (circleSize + spacing) + spacing) / 2
+			
+			LazyVGrid(columns: columns, spacing: spacing) {
+				ForEach(status.indices, id: \.self) { index in
+					Circle()
+						.fill(Self.colorForConnectionState(status[index]))
+						.frame(width: circleSize, height: circleSize)
+				}
 			}
+			.padding(.horizontal, horizontalPadding)
+			.padding(.vertical, verticalPadding)
 		}
 	}
 	
@@ -261,7 +274,14 @@ struct ConnectionDotView:View {
 			return Color.green
 		}
 	}
+	
+	static func maxCirclesInFrame(maxWidth: CGFloat, maxHeight: CGFloat, circleSize: CGFloat, spacing: CGFloat) -> Int {
+		let numberOfColumns = Int((maxWidth - spacing) / (circleSize + spacing))
+		let numberOfRows = Int((maxHeight - spacing) / (circleSize + spacing))
+		return numberOfColumns * numberOfRows
+	}
 }
+
 
 struct CustomTitleBar: View {
 	let ue:UE

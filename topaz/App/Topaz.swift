@@ -13,9 +13,14 @@ import SystemPackage
 @main
 struct Topaz:App {
 	public static let defaultRelays:Set<Relay> = Set([
-		Relay("wss://relay.damus.io"),
 		Relay("wss://relay.snort.social"),
-		Relay("wss://relay.topaz.place")
+		Relay("wss://relay.topaz.place"),
+		Relay("wss://relay.damus.io"),
+		Relay("wss://nos.lol"),
+		Relay("wss://brb.io"),
+		Relay("wss://relay.nostr.bg"),
+		Relay("wss://no.str.cr"),
+		Relay("wss://nostr.mom"),
 	])
 	
 	public static let tester_account = try! KeyPair.from(nsec:"nsec1s23j6z0x4w2y35c5zkf6le539sdmkmw4r7mm9jj22gnltrllqxzqjnh2wm")

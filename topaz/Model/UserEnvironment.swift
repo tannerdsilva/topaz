@@ -12,137 +12,8 @@ import Logging
 import SwiftBlake2
 import AsyncAlgorithms
 
-// FRIENDS:
-// a user may be considered a friend to the current user if the current user is following them
-extension UE {
-	class Profiles:ObservableObject {
-		enum Databases:String {
-			case profile_main = "_profiles-core"
-		}
 
-		let env:QuickLMDB.Environment
-		fileprivate let decoder = JSONDecoder()
-		
-		let profilesDB:Database  // [String:Pofile] where the key is the pubkey
 
-		init(_ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
-			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
-			self.env = env
-			self.profilesDB = try env.openDatabase(named:Databases.profile_main.rawValue, flags:[.create], tx:subTrans)
-			try subTrans.commit()
-		}
-
-		/// gets a profile from the database
-		func getPublicKeys(publicKeys:Set<String>) throws -> [String:nostr.Profile] {
-			let newTrans = try QuickLMDB.Transaction(self.env, readOnly:true)
-			let getCursor = try self.profilesDB.cursor(tx:newTrans)
-			var profiles = [String:nostr.Profile]()
-			for curID in publicKeys {
-				let getProfile = Data(try getCursor.getEntry(.set, key:curID).value)!
-				let decoded = try self.decoder.decode(nostr.Profile.self, from:getProfile)
-				profiles[curID] = decoded
-			}
-			try newTrans.commit()
-			return profiles
-		}
-
-		/// set a profile in the database
-		func setPublicKeys(_ profiles:[String:nostr.Profile]) throws {
-			let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false)
-			let encoder = JSONEncoder()
-			let profileCursor = try self.profilesDB.cursor(tx:newTrans)
-			for (pubkey, curProfile) in profiles {
-				let encoded = try encoder.encode(curProfile)
-				try profileCursor.setEntry(value:encoded, forKey:pubkey)
-			}
-			try newTrans.commit()
-		}
-	}
-}
-
-extension UE {
-	// user context
-	// - stores information about the current state of the user environment. this includes things such as notification badges, sync times with relays, etc
-	// - the stuff that is stored in here is not metadata that a user should ever be concerned with managing directly. this is mostly a place for the topaz app to store relevant information about the user's current state
-	class Context:ObservableObject {
-		static let logger = Topaz.makeDefaultLogger(label:"ue-context")
-		enum Contexts:String, MDB_convertible {
-			case badgeStatus = "badge_status" // ViewBadgeStatus
-			case viewMode = "view_mode" // ViewMode
-		}
-
-		// tab bar related items
-		@Published var badgeStatus:ViewBadgeStatus {
-			willSet {
-				let encoder = JSONEncoder()
-				let encoded = try! encoder.encode(newValue)
-				try! self.userContext.setEntry(value:encoded, forKey:Contexts.badgeStatus, tx:nil)
-				Self.logger.debug("successfully updated badge status.", metadata:["badgeStatus": "\(newValue)"])
-			}
-		}
-
-		@Published var viewMode:ViewMode {
-			willSet {
-				let encoder = JSONEncoder()
-				let encoded = try! encoder.encode(newValue)
-				try! self.userContext.setEntry(value:encoded, forKey:Contexts.viewMode, tx:nil)
-				Self.logger.debug("successfully updated view mode.", metadata:["viewMode": "\(newValue)"])
-			}
-		}
-		
-		fileprivate let env:QuickLMDB.Environment
-		fileprivate let encoder:JSONEncoder
-		fileprivate let decoder:JSONDecoder
-		fileprivate let userContext:Database
-
-		// initializes the user context database with a valid read/write transaction
-		init(_ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
-			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
-			self.env = env
-			let context = try env.openDatabase(named:Databases.userContext.rawValue, flags:[.create], tx:subTrans)
-			self.userContext = context
-			let encoder = JSONEncoder()
-			let decoder = JSONDecoder()
-			self.encoder = encoder
-			self.decoder = decoder
-
-			// get the badge status
-			do {
-				let decoded = try decoder.decode(ViewBadgeStatus.self, from:try context.getEntry(type:Data.self, forKey:Contexts.badgeStatus, tx:subTrans)!)
-				_badgeStatus = Published(wrappedValue:decoded)
-			} catch LMDBError.notFound {
-				let newBadgeStatus = ViewBadgeStatus.defaultViewBadgeStatus()
-				_badgeStatus = Published(wrappedValue:newBadgeStatus)
-				try context.setEntry(value:try encoder.encode(newBadgeStatus), forKey:Contexts.badgeStatus, tx:subTrans)
-			}
-
-			// get the view mode
-			do {
-				let decoded = try decoder.decode(ViewMode.self, from:try context.getEntry(type:Data.self, forKey:Contexts.viewMode, tx:subTrans)!)
-				_viewMode = Published(initialValue:decoded)
-			} catch LMDBError.notFound {
-				let newViewMode:ViewMode = .home
-				_viewMode = Published(initialValue:newViewMode)
-				try context.setEntry(value:encoder.encode(newViewMode), forKey:Contexts.viewMode, tx:subTrans)
-			}
-			try subTrans.commit()
-		}
-	}
-	
-}
-
-extension UE {
-	// UserSettings
-	// - stores information about the user's preferences
-	class Settings:ObservableObject {
-		
-		// initializes the settings database with a valid read/write transaction
-		init(_ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
-			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
-			try subTrans.commit()
-		}
-	}
-}
 
 class UE:ObservableObject {
 	/// stores the primary root view that the user is currently viewing
@@ -208,13 +79,14 @@ class UE:ObservableObject {
 	// contacts db
 	let contactsDB:UE.Contacts
 
+	// profiles db
 	let profilesDB:Profiles
 	
 	// context
 	var contextDB:UE.Context
 
 	// relays
-	let relaysDB:UE.Contacts.RelaysDB
+	let relaysDB:UE.RelaysDB
 
 	init(keypair:KeyPair, uuid:String = UUID().uuidString) throws {
 		let makeLogger = Topaz.makeDefaultLogger(label:"user-environment")
@@ -250,7 +122,7 @@ class UE:ObservableObject {
 			let makeProfilesDB = try! Profiles(env, tx:newTrans)
 
 			// initialize the relays database
-			let makeRelaysDB = try! UE.Contacts.RelaysDB(pubkey:keypair.pubkey, env:env, tx:newTrans)
+			let makeRelaysDB = try! UE.RelaysDB(pubkey:keypair.pubkey, env:env, tx:newTrans)
 			self.relaysDB = makeRelaysDB
 
 			self.profilesDB = makeProfilesDB
@@ -262,6 +134,10 @@ class UE:ObservableObject {
 		case let .failure(err):
 			throw err
 		}
+	}
+
+	func buildMainUserFilters() throws -> [nostr.Filter] {
+		
 	}
 
 	/// opens a new transaction for the user environment
@@ -470,287 +346,7 @@ extension UE {
 
 		// relay related
 		/// this database stores the list of relays that the user has listed in their profile
-		class RelaysDB:ObservableObject {
-			static func produceRelayHash<B>(url:B) throws -> Data where B:ContiguousBytes {
-				var newHasher = try Blake2bHasher(outputLength:8)
-				try newHasher.update(url)
-				return try newHasher.export()
-			}
-			
-			actor EventHolder:AsyncSequence {
-				
-				nonisolated func makeAsyncIterator() -> EventHolderEventStream {
-					return EventHolderEventStream(holder:self)
-				}
-				
-				typealias AsyncIterator = EventHolderEventStream
-				typealias Element = [nostr.Event]
-				struct EventHolderEventStream:AsyncIteratorProtocol {
-					let holder:EventHolder
-					func next() async throws -> [nostr.Event]? {
-						await holder.waitForNext()
-					}
-					
-					typealias Element = [nostr.Event]
-				}
-				
-				private var events = [nostr.Event]()
-				
-				init(holdInterval:TimeInterval) {
-					self.holdInterval = holdInterval
-				}
-				func append(event:nostr.Event) {
-					self.events.append(event)
-					if self.hasTimeThresholdPassed() == true && waiters.count > 0 {
-						for curFlush in self.waiters {
-							curFlush.resume(returning:self.events)
-						}
-						self.waiters.removeAll()
-						self.events.removeAll()
-					}
-				}
-				
-				let holdInterval:TimeInterval
-				var lastFlush:Date? = nil
-				private var waiters = [UnsafeContinuation<[nostr.Event]?, Never>]()
-				private func hasTimeThresholdPassed() -> Bool {
-					if (abs(lastFlush!.timeIntervalSinceNow) > holdInterval) {
-						return true
-					} else {
-						return false
-					}
-				}
-				private func waitForNext() async -> [nostr.Event]? {
-					func flushIt() -> [nostr.Event]? {
-						defer {
-							self.events.removeAll()
-							self.lastFlush = Date()
-						}
-						return self.events
-					}
-					func waitItOut() async -> [nostr.Event]? {
-						return await withUnsafeContinuation({ waitCont in
-							self.waiters.append(waitCont)
-						})
-					}
-					if lastFlush == nil {
-						// time limit does not apply
-						if (self.events.count > 0) {
-							return flushIt()
-						} else {
-							return await waitItOut()
-						}
-					} else {
-						switch self.hasTimeThresholdPassed() {
-						case true:
-							if self.events.count > 0 {
-								return flushIt()
-							} else {
-								return await waitItOut()
-							}
-						case false:
-							return await waitItOut()
-						}
-					}
-				}
-			}
-
-			enum Databases:String {
-				case pubkey_relayHash = "pubkey-relayHash"
-				case relayHash_relayString = "relayHash-relayString"
-				case relayHash_pubKey = "relayHash-pubKey"
-			}
-			
-			fileprivate let logger:Logger
-			fileprivate let env:QuickLMDB.Environment
-			let myPubkey:String
-
-			let pubkey_relayHash:Database		// stores the list of relay hashes that the user has listed in their profile	[String:String] * DUP *
-			let relayHash_relayString:Database	// stores the full relay URL for a given relay hash								[String:String]
-			let relayHash_pubKey:Database		// stores the public key for a given relay hash									[String:String] * DUP *
-
-			@Published public private(set) var userRelayConnections:[String:RelayConnection]
-			@Published public private(set) var userRelayConnectionStates:[String:RelayConnection.State]
-
-			
-			/// this is the channel that is used to read state change tasks from the relay connections
-			fileprivate let stateChannel:AsyncChannel<RelayConnection.StateChangeEvent>
-			// fileprivate let stateContinuation:AsyncStream<Void>.Continuation
-			fileprivate let eventChannel:AsyncChannel<RelayConnection.EventCapture>
-			// fileprivate let eventContinuation:AsyncStream<Void>.Continuation
-			
-			fileprivate var eventHolder:[nostr.Event]
-
-			var digestTask:Task<Void, Never>? = nil
-			init(pubkey:String, env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
-				self.env = env
-				self.myPubkey = pubkey
-				self.eventHolder = [nostr.Event]()
-				let newLogger = Logger(label:"relay-db")
-				let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
-				let pubRelaysDB = try env.openDatabase(named:Databases.pubkey_relayHash.rawValue, flags:[.create, .dupSort], tx:subTrans)
-				let relayStringDB = try env.openDatabase(named:Databases.relayHash_relayString.rawValue, flags:[.create], tx:subTrans)
-				let pubRelaysCursor = try pubRelaysDB.cursor(tx:subTrans)
-				let relayStringCursor = try relayStringDB.cursor(tx:subTrans)
-				let eventC = AsyncChannel<RelayConnection.EventCapture>()
-				let stateC = AsyncChannel<RelayConnection.StateChangeEvent>()
-				self.stateChannel = stateC
-				self.eventChannel = eventC
-				self.pubkey_relayHash = pubRelaysDB
-				self.relayHash_relayString = relayStringDB
-				self.relayHash_pubKey = try env.openDatabase(named:Databases.relayHash_pubKey.rawValue, flags:[.create, .dupSort], tx:subTrans)
-				let getRelays:Set<String>
-				do {
-					let iterator = try pubRelaysCursor.makeDupIterator(key: pubkey)
-					var buildStrings = Set<String>()
-
-					for (_, curRelayHash) in iterator {
-						let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
-						buildStrings.update(with:String(relayString)!)
-					}
-					getRelays = buildStrings
-				} catch LMDBError.notFound {
-					let relays = Set(Topaz.defaultRelays.compactMap({ $0.url }))
-					for curRelay in relays {
-						let relayHash = try RelaysDB.produceRelayHash(url:Data(curRelay.utf8))
-						try relayStringCursor.setEntry(value:curRelay, forKey:relayHash)
-						try pubRelaysCursor.setEntry(value:relayHash, forKey:pubkey)
-						try self.relayHash_pubKey.setEntry(value:pubkey, forKey:relayHash, tx:subTrans)
-					}
-					getRelays = relays
-				}
-				var buildConnections = [String:RelayConnection]()
-				var buildStates = [String:RelayConnection.State]()
-				for curRelay in getRelays {
-					let newConnection = RelayConnection(url:curRelay, stateChannel:stateC, eventChannel: eventC)
-					buildConnections[curRelay] = newConnection
-					buildStates[curRelay] = .disconnected
-				}
-				_userRelayConnections = Published(wrappedValue:buildConnections)
-				_userRelayConnectionStates = Published(initialValue:buildStates)
-				self.logger = newLogger
-				try subTrans.commit()
-				
-				self.digestTask = Task.detached { [weak self, sc = stateC, ec = eventC, newEnv = env, logThing = newLogger] in
-					await withThrowingTaskGroup(of:Void.self, body: { [weak self, sc = sc, ec = ec, newEnv = newEnv] tg in
-						// status
-						tg.addTask { [weak self, sc = sc, newEnv = newEnv] in
-							guard let self = self else { return }
-							for await (curChanger, newState) in sc {
-								let newTrans = try Transaction(newEnv, readOnly:false)
-								await self.relayConnectionStatusUpdated(relay:curChanger.url, state:newState)
-								logThing.info("successfully updated relay connection state \(newState)")
-								try newTrans.commit()
-							}
-						}
-						// events intake into internal holder
-						tg.addTask { [weak self, ec = ec] in
-							guard let self = self else { return }
-							for await (_, newEvent) in ec {
-								self.relayConnectionProduced(event:newEvent)
-								logThing.info("an event was found in the relay stream")
-							}
-						}
-					})
-				}
-			}
-			
-			// an internal function that an instance calls upon itself to update the relay connection state
-			fileprivate func relayConnectionStatusUpdated(relay:String, state:RelayConnection.State) async {
-				await MainActor.run(body: {
-					self.userRelayConnectionStates[relay] = state
-				})
-			}
-			// an internal function that an instance calls upon itself to store an event
-			fileprivate func relayConnectionProduced(event:nostr.Event) {
-				self.eventHolder.append(event)
-			}
-
-			// gets the relays for a given pubkey
-			//  - throws LMDBError.notFound if the pubkey is not found
-			func getRelays(pubkey:String, tx someTrans:QuickLMDB.Transaction) throws -> Set<String> {
-				let newTrans = try Transaction(self.env, readOnly:true, parent:someTrans)
-				var buildRelays = Set<String>()
-				let relayHashCursor = try self.pubkey_relayHash.cursor(tx:newTrans)
-				let relayStringCursor = try self.relayHash_relayString.cursor(tx:newTrans)
-				for (_, curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
-					let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
-					buildRelays.update(with:String(relayString)!)
-				}
-				return buildRelays
-			}
-
-			// sets the relays for a given pubkey
-			//  - if the relay information is already in the database, it will be updated silently and any keys that existed previously will be dropped
-			func setRelays(_ relays:Set<String>, pubkey:String, tx someTrans:QuickLMDB.Transaction) throws {
-				let newTrans = try Transaction(self.env, readOnly:false, parent:someTrans)
-				let relayHashCursor = try self.pubkey_relayHash.cursor(tx:newTrans)
-				let relayStringCursor = try self.relayHash_relayString.cursor(tx:newTrans)
-				let relayHashPubKeyCursor = try self.relayHash_pubKey.cursor(tx:newTrans)
-				var assignRelays = relays
-				do {
-					// iterate through all existing entries and determine if they need to be removed from the database
-					for (_ , curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
-						// check if the relay is still in the list of relays that we are setting
-						let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
-						if !assignRelays.contains(String(relayString)!) {
-							// check if there are any other public keys that are using this relay
-							do {
-								try relayHashPubKeyCursor.getEntry(.getBoth, key:curRelayHash, value:pubkey)
-								let relayHashPubKeyCount = try relayHashPubKeyCursor.dupCount()
-								if relayHashPubKeyCount == 1 {
-									// this is the only public key that is using this relay, so we can remove it from the database
-									try relayHashPubKeyCursor.deleteEntry()
-									try relayStringCursor.deleteEntry()
-									try relayHashCursor.deleteEntry()
-								} else {
-									// there are other public keys that are using this relay, so we can just remove the public key from the list of public keys that are using this relay
-									try relayHashPubKeyCursor.deleteEntry()
-								}
-							} catch LMDBError.notFound {
-								// this should never happen, but if it does, we can just remove the relay from the database
-								try relayHashPubKeyCursor.deleteEntry()
-								try relayStringCursor.deleteEntry()
-								try relayHashCursor.deleteEntry()
-							}
-						} else {
-							// remove the relay from the list of relays that we are setting
-							assignRelays.remove(String(relayString)!)
-						}
-					}
-				} catch LMDBError.notFound {}
-
-				// iterate through the list of relays that we are setting and add them to the database
-				for curRelay in assignRelays {
-					let curRelayHash = try RelaysDB.produceRelayHash(url:Data(curRelay.utf8))
-					try relayHashCursor.setEntry(value:curRelayHash, forKey:pubkey)
-					try relayStringCursor.setEntry(value:curRelay, forKey:curRelayHash)
-					try relayHashPubKeyCursor.setEntry(value:pubkey, forKey:curRelayHash)
-				}
-
-				// if these are the relays that belong to the current user, manage the current connections so that they can become an updated list of connections
-				if pubkey == myPubkey {
-					let existingRelays = Set(self.userRelayConnections.keys)
-					var editConnections = self.userRelayConnections
-					let newRelays = relays
-					let compare = Delta(start:existingRelays, end:newRelays)
-					for curDrop in compare.exclusiveStart {
-						if let hasItem = editConnections.removeValue(forKey:curDrop) {
-							Task.detached { [item = hasItem] in
-								try await item.forceClosure()
-							}
-						}
-					}
-					for curAdd in compare.exclusiveEnd {
-						let newConn = RelayConnection(url:curAdd, stateChannel:stateChannel, eventChannel:eventChannel)
-						editConnections[curAdd] = newConn
-					}
-					self.objectWillChange.send()
-					self._userRelayConnections = Published(wrappedValue:editConnections)
-				}
-				try newTrans.commit()
-			}
-		}
+		
 	}
 }
 
