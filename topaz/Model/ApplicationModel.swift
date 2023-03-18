@@ -34,7 +34,7 @@ class ApplicationModel:ObservableObject {
 
 	private enum Metadatas:String {
 		case appState = "appState"					// State
-		case currentUser = "currentUser"
+		case currentUser = "currentUser"			// the currernt public key that is assigned to the user
 		case tosAcknowledged = "tosAcknlowledged?"	// Bool
 	}
 
@@ -68,39 +68,59 @@ class ApplicationModel:ObservableObject {
 	}
 	
 	/// the primary store for the application users and their private keys
-	@Published var userStore:UserStore
+	var userStore:UserStore
 	
-	@Published var defaultUE:UE?
+	@Published public private(set) var currentUE:UE?
 
 	/// the primary store for the user sessions
 	init(_ docEnv:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction? = nil) throws {
 		self.env = docEnv
-		
 		// open the app metadata database
 		let subTrans = try Transaction(docEnv, readOnly:false, parent:someTrans)
-		self.app_metadata = try docEnv.openDatabase(named:Databases.app_metadata.rawValue, flags:[.create], tx:subTrans)
-		
+		self.userStore = try UserStore(docEnv, tx:subTrans)
+		let getMetadata = try docEnv.openDatabase(named:Databases.app_metadata.rawValue, flags:[.create], tx:subTrans)
+		self.app_metadata = getMetadata
+		self.userStore = try UserStore(docEnv, tx:subTrans)
 		// load the app state
 		do {
-			_state = Published(wrappedValue:try self.app_metadata.getEntry(type:State.self, forKey:Metadatas.appState.rawValue, tx:subTrans)!)
+			_state = Published(wrappedValue:try getMetadata.getEntry(type:State.self, forKey:Metadatas.appState.rawValue, tx:subTrans)!)
 		} catch LMDBError.notFound {
 			_state = Published(wrappedValue:.welcomeFlow)
 		}
 		// load the TOS acknowledgement
 		do {
-			_isTOSAcknowledged = Published(wrappedValue:try self.app_metadata.getEntry(type:Bool.self, forKey:Metadatas.tosAcknowledged.rawValue, tx:subTrans)!)
+			_isTOSAcknowledged = Published(wrappedValue:try getMetadata.getEntry(type:Bool.self, forKey:Metadatas.tosAcknowledged.rawValue, tx:subTrans)!)
 		} catch LMDBError.notFound {
 			_isTOSAcknowledged = Published(wrappedValue:false)
 		}
-		self.userStore = try UserStore(docEnv, tx:subTrans)
-		let getUsers = try self.userStore.allUsers(tx:subTrans)
-		if getUsers.isEmpty {
-			_defaultUE = Published(wrappedValue:nil)
+		// determine the current user logged in
+		let curUser:String?
+		do {
+			curUser = try getMetadata.getEntry(type:String.self, forKey:Metadatas.currentUser.rawValue, tx:subTrans)!
+		} catch LMDBError.notFound {
+			curUser = nil
+		}
+		// initialize the current user experience if there is one
+		if curUser == nil {
+			_currentUE = Published(wrappedValue:nil)
 		} else {
-			let getKeypair = try self.userStore.keypair(pubkey:getUsers.randomElement()!, tx:subTrans)
-			_defaultUE = Published(wrappedValue:try UE(keypair:getKeypair))
+			let getKeypair = try self.userStore.keypair(pubkey:curUser!, tx:subTrans)
+			let loadUE = try UE(keypair:getKeypair)
+			_currentUE = Published(wrappedValue:loadUE)
 		}
 		try subTrans.commit()
+	}
+
+	//set a user to be the currently assigned user
+	@MainActor func setCurrentlyLoggedInUser(_ publicKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
+		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
+		// verify that the public key exists
+		let getKeypair = try self.userStore.keypair(pubkey:publicKey, tx:newTrans)
+		self.objectWillChange.send()
+		let asUE = try UE(keypair:getKeypair)
+		_currentUE = Published(wrappedValue:asUE)
+		try self.app_metadata.setEntry(value:publicKey, forKey:Metadatas.currentUser.rawValue, tx:newTrans)
+		try newTrans.commit()
 	}
 	
 	/// installs a user in the application and ensures that the state of the app is updated
@@ -108,24 +128,27 @@ class ApplicationModel:ObservableObject {
 		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
 		self.objectWillChange.send()
 		_state = Published(wrappedValue:.onboarded)
+		try self.app_metadata.setEntry(value:ApplicationModel.State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
 		try self.userStore.addUser(publicKey, privateKey:privateKey, tx:newTrans)
-		try self.app_metadata.setEntry(value:State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
+		try setCurrentlyLoggedInUser(publicKey, tx:newTrans)
 		try newTrans.commit()
-		_defaultUE = Published(wrappedValue:try! UE(keypair:KeyPair(pubkey:publicKey, privkey:privateKey)))
+		_currentUE = Published(wrappedValue:try! UE(keypair:KeyPair(pubkey:publicKey, privkey:privateKey)))
 	}
 
 
 	/// removes a user from the application and ensures that the state of the app is updated if there are no more users
-	func removeUser(publicKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
+	@MainActor func removeUser(publicKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
 		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:nil)
 		self.objectWillChange.send()
 		try self.userStore.removeUser(publicKey, tx:newTrans)
-		let allUsers = try self.userStore.allUsers(tx:newTrans)
-		if (allUsers.count == 0) {
-			_state = Published(wrappedValue:.welcomeFlow)
-			try self.app_metadata.setEntry(value:State.welcomeFlow, forKey:Metadatas.appState.rawValue, tx:newTrans)
-		} else {
-			
+		// if this is the current user
+		if self.currentUE!.keypair.pubkey == publicKey {
+			let getUsers = try self.userStore.allUsers(tx:newTrans)
+			if getUsers.count == 0 {
+				self.objectWillChange.send()
+				_currentUE = Published(wrappedValue:nil)
+				_state = Published(wrappedValue:.welcomeFlow)
+			}
 		}
 	}
 }
@@ -158,7 +181,7 @@ extension ApplicationModel {
 		@MainActor fileprivate func addUser(_ publicKey:String, privateKey:String, tx someTrans:QuickLMDB.Transaction? = nil) throws {
 			let subTrans = try QuickLMDB.Transaction(env, readOnly:false, parent:someTrans)
 			self.objectWillChange.send()
-			try userDB.setEntry(value:privateKey, forKey:publicKey, tx:subTrans)
+			try userDB.setEntry(value:privateKey, forKey:publicKey, flags:[.noOverwrite], tx:subTrans)
 			try subTrans.commit()
 		}
 
