@@ -141,7 +141,6 @@ extension ApplicationModel {
 
 		/// all the users in the store
 		@Published public private(set) var users:Set<String>
-
 		init(_ docEnv:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction? = nil) throws {
 			self.env = docEnv
 			let subTrans = try QuickLMDB.Transaction(docEnv, readOnly:false, parent:someTrans)

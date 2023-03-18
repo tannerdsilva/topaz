@@ -80,8 +80,8 @@ extension nostr {
 		}
 		
 		///
-		enum Kind:Int, Equatable, MDB_convertible {
-			case set_metadata = 0
+		enum Kind:Int, Equatable, MDB_convertible, Codable {
+			case metadata = 0
 			case text_note = 1
 			case recommended_relay = 2
 			case contacts = 3
@@ -92,10 +92,14 @@ extension nostr {
 			case channel_create = 8
 			case channel_meta = 9
 			case chat = 42
-			case list = 40000
+			case list = 40000 // (?)
 			case zap = 9735
 			case zap_request = 9734
 			case private_zap = 9733 // I think?
+			case list_mute = 10000
+			case list_pin = 10001
+			case list_categorized = 30000
+			case list_categorized_bookmarks = 30001
 		}
 
 		struct Tag:Codable {

@@ -94,10 +94,10 @@ class UE:ObservableObject {
 		let makeEnv = Topaz.openLMDBEnv(named:"topaz-u-\(keypair.pubkey.prefix(8))")
 		switch makeEnv {
 		case let .success(env):
-			let newTrans = try! QuickLMDB.Transaction(env, readOnly:false)
-			let makeSettings = try! env.openDatabase(named:Databases.userSettings.rawValue, flags:[.create], tx:newTrans)
+			let newTrans = try QuickLMDB.Transaction(env, readOnly:false)
+			let makeSettings = try env.openDatabase(named:Databases.userSettings.rawValue, flags:[.create], tx:newTrans)
 			self.userSettings = makeSettings
-			let makeUserInfo = try! env.openDatabase(named:Databases.userInfo.rawValue, flags:[.create], tx:newTrans)
+			let makeUserInfo = try env.openDatabase(named:Databases.userInfo.rawValue, flags:[.create], tx:newTrans)
 			self.userInfo = makeUserInfo
 
 			// public key always present
@@ -108,21 +108,21 @@ class UE:ObservableObject {
 			self.env = env
 
 			// initialize the events database
-			let makeEventsDB = try! UE.EventsDB(env:env, tx:newTrans)
+			let makeEventsDB = try UE.EventsDB(env:env, tx:newTrans)
 			self.eventsDB = makeEventsDB
 
 			// initialize the contacts database
-			let makeContactsDB = try! UE.Contacts(publicKey:keypair.pubkey, env:env, tx:newTrans)
+			let makeContactsDB = try UE.Contacts(publicKey:keypair.pubkey, env:env, tx:newTrans)
 			self.contactsDB = makeContactsDB
 			
-			let makeContextDB = try! UE.Context(env, tx:newTrans)
+			let makeContextDB = try UE.Context(env, tx:newTrans)
 			self.contextDB = makeContextDB
 			
 			// initialize the profiles database
-			let makeProfilesDB = try! Profiles(env, tx:newTrans)
+			let makeProfilesDB = try Profiles(env, tx:newTrans)
 
 			// initialize the relays database
-			let makeRelaysDB = try! UE.RelaysDB(pubkey:keypair.pubkey, env:env, tx:newTrans)
+			let makeRelaysDB = try UE.RelaysDB(pubkey:keypair.pubkey, env:env, tx:newTrans)
 			self.relaysDB = makeRelaysDB
 
 			self.profilesDB = makeProfilesDB
@@ -137,7 +137,48 @@ class UE:ObservableObject {
 	}
 
 	func buildMainUserFilters() throws -> [nostr.Filter] {
+		let newTransaction = try QuickLMDB.Transaction(self.env, readOnly:true)
 		
+		// get the friends list
+		let myFriends = try self.contactsDB.followDB.getFollows(pubkey:self.keypair.pubkey, tx:newTransaction)
+		try newTransaction.commit()
+
+		// build the contacts filter
+		var contactsFilter = nostr.Filter()
+		contactsFilter.authors = Array(myFriends)
+		contactsFilter.kinds = [.metadata]
+
+		// build the "our contacts" filter
+		var ourContactsFilter = nostr.Filter()
+		ourContactsFilter.kinds = [.metadata, .contacts]
+
+		// build "blocklist" filter
+		var blocklistFilter = nostr.Filter()
+		blocklistFilter.kinds = [.list_categorized]
+		blocklistFilter.parameter = ["mute"]
+		blocklistFilter.authors = [self.keypair.pubkey]
+
+		// build "dms" filter
+		var dmsFilter = nostr.Filter()
+		dmsFilter.kinds = [.dm]
+		dmsFilter.authors = [self.keypair.pubkey]
+
+		// build "our" dms filter
+		var ourDMsFilter = nostr.Filter()
+		ourDMsFilter.kinds = [.dm]
+		ourDMsFilter.authors = [self.keypair.pubkey]
+
+		// create home filter
+		var homeFilter = nostr.Filter()
+		homeFilter.kinds = [.text_note, .like, .boost]
+		homeFilter.authors = Array(myFriends)
+
+		// create "notifications" filter
+		var notificationsFilter = nostr.Filter()
+		notificationsFilter.kinds = [.like, .boost, .text_note, .zap]
+		notificationsFilter.limit = 500
+
+		return [contactsFilter, ourContactsFilter, blocklistFilter, dmsFilter, ourDMsFilter, homeFilter, notificationsFilter]
 	}
 
 	/// opens a new transaction for the user environment

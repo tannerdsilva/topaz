@@ -42,7 +42,7 @@ struct UserExperienceView: View {
 		}
 		// Navigation Bar
 		HStack {
-			CustomTabBar(context:context)
+			CustomTabBar(viewMode:$context.viewMode, badgeStatus:$context.badgeStatus)
 		}
     }
 }
@@ -79,48 +79,39 @@ struct UserExperienceView: View {
 //	}
 //}
 
-struct CustomTabBar: View {
-	@ObservedObject var context:UE.Context
-
-	var body: some View {
-		HStack {
-			TabButton(myView:.home, icon: "house.fill", index: 0, selectedTab:$context.viewMode, accentColor: .cyan, showBadge: $context.badgeStatus.homeBadge).frame(maxWidth:.infinity)
-			TabButton(myView:.notifications, icon: "bell.fill", index: 1, selectedTab:$context.viewMode, accentColor: .orange, showBadge: $context.badgeStatus.notificationsBadge).frame(maxWidth:.infinity)
-			TabButton(myView:.dms, icon: "envelope.fill", index: 2, selectedTab:$context.viewMode, accentColor: .cyan, showBadge: $context.badgeStatus.dmsBadge).frame(maxWidth:.infinity)
-			TabButton(myView:.search, icon: "magnifyingglass", index: 3, selectedTab:$context.viewMode, accentColor: .orange, showBadge: $context.badgeStatus.searchBadge).frame(maxWidth:.infinity)
-			TabButton(myView:.profile, icon: "person.fill", index: 4, selectedTab:$context.viewMode, accentColor: .cyan, showBadge: $context.badgeStatus.profileBadge).frame(maxWidth:.infinity)
-		}
-		.padding(.init(top: 5, leading:0, bottom: 10, trailing:0))
-		.background(Color(.systemBackground))
-	}
-}
-
 struct TabButton: View {
 	let myView:UE.ViewMode
 	let icon: String
 	let index: Int
-	@Binding var selectedTab:UE.ViewMode
+	@Binding var selectedTab: UE.ViewMode
 	let accentColor: Color
 	@Binding var showBadge: Bool
-	
+	let profileImage: Image?
+
 	var body: some View {
 		Button(action: {
 			selectedTab = myView
-			if showBadge == true {
-				showBadge = false
-			}
+			showBadge = false
 		}) {
 			ZStack {
-				Image(systemName: icon)
-					.foregroundColor(selectedTab == myView ? accentColor : .gray)
-					.frame(width: 44, height: 44)
+				// Use this conditional to display the profile image or the default icon
+				if myView == .profile, let profileImg = profileImage {
+					profileImg
+						.resizable()
+						.aspectRatio(contentMode: .fill)
+						.clipShape(Circle())
+						.frame(width: 44, height: 44)
+				} else {
+					Image(systemName: icon)
+						.foregroundColor(selectedTab == myView ? accentColor : .gray)
+						.frame(width: 44, height: 44)
+				}
 				
 				if showBadge {
 					ZStack {
 						Circle()
 							.fill(Color.red)
 							.frame(width: 10, height: 10)
-						
 					}
 					.offset(x: 10, y: -10)
 				}
@@ -128,6 +119,35 @@ struct TabButton: View {
 		}
 	}
 }
+
+struct CustomTabBar: View {
+	@Binding var viewMode: UE.ViewMode
+	@Binding var badgeStatus: UE.ViewBadgeStatus
+	let profileImage: Image? = nil // Add this parameter for the profile image
+
+	var body: some View {
+		HStack {
+			TabButton(myView: .home, icon: "house.fill", index: 0, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.homeBadge, profileImage: nil)
+				.frame(maxWidth: .infinity)
+
+			TabButton(myView: .notifications, icon: "bell.fill", index: 1, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.notificationsBadge, profileImage: nil)
+				.frame(maxWidth: .infinity)
+
+			TabButton(myView: .dms, icon: "envelope.fill", index: 2, selectedTab: $viewMode, accentColor: .pink, showBadge: $badgeStatus.dmsBadge, profileImage: nil)
+				.frame(maxWidth: .infinity)
+
+			TabButton(myView: .search, icon: "magnifyingglass", index: 3, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.searchBadge, profileImage: nil)
+				.frame(maxWidth: .infinity)
+
+			TabButton(myView: .profile, icon: "person.fill", index: 4, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.profileBadge, profileImage: profileImage) // Pass the profile image here
+				.frame(maxWidth: .infinity)
+		}
+		.padding(.top)
+		.frame(maxWidth: .infinity).background(Color(.systemBackground))
+	}
+}
+
+
 
 struct HomeView: View {
 	let ue:UE
@@ -176,18 +196,20 @@ struct PV: View {
 struct ConnectionStatusIndicator: View {
 	@ObservedObject var relays: UE.RelaysDB
 	@State private var isTextVisible = false
+	@State var showModal = false
 
 	var body: some View {
 		GeometryReader { geometry in
 			let circleSize: CGFloat = 6
 			let spacing: CGFloat = 4
-			let maxCircles = Int((geometry.size.width - spacing) / (circleSize + spacing))
 			let succ = relays.userRelayConnectionStates.sorted(by: { $0.key < $1.key }).compactMap({ $0.value })
 			let connCount = succ.filter { $0 == .connected }
 
 			VStack {
 				if succ.count <= ConnectionDotView.maxCirclesInFrame(maxWidth:geometry.size.width, maxHeight:geometry.size.height, circleSize:circleSize, spacing:spacing) {
-					ConnectionDotView(spacing:spacing, circleSize:circleSize, status:succ)
+					ConnectionDotView(spacing:spacing, circleSize:circleSize, status:succ).sheet(isPresented: $showModal) {
+					  ModalView()
+				  }
 				} else {
 					ProgressRing(progress: Double(connCount.count) / Double(succ.count))
 						.stroke(Color.green, lineWidth: 4)
@@ -205,10 +227,10 @@ struct ConnectionStatusIndicator: View {
 		}
 		.frame(width: 45, height: 30)
 		.onTapGesture {
-			withAnimation(.easeInOut(duration: 0.3)) {
-				isTextVisible.toggle()
-			}
-
+//			withAnimation(.easeInOut(duration: 0.3)) {
+//				isTextVisible.toggle()
+//			}
+			showModal.toggle()
 			if isTextVisible {
 				Task.detached {
 					try await Task.sleep(nanoseconds:5_000_000_000)
@@ -281,6 +303,20 @@ struct ConnectionDotView: View {
 		return numberOfColumns * numberOfRows
 	}
 }
+
+struct ModalView: View {
+	@Environment(\.dismiss) var dismiss
+
+	var body: some View {
+		VStack {
+			Text("This is a full screen modal view")
+			Button("Dismiss") {
+				dismiss()
+			}
+		}
+	}
+}
+
 
 
 struct CustomTitleBar: View {

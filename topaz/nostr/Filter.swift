@@ -23,7 +23,7 @@ extension nostr {
 		}
 
 		var ids:[String]?
-		var kinds:[String]?
+		var kinds:[nostr.Event.Kind]?
 		var referenced_ids:[String]?
 		var pubkeys:[String]?
 		var since:Date?
@@ -35,7 +35,7 @@ extension nostr {
 		var hashtag:[String]?
 		var parameter:[String]?
 
-		init(ids:[String]? = nil, kinds:[String]? = nil, referenced_ids:[String]? = nil, pubkeys:[String]? = nil, since:Date? = nil, until:Date? = nil, limit:UInt32? = nil, authors:[String]? = nil, hashtag:[String]? = nil, parameter:[String]? = nil) {
+		init(ids:[String]? = nil, kinds:[nostr.Event.Kind]? = nil, referenced_ids:[String]? = nil, pubkeys:[String]? = nil, since:Date? = nil, until:Date? = nil, limit:UInt32? = nil, authors:[String]? = nil, hashtag:[String]? = nil, parameter:[String]? = nil) {
 			self.ids = ids
 			self.kinds = kinds
 			self.referenced_ids = referenced_ids
@@ -52,7 +52,7 @@ extension nostr {
 		init(from decoder:Decoder) throws {
 			let container = try decoder.container(keyedBy: CodingKeys.self)
 			ids = try container.decodeIfPresent([String].self, forKey: .ids)
-			kinds = try container.decodeIfPresent([String].self, forKey: .kinds)
+			kinds = try container.decodeIfPresent([nostr.Event.Kind].self, forKey: .kinds)
 			referenced_ids = try container.decodeIfPresent([String].self, forKey: .referenced_ids)
 			pubkeys = try container.decodeIfPresent([String].self, forKey: .pubkeys)
 			since = try container.decodeIfPresent(Date.self, forKey: .since)
@@ -88,11 +88,6 @@ extension nostr.Filter {
 	public static func makeAuthorFilter(_ author:String) -> nostr.Filter {
 		return nostr.Filter(authors: [author])
 	}
-
-	public static func makeKindFilter(_ kind:String) -> nostr.Filter {
-		return nostr.Filter(kinds: [kind])
-	}
-
 	public static func makeSinceFilter(_ since:Date) -> nostr.Filter {
 		return nostr.Filter(since: since)
 	}

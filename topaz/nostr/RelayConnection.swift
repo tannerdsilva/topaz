@@ -65,25 +65,22 @@ final actor RelayConnection:ObservableObject {
     @Published public private(set) var state:State = .disconnected
 
     fileprivate let stateChannel:AsyncChannel<StateChangeEvent>
-	fileprivate let eventChannel:AsyncChannel<EventCapture>
-
+    public let holder:EventHolder
     /// whether or not the instance should ignore user requests to reconnect to the relay
     /// - when `true`, the connection will NEVER reconnect to the relay after a connection is closed
     fileprivate var reconnectOverride:Bool = false
-	
     /// the deferred task that is used to reconnect to the relay after a connection is closed (or upon initialization)
 	fileprivate var reconnectionTask:Task<(), Swift.Error>?
-	
 	fileprivate let encoder = JSONEncoder()
 
     /// initialize a new relay connection. the connection will be started immediately.
-	init(url:String, stateChannel:AsyncChannel<StateChangeEvent>, eventChannel:AsyncChannel<EventCapture>) {
+	init(url:String, stateChannel:AsyncChannel<StateChangeEvent>, holder:EventHolder) {
         self.url = url
         var logger = Logger(label: "relay-ctx")
 		logger.logLevel = .trace
 		self.logger = logger
-        self.eventChannel = eventChannel
 		self.stateChannel = stateChannel
+        self.holder = holder
         // connect to the relay in the background
 		self.reconnectionTask = Task.detached { [weak self] in
             guard let self = self else { return }
@@ -196,8 +193,9 @@ final actor RelayConnection:ObservableObject {
             self.websocket = newWS
             
             // launch the task that handles the data as it comes off the async stream
-			Task.detached { [weak self, chan = self.eventChannel, ms = mainStream, reconn = retryLaterIfFailed] in
-				guard let self = self else {
+			Task.detached { [weak self, ho = holder, ms = mainStream, reconn = retryLaterIfFailed] in
+				// ensure that the connection is in the correct state
+                guard let self = self else {
 					return
 				}
 				let decoder = JSONDecoder()
@@ -206,13 +204,12 @@ final actor RelayConnection:ObservableObject {
 					case let .data(capData):
 						do {
 							let decoded = try decoder.decode(nostr.Event.self, from:capData)
-							await chan.send((self.url, decoded))
+							await ho.append(event:decoded)
 						} catch let error {
 							self.logger.error("unable to parse nostr event.", metadata:["error":"\(error)"])
 						}
 					case .pingPong:
 						break;
-//						await chan.send(.pingPong(self))
 					}
 				}
 				await self.websocketWasClosed(retry:reconn)
@@ -275,6 +272,89 @@ final actor RelayConnection:ObservableObject {
             self.reconnectOverride = true
             // close the connection
 			try await hasSocket.close().get()
+        }
+    }
+}
+
+// MARK: - EventHolder
+extension RelayConnection {
+    // the event holder is a simple class that allows for the holding of events until a certain amount of time has passed.
+    // it generally helps group an agressive stream of incoming events into more digestable chunks for the database and UI
+    // this tool is deployed by the holder of a relay connection.
+    internal actor EventHolder:AsyncSequence {
+        nonisolated func makeAsyncIterator() -> EventHolderEventStream {
+            return EventHolderEventStream(holder:self)
+        }
+        
+        typealias AsyncIterator = EventHolderEventStream
+        typealias Element = [nostr.Event]
+        struct EventHolderEventStream:AsyncIteratorProtocol {
+            let holder:EventHolder
+            func next() async throws -> [nostr.Event]? {
+                await holder.waitForNext()
+            }
+            
+            typealias Element = [nostr.Event]
+        }
+        
+        private var events = [nostr.Event]()
+        
+        init(holdInterval:TimeInterval) {
+            self.holdInterval = holdInterval
+        }
+        func append(event:nostr.Event) {
+            self.events.append(event)
+            if self.hasTimeThresholdPassed() == true && waiters.count > 0 {
+                for curFlush in self.waiters {
+                    curFlush.resume(returning:self.events)
+                }
+                self.waiters.removeAll()
+                self.events.removeAll()
+            }
+        }
+        
+        let holdInterval:TimeInterval
+        private var lastFlush:Date? = nil
+        private var waiters = [UnsafeContinuation<[nostr.Event]?, Never>]()
+        private func hasTimeThresholdPassed() -> Bool {
+            if (abs(lastFlush!.timeIntervalSinceNow) > holdInterval) {
+                return true
+            } else {
+                return false
+            }
+        }
+        private func waitForNext() async -> [nostr.Event]? {
+            func flushIt() -> [nostr.Event]? {
+                defer {
+                    self.events.removeAll()
+                    self.lastFlush = Date()
+                }
+                return self.events
+            }
+            func waitItOut() async -> [nostr.Event]? {
+                return await withUnsafeContinuation({ waitCont in
+                    self.waiters.append(waitCont)
+                })
+            }
+            if lastFlush == nil {
+                // time limit does not apply
+                if (self.events.count > 0) {
+                    return flushIt()
+                } else {
+                    return await waitItOut()
+                }
+            } else {
+                switch self.hasTimeThresholdPassed() {
+                case true:
+                    if self.events.count > 0 {
+                        return flushIt()
+                    } else {
+                        return await waitItOut()
+                    }
+                case false:
+                    return await waitItOut()
+                }
+            }
         }
     }
 }
