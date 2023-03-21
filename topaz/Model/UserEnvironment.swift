@@ -123,12 +123,33 @@ class UE:ObservableObject {
 
 			// initialize the relays database
 			let makeRelaysDB = try UE.RelaysDB(pubkey:keypair.pubkey, env:env, tx:newTrans)
+			let myRelays = try makeRelaysDB.getRelays(pubkey:keypair.pubkey, tx:newTrans)
+			
 			self.relaysDB = makeRelaysDB
 
 			self.profilesDB = makeProfilesDB
 			self.keypair = keypair
 			
-			
+			let homeSubs = try self.buildMainUserFilters(tx:newTrans)
+//			Task.detached { [mrdb = makeRelaysDB, myRs = myRelays, subs = buildSubscribe] in
+			for curRelay in myRelays {
+				try makeRelaysDB.add(subscriptions:[nostr.Subscribe(sub_id:UUID().uuidString, filters:homeSubs)], to:curRelay, tx:newTrans)
+			}
+			Task.detached { [weak self, hol = makeRelaysDB.holder] in
+				guard let self = self else {
+					return
+				}
+				for try await curEvs in hol {
+					self.logger.notice("flushing event holder")
+					defer {
+						self.logger.info("done")
+					}
+					let newTrans = try Transaction(self.env, readOnly:false)
+					let newEvsSet = Set(curEvs)
+					try self.eventsDB.writeEvents(newEvsSet, tx:newTrans)
+					try newTrans.commit()
+				}
+			}
 			try newTrans.commit()
 			self.logger.info("instance initialized.", metadata:["public_key":"\(keypair.pubkey)"])
 		case let .failure(err):
@@ -136,13 +157,10 @@ class UE:ObservableObject {
 		}
 	}
 
-	func buildMainUserFilters() throws -> [nostr.Filter] {
-		let newTransaction = try QuickLMDB.Transaction(self.env, readOnly:true)
-		
+	func buildMainUserFilters(tx someTrans:QuickLMDB.Transaction) throws -> [nostr.Filter] {
 		// get the friends list
-		let myFriends = try self.contactsDB.followDB.getFollows(pubkey:self.keypair.pubkey, tx:newTransaction)
-		try newTransaction.commit()
-
+		let myFriends = try self.contactsDB.followDB.getFollows(pubkey:self.keypair.pubkey, tx:someTrans)
+		
 		// build the contacts filter
 		var contactsFilter = nostr.Filter()
 		contactsFilter.authors = Array(myFriends)
@@ -178,6 +196,7 @@ class UE:ObservableObject {
 		notificationsFilter.kinds = [.like, .boost, .text_note, .zap]
 		notificationsFilter.limit = 500
 
+		// return [contactsFilter]
 		return [contactsFilter, ourContactsFilter, blocklistFilter, dmsFilter, ourDMsFilter, homeFilter, notificationsFilter]
 	}
 
@@ -198,8 +217,6 @@ extension UE:Equatable {
 		return lhs.uuid == rhs.uuid && lhs.keypair.pubkey == rhs.keypair.pubkey
 	}
 }
-
-	
 
 extension UE {
 	// the primary contacts database that assures that a user is able to reach any given public key on the network.
@@ -388,213 +405,5 @@ extension UE {
 		// relay related
 		/// this database stores the list of relays that the user has listed in their profile
 		
-	}
-}
-
-extension UE {
-	class EventsDB:ObservableObject {
-		struct KindDatabase {
-			static let logger:Logger = Logger(label:"com.nostr.eventsdb")
-
-			enum Databases:String, MDB_convertible {
-				case uid_kind = "_event_uid-kind"
-				case kind_uid = "_event_kind-uid"
-			}
-
-			let env:QuickLMDB.Environment
-
-			// * does not allow an override of an existing entry if the values are not the same *
-			let uid_kind:Database		// [UID:String]
-			let kind_uid:Database		// [Kind:String] * DUP *
-
-			init(_ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction? = nil) throws {
-				self.env = env
-				let subTrans = try Transaction(env, readOnly:false, parent: someTrans)
-				self.uid_kind = try env.openDatabase(named:Databases.uid_kind.rawValue, flags:[.create], tx:subTrans)
-				self.kind_uid = try env.openDatabase(named:Databases.kind_uid.rawValue, flags:[.create], tx:subTrans)
-				try subTrans.commit()
-			}
-
-			/// bulk import events into the database
-			/// - for each public key, the event kinds will attempt to be assigned
-			/// - will NOT overwrite existing data if the specified public key is already in the database
-			/// - will NOT throw ``LMDBError.keyExists`` if the public key is already in the database with the same kind
-			func setEvent(_ events:[nostr.Event], tx someTrans:QuickLMDB.Transaction? = nil) throws {
-				let subTrans = try Transaction(env, readOnly:false, parent: someTrans)
-				let uidKCursor = try self.uid_kind.cursor(tx:subTrans)
-				let kUIDCursor = try self.kind_uid.cursor(tx:subTrans)
-				for event in events {
-					do {
-						try uidKCursor.setEntry(value:event.kind, forKey:event.uid, flags:[.noOverwrite])
-					} catch {
-						// throw an error if the key already exists and the value is not the same
-						guard nostr.Event.Kind(rawValue:Int(try uidKCursor.getEntry(.set, key:event.uid).value)!) == event.kind else {
-							throw LMDBError.keyExists
-						}
-					}
-					try kUIDCursor.setEntry(value:event.uid, forKey:event.kind)
-				}
-				try subTrans.commit()
-				Self.logger.debug("successfully installed events.", metadata:["count": "\(events.count)"])
-			}
-
-			/// get all kinds for a given uid
-			/// - never throws LMDBError.notFound
-			func getKinds(uids:Set<String>, tx someTrans:QuickLMDB.Transaction? = nil) throws -> [String:nostr.Event.Kind] {
-				let subTrans = try Transaction(env, readOnly:true, parent: someTrans)
-				let uidKCursor = try self.uid_kind.cursor(tx:subTrans)
-				var ret = [String:nostr.Event.Kind]()
-				for uid in uids {
-					ret[uid] = nostr.Event.Kind(rawValue:Int(try uidKCursor.getEntry(.set, key:uid).value)!)
-				}
-				try subTrans.commit()
-				return ret
-			}
-
-			/// removes the given uids from the database
-			func deleteEvents(uids:Set<String>, tx someTrans:QuickLMDB.Transaction? = nil) throws {
-				let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
-				let uidKCursor = try self.uid_kind.cursor(tx:subTrans)
-				let kindUIDCursor = try self.kind_uid.cursor(tx:subTrans)
-				for curID in uids {
-					let getKind = try uidKCursor.getEntry(.set, key:curID).value
-					let asKind = nostr.Event.Kind(getKind)!
-					try kindUIDCursor.getEntry(.getBoth, key:asKind, value:curID)
-					try kindUIDCursor.deleteEntry()
-					try uidKCursor.deleteEntry()
-				}
-				try subTrans.commit()
-				Self.logger.debug("successfully deleted events.", metadata:["count": "\(uids.count)"])
-			}
-		}
-
-		fileprivate let encoder = JSONEncoder()
-
-		let env:QuickLMDB.Environment
-		
-		// stores a given event ID and the JSON-encoded event.
-		let eventDB_core:Database 	// [String:nostr.Event]
-
-		init(env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
-			self.env = env
-			let subTrans = try Transaction(env, readOnly:false, parent: someTrans)
-			self.eventDB_core = try env.openDatabase(named:Databases.events_core.rawValue, flags:[.create], tx:subTrans)
-			try subTrans.commit()
-		}
-
-		func writeEvents(_ events:Set<nostr.Event>, tx someTrans:QuickLMDB.Transaction? = nil) throws {
-			let subTrans = try Transaction(env, readOnly:false, parent: someTrans)
-			let eventCursor = try self.eventDB_core.cursor(tx:subTrans)
-			for curEvent in events {
-				let encodedData = try encoder.encode(curEvent)
-				try eventCursor.setEntry(value:encodedData, forKey:curEvent.uid)
-			}
-			try subTrans.commit()
-		}
-
-		func getEvents(tx someTrans:QuickLMDB.Transaction? = nil) -> Result<[nostr.Event], Swift.Error> {
-			do {
-				let subTrans = try Transaction(env, readOnly:true, parent:someTrans)
-				let cursor = try self.eventDB_core.cursor(tx:subTrans)
-				var buildEvents = [nostr.Event]()
-				for (_, curEvent) in cursor {
-					buildEvents.append(try JSONDecoder().decode(nostr.Event.self, from:Data(curEvent)!))
-				}
-				try subTrans.commit()
-				return .success(buildEvents)
-			} catch let error {
-				return .failure(error)
-			}
-		}
-	}
-}
-
-
-extension UE {
-	class ZapsDB:ObservableObject {
-		static let logger = Topaz.makeDefaultLogger(label:"zaps-db")
-		enum Databases:String {
-			case zap_core = "zap_core"
-			case zap_totals = "zap_totals"
-			case my_zaps = "my_zaps"
-		}
-		fileprivate let pubkey:String
-		let env:QuickLMDB.Environment
-		
-		let zap_core:Database	// [String:Zap] where key is the zaps event id and value is the zap codable data itself
-		let zap_totals:Database	// [String:UInt64] where key is the zaps target id and value is the total amount of zap value for that event
-		let my_zaps:Database	// [String:String] * DUP * where key is the note target note ID, value is the zaps event ID
-		
-		init(pubkey:String, env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
-			self.pubkey = pubkey
-			self.env = env
-			let subTrans = try Transaction(env, readOnly:false, parent: someTrans)
-			self.zap_core = try env.openDatabase(named:Databases.zap_core.rawValue, flags:[.create], tx:subTrans)
-			self.zap_totals = try env.openDatabase(named:Databases.zap_totals.rawValue, flags:[.create], tx:subTrans)
-			self.my_zaps = try env.openDatabase(named:Databases.my_zaps.rawValue, flags:[.create, .dupSort], tx:subTrans)
-			try subTrans.commit()
-			Self.logger.info("instance successfully initialized.")
-		}
-
-		/// adds a series of zaps into the databsae
-		/// - the zap is json encoded and stored against its event ID
-		/// - the zap total is stored against the target ID
-		/// if this is a zap that originated from the public key of this UE, then the zap is also stored against the note ID of the target note
-		func add(zaps:[Zap], tx someTrans:QuickLMDB.Transaction? = nil) throws {
-			let subTrans = try Transaction(env, readOnly:false, parent: someTrans)
-			let zapCursor = try self.zap_core.cursor(tx:subTrans)
-			let totalsCursor = try self.zap_totals.cursor(tx:subTrans)
-			let myZapCursor = try self.my_zaps.cursor(tx:subTrans)
-			let encoder = JSONEncoder()
-			for curZap in zaps {
-				// no payments to self.
-				guard curZap.request.ev.pubkey != curZap.target.pubkey else {
-					continue
-				}
-				// document the zap itself
-				do {
-					try zapCursor.setEntry(value:try encoder.encode(curZap), forKey:curZap.event.uid, flags:[.noOverwrite])
-				} catch let error {
-					// cannot add this zap because it already exists
-					Self.logger.error("the zaps db already contains a zap with the event id \(curZap.event.uid).", metadata:["error": "\(error)"])
-					throw error
-				}
-				do {
-					let existingValue = UInt64(try totalsCursor.getEntry(.set, key:curZap.event.uid).value)!
-					try totalsCursor.setEntry(value:existingValue + UInt64(curZap.invoice.amount), forKey:curZap.event.uid)
-				} catch LMDBError.notFound {
-					try totalsCursor.setEntry(value:curZap.invoice.amount, forKey:curZap.event.id)
-				}
-				// record our zaps for an event
-				if curZap.request.ev.pubkey == pubkey {
-					switch curZap.target {
-						case .note(let note_target):
-						try myZapCursor.setEntry(value:curZap.event.uid, forKey:note_target.note_id)
-						case .profile(_):
-							break;
-					}
-				}
-			}
-			Self.logger.debug("successfully added zaps.", metadata:["count": "\(zaps.count)"])
-			try subTrans.commit()
-		}
-
-		func get(eventIDs:Set<String>, tx someTrans:QuickLMDB.Transaction? = nil) throws -> [String:Zap] {
-			let decoder = JSONDecoder()
-			let subTrans = try Transaction(env, readOnly:true, parent:someTrans)
-			let zapCursor = try self.zap_core.cursor(tx:subTrans)
-			var buildZaps = [String:Zap]()
-			for curID in eventIDs {
-				do {
-					let zapData = Data(try zapCursor.getEntry(.set, key:curID).value)!
-					let asZap = try decoder.decode(Zap.self, from:zapData)
-					buildZaps[curID] = asZap
-				} catch LMDBError.notFound {
-					Self.logger.error("could not find zap for event id \(curID).")
-					throw LMDBError.notFound
-				}
-			}
-			return buildZaps
-		}
 	}
 }

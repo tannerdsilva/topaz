@@ -20,7 +20,7 @@ extension UE {
 		fileprivate let decoder = JSONDecoder()
 		
 		let profilesDB:Database  // [String:Pofile] where the key is the pubkey
-
+		
 		init(_ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
 			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
 			self.env = env

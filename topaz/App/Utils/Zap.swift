@@ -237,7 +237,7 @@ func decode_bolt11(_ s: String) -> Invoice? {
 
 func event_tag(_ ev:nostr.Event, name: String) -> String? {
 	for tag in ev.tags {
-		if tag.kind == .event {
+		if case .event = tag.kind {
 			return tag.info[0]
 		}
 	}

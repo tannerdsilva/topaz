@@ -2,61 +2,58 @@
 //  TimelineView.swift
 //  topaz
 //
-//  Created by Tanner Silva on 03-09-23.
+//  Created by Tanner Silva on 3/21/23.
 //
 
+import Foundation
 import SwiftUI
 
-enum TimelineAction {
-	case chillin
-	case navigating
-}
-
 struct TimelineView: View {
-	@Environment(\.colorScheme) var colorScheme
+	let ue:UE
+//	@State private var timeline = [TimelineModel]()
+//	@State private var isLoading: Bool = false
+//	@State private var lastEventDate: Date? = nil
+//	@State private var lastEventUID: String? = nil
 
-	@ObservedObject var ue:UE
-	
 	var body: some View {
-		MainContent
+//		ScrollView {
+//			LazyVStack(spacing: 10) {
+//				ForEach(timeline) { item in
+//					EventViewCell(event: item.event, profile: item.profile)
+//
+//					if timeline.last?.id == item.id && !isLoading {
+//						Divider()
+//						ProgressView() // Loading indicator
+//							.onAppear {
+//								loadMoreData()
+//							}
+//					}
+//				}
+//			}
+//		}
+//		.onAppear {
+//			loadMoreData()
+//		}
+		Text("FOO")
 	}
 	
-	var realtime_bar_opacity: Double {
-		colorScheme == .dark ? 0.2 : 0.1
-	}
-	
-	var MainContent: some View {
-		ScrollViewReader { scroller in
-			ScrollView {
-				Color.white.opacity(0)
-					.id("startblock")
-					.frame(height: 1)
-				InnerTimelineView(ue:ue)
-					.background(GeometryReader { proxy -> Color in
-//						DispatchQueue.main.async {
-//							handle_scroll_queue(proxy, queue: [])
-//						}
-						return Color.clear
-					})
-			}
-			.buttonStyle(BorderlessButtonStyle())
-			.coordinateSpace(name: "scroll")
-		}
-	}
-}
-
-protocol ScrollQueue {
-	var should_queue: Bool { get }
-	func set_should_queue(_ val: Bool)
-}
-	
-func handle_scroll_queue(_ proxy: GeometryProxy, queue: ScrollQueue) {
-	let offset = -proxy.frame(in: .named("scroll")).origin.y
-	guard offset >= 0 else {
-		return
-	}
-	let val = offset > 0
-	if queue.should_queue != val {
-		queue.set_should_queue(val)
-	}
+//	func loadMoreData() {
+//		isLoading = true
+//
+//		// Example function signature for the database
+//		fetchEventsAndProfiles(lastEventDate: lastEventDate, lastEventUID: lastEventUID, limit: 20) { newEventsAndProfiles in
+//			let newTimelineItems = newEventsAndProfiles.map { (event, profile) -> TimelineModel in
+//				return TimelineModel(id: UUID(), event: event, profile: profile)
+//			}
+//			
+//			timeline.append(contentsOf: newTimelineItems)
+//			isLoading = false
+//			
+//			// Update the last event's date and UID for the next pagination request
+//			if let lastEvent = newEventsAndProfiles.last?.0 {
+//				lastEventDate = lastEvent.date
+//				lastEventUID = lastEvent.uid
+//			}
+//		}
+//	}
 }

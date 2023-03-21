@@ -108,11 +108,62 @@ extension nostr {
 			}
 			static let logger = Topaz.makeDefaultLogger(label:"nostr.Event.Tag")
 
-			enum Kind:String, Codable {
+			enum Kind:Codable, LosslessStringConvertible {
 				/// a tag that references another nostr event
-				case event = "e"
+				case event
 				/// a tag that references a user
-				case pubkey = "p"
+				case pubkey
+
+				/// any kind of tag that is not supported in this software
+				case unknown(String)
+
+				var description:String {
+					get {
+						switch self {
+						case .event:
+							return "e"
+						case .pubkey:
+							return "p"
+						case .unknown(let str):
+							return str
+						}
+					}
+				}
+				init(_ description:String) {
+					switch description {
+					case "e":
+						self = .event
+					case "p":
+						self = .pubkey
+					default:
+						self = .unknown(description)
+					}
+				}
+
+				init(from decoder: Decoder) throws {
+					let container = try decoder.singleValueContainer()
+					let rawValue = try container.decode(String.self)
+					switch rawValue {
+					case "e":
+						self = .event
+					case "p":
+						self = .pubkey
+					default:
+						self = .unknown(rawValue)
+					}
+				}
+
+				func encode(to encoder: Encoder) throws {
+					var container = encoder.singleValueContainer()
+					switch self {
+					case .event:
+						try container.encode("e")
+					case .pubkey:
+						try container.encode("p")
+					case .unknown(let str):
+						try container.encode(str)
+					}
+				}
 			}
 
 			let kind:Kind
@@ -122,10 +173,8 @@ extension nostr {
 				return info.count + 1
 			}
 			
-			init(_ array:[String]) throws {
-				guard let makeKind = Kind(rawValue:array[0]) else {
-					throw Error.unknownTagKind
-				}
+			init(_ array:[String]) {
+				let makeKind = Kind(array[0])
 				self.kind = makeKind
 				self.info = Array(array[array.startIndex.advanced(by: 1)..<array.count])
 			}
@@ -160,7 +209,7 @@ extension nostr {
 			subscript(_ index:Int) -> String {
 				get {
 					if index == 0 {
-						return kind.rawValue
+						return kind.description
 					} else {
 						return info[index-1]
 					}
@@ -168,7 +217,7 @@ extension nostr {
 			}
 			
 			func toArray() -> [String] {
-				var buildArray = [kind.rawValue]
+				var buildArray = [kind.description]
 				buildArray.append(contentsOf:info)
 				return buildArray
 			}
@@ -179,7 +228,7 @@ extension nostr {
 					relay_id = info[2]
 				}
 
-				return ReferenceID(ref_id:info[1], relay_id:relay_id, key:self.kind.rawValue)
+				return ReferenceID(ref_id:info[1], relay_id:relay_id, key:self.kind.description)
 			}
 		}
 
@@ -247,7 +296,7 @@ extension nostr {
 		
 		func getReferencedIDs(_ key:String = "e") -> [ReferenceID] {
 			return tags.reduce(into: []) { (acc, tag) in
-				if tag.count >= 2 && tag.kind.rawValue == key {
+				if tag.count >= 2 && tag.kind.description == key {
 					var relay_id: String? = nil
 					if tag.count >= 3 {
 						relay_id = tag[2]
@@ -341,7 +390,7 @@ extension nostr.Event {
 	}
 	func firstEventTag() -> String? {
 		for tag in tags {
-			if tag.kind == .event {
+			if case .event = tag.kind {
 				return tag.info[0]
 			}
 		}
@@ -349,7 +398,7 @@ extension nostr.Event {
 	}
 	func lastEventTag() -> String? {
 		for tag in tags.reversed() {
-			if tag.kind == .event {
+			if case .event = tag.kind {
 				return tag.info[0]
 			}
 		}

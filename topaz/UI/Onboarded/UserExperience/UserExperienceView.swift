@@ -152,9 +152,7 @@ struct CustomTabBar: View {
 struct HomeView: View {
 	let ue:UE
 	var body: some View {
-		NavigationLink("Push view", destination: {
-			AccountPickerView(ue:ue)
-		})
+		TimelineView(ue:ue)
 	}
 }
 
@@ -193,6 +191,82 @@ struct PV: View {
 	}
 }
 
+struct EventViewCell: View {
+	let event: nostr.Event
+	let profile: nostr.Profile?
+
+	var dateFormatter: DateFormatter {
+		let formatter = DateFormatter()
+		formatter.dateStyle = .medium
+		formatter.timeStyle = .short
+		return formatter
+	}
+
+	var body: some View {
+		VStack(alignment: .leading, spacing: 8) {
+			HStack {
+				if let profilePicture = profile?.picture, let url = URL(string: profilePicture) {
+					AsyncImage(url: url) { image in
+						image
+							.resizable()
+							.aspectRatio(contentMode: .fill)
+					} placeholder: {
+						ProgressView()
+					}
+					.frame(width: 50, height: 50)
+					.cornerRadius(25)
+				} else {
+					Image(systemName: "person.crop.circle.fill")
+						.resizable()
+						.frame(width: 50, height: 50)
+						.foregroundColor(.gray)
+				}
+
+				VStack(alignment: .leading, spacing: 2) {
+					HStack(spacing: 4) {
+						Text(profile?.display_name ?? profile?.name ?? "Unknown")
+							.font(.headline)
+						
+						if profile?.nip05 != nil {
+							Image(systemName: "checkmark.circle.fill")
+								.foregroundColor(.blue)
+								.font(.system(size: 18))
+						}
+					}
+					
+					Text("@\(profile?.name ?? "unknown")")
+						.font(.subheadline)
+						.foregroundColor(.gray)
+				}
+			}
+
+			Text(event.content)
+				.font(.body)
+
+			HStack {
+				Text(dateFormatter.string(from: event.created))
+					.font(.caption)
+					.foregroundColor(.gray)
+
+				Spacer()
+
+				if let boostedBy = event.boosted_by {
+					HStack {
+						Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+						Text(boostedBy)
+					}
+					.font(.caption)
+					.foregroundColor(.accentColor)
+				}
+			}
+		}
+		.padding()
+		.background(Color(.systemBackground))
+		.cornerRadius(8)
+		.shadow(color: Color(.systemGray6), radius: 4, x: 0, y: 2)
+	}
+}
+
 struct ConnectionStatusIndicator: View {
 	@ObservedObject var relays: UE.RelaysDB
 	@State private var isTextVisible = false
@@ -206,9 +280,9 @@ struct ConnectionStatusIndicator: View {
 			let connCount = succ.filter { $0 == .connected }
 
 			VStack {
-				if succ.count <= ConnectionDotView.maxCirclesInFrame(maxWidth:geometry.size.width, maxHeight:geometry.size.height, circleSize:circleSize, spacing:spacing) {
-					ConnectionDotView(spacing:spacing, circleSize:circleSize, status:succ).sheet(isPresented: $showModal) {
-					  ModalView()
+				if succ.count <= ConnectionDotView.maxShapesInFrame(maxWidth:geometry.size.width, maxHeight:geometry.size.height, shapeSize:circleSize, spacing:spacing) {
+					ConnectionDotView(spacing:spacing, shapeSize:circleSize, status:succ).sheet(isPresented: $showModal) {
+						ConnectionDetailsView(relayDB: relays)
 				  }
 				} else {
 					ProgressRing(progress: Double(connCount.count) / Double(succ.count))
@@ -227,9 +301,6 @@ struct ConnectionStatusIndicator: View {
 		}
 		.frame(width: 45, height: 30)
 		.onTapGesture {
-//			withAnimation(.easeInOut(duration: 0.3)) {
-//				isTextVisible.toggle()
-//			}
 			showModal.toggle()
 			if isTextVisible {
 				Task.detached {
@@ -261,24 +332,23 @@ struct ProgressRing: Shape {
 
 struct ConnectionDotView: View {
 	let spacing: CGFloat
-	let circleSize: CGFloat
+	let shapeSize: CGFloat
 	let status: [RelayConnection.State]
-	
+
 	var body: some View {
 		GeometryReader { geometry in
-			let numberOfColumns = Int((geometry.size.width - spacing) / (circleSize + spacing))
-			let numberOfRows = Int((geometry.size.height - spacing) / (circleSize + spacing))
-			let columns = Array(repeating: GridItem(.fixed(circleSize), spacing: spacing), count: numberOfColumns)
-			
-			let horizontalPadding = (geometry.size.width - CGFloat(min(numberOfColumns, status.count)) * (circleSize + spacing) + spacing) / 2
+			let numberOfColumns = Int((geometry.size.width - spacing) / (shapeSize + spacing))
+			let numberOfRows = Int((geometry.size.height - spacing) / (shapeSize + spacing))
+			let columns = Array(repeating: GridItem(.fixed(shapeSize), spacing: spacing), count: numberOfColumns)
+
+			let horizontalPadding = (geometry.size.width - CGFloat(min(numberOfColumns, status.count)) * (shapeSize + spacing) + spacing) / 2
 			let usedRows = max(1, Int(ceil(Double(status.count) / Double(numberOfColumns))))
-			let verticalPadding = (geometry.size.height - CGFloat(usedRows) * (circleSize + spacing) + spacing) / 2
-			
+			let verticalPadding = (geometry.size.height - CGFloat(usedRows) * (shapeSize + spacing) + spacing) / 2
+
 			LazyVGrid(columns: columns, spacing: spacing) {
 				ForEach(status.indices, id: \.self) { index in
-					Circle()
-						.fill(Self.colorForConnectionState(status[index]))
-						.frame(width: circleSize, height: circleSize)
+					DotConnectionView(state: status[index])
+						.frame(width: shapeSize, height: shapeSize)
 				}
 			}
 			.padding(.horizontal, horizontalPadding)
@@ -286,7 +356,33 @@ struct ConnectionDotView: View {
 		}
 	}
 	
-	fileprivate static func colorForConnectionState(_ state: RelayConnection.State) -> Color {
+	static func maxShapesInFrame(maxWidth: CGFloat, maxHeight: CGFloat, shapeSize: CGFloat, spacing: CGFloat) -> Int {
+		let numberOfColumns = Int((maxWidth - spacing) / (shapeSize + spacing))
+		let numberOfRows = Int((maxHeight - spacing) / (shapeSize + spacing))
+		return numberOfColumns * numberOfRows
+	}
+}
+
+struct DotConnectionView: View {
+	let state: RelayConnection.State
+
+	var body: some View {
+		connectionShape(state: state)
+			.foregroundColor(colorForConnectionState(state))
+	}
+
+	func connectionShape(state: RelayConnection.State) -> some Shape {
+		switch state {
+		case .disconnected:
+			return AnyShape(Triangle())
+		case .connecting:
+			return AnyShape(Rectangle())
+		case .connected:
+			return AnyShape(Circle())
+		}
+	}
+
+	func colorForConnectionState(_ state: RelayConnection.State) -> Color {
 		switch state {
 		case .disconnected:
 			return Color.red
@@ -296,28 +392,34 @@ struct ConnectionDotView: View {
 			return Color.green
 		}
 	}
-	
-	static func maxCirclesInFrame(maxWidth: CGFloat, maxHeight: CGFloat, circleSize: CGFloat, spacing: CGFloat) -> Int {
-		let numberOfColumns = Int((maxWidth - spacing) / (circleSize + spacing))
-		let numberOfRows = Int((maxHeight - spacing) / (circleSize + spacing))
-		return numberOfColumns * numberOfRows
+}
+
+struct Triangle: Shape {
+	func path(in rect: CGRect) -> Path {
+		var path = Path()
+
+		path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+		path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+		path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+		path.closeSubpath()
+
+		return path
 	}
 }
 
-struct ModalView: View {
-	@Environment(\.dismiss) var dismiss
+struct AnyShape: Shape {
+	private let pathBuilder: (CGRect) -> Path
 
-	var body: some View {
-		VStack {
-			Text("This is a full screen modal view")
-			Button("Dismiss") {
-				dismiss()
-			}
+	init<S: Shape>(_ wrapped: S) {
+		pathBuilder = { rect in
+			return wrapped.path(in: rect)
 		}
 	}
+
+	func path(in rect: CGRect) -> Path {
+		return pathBuilder(rect)
+	}
 }
-
-
 
 struct CustomTitleBar: View {
 	let ue:UE

@@ -7,19 +7,21 @@
 
 import Foundation
 
+
 extension nostr {
 	/// a subscription request to the server
-	struct Subscribe {
+	struct Subscribe:Codable {
 		/// The subscription ID
 		let sub_id:String
 		/// The filters to apply to the subscription
 		let filters:[Filter]
 	}
 
-	enum Request:Codable {
+	enum Subscription:Codable {
 		enum Error:Swift.Error {
 			case unknownRequestInstruction(String)
 		}
+		
 		/// subscribe to a set of filters
 		case subscribe(Subscribe)
 
@@ -27,7 +29,10 @@ extension nostr {
 		case unsubscribe(String)
 
 		/// send an event to the server(?)
-		case event(Event)
+		case event(String, Event)
+		
+		/// the end of a stored event list
+		case endOfStoredEvents(String)
 
 		init(from decoder:Decoder) throws {
 			var container = try decoder.unkeyedContainer()
@@ -44,8 +49,12 @@ extension nostr {
 					let sub_id = try container.decode(String.self)
 					self = .unsubscribe(sub_id)
 				case "EVENT":
+					let subID = try container.decode(String.self)
 					let event = try container.decode(Event.self)
-					self = .event(event)
+					self = .event(subID, event)
+				case "EOSE":
+					let subID = try container.decode(String.self)
+					self = .endOfStoredEvents(subID)
 			default:
 				throw Error.unknownRequestInstruction(type)
 			}
@@ -63,9 +72,12 @@ extension nostr {
 				case .unsubscribe(let sub_id):
 					try container.encode("CLOSE")
 					try container.encode(sub_id)
-				case .event(let event):
+				case .event(_, let event):
 					try container.encode("EVENT")
 					try container.encode(event)
+				case .endOfStoredEvents(let subID):
+					try container.encode("EOSE")
+					try container.encode(subID)
 			}
 		}
 	}

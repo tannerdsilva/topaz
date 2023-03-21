@@ -49,7 +49,7 @@ struct TextEvent: View {
 			VStack(alignment: .leading) {
 				HStack(alignment: .center) {
 					let pk = is_anon ? "anon" : pubkey
-					EventProfileName(pubkey: pk, profile:profile, ue:ue, show_friend_confirmed: true, size: .normal)
+//					EventProfileName(pubkey: pk, profile:profile, ue:ue, show_friend_confirmed: true, size: .normal)
 					
 					Text(verbatim:"\(event.created.relativeShortTimeString())")
 						.foregroundColor(.gray)
@@ -77,7 +77,7 @@ struct TextEvent: View {
 		.contentShape(Rectangle())
 		.background(event_validity_color((try? event.validate()) ?? .bad_sig))
 		.id(event.id)
-		.frame(maxWidth: .infinity, minHeight: PFP_SIZE)
+		.frame(maxWidth: .infinity, minHeight: 52)
 		.padding([.bottom], 2)
 //		.event_context_menu(event, keypair:ue.keypair, target_pubkey: pubkey, bookmarks: damus.bookmarks)
 		

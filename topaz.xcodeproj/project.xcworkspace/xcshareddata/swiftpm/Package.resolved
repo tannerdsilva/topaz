@@ -67,8 +67,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tannerdsilva/QuickLMDB",
       "state" : {
-        "revision" : "0d8925a4842f53378b9dbdc67c8fb556b05de9ea",
-        "version" : "1.4.4"
+        "branch" : "object-db",
+        "revision" : "7cf1befebba713d1e9d95c800404feb226c40656"
       }
     },
     {

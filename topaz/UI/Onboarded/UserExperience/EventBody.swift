@@ -27,7 +27,7 @@ struct EventBody:View {
 	
 	var body: some View {
 		if event_is_reply(event, privkey: ue.keypair.privkey) {
-			ReplyDescription(ue:ue, event: event)
+//			ReplyDescription(ue:ue, event: event)
 		}
 		Text("Note content view")
 //		NoteContentView(ue:ue, event: event, show_images: should_show_img, size: size, artifacts: .just_content(content), truncate: true).frame(maxWidth: .infinity, alignment: .leading)
