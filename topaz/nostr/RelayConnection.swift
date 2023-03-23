@@ -286,6 +286,10 @@ final actor RelayConnection:ObservableObject {
 			try await hasSocket.close().get()
         }
     }
+	
+	deinit {
+		self.logger.notice("relayconnection is deinitializing", metadata:["url":"\(self.url)"])
+	}
 }
 
 // MARK: - EventHolder

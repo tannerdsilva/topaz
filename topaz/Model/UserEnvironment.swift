@@ -12,9 +12,6 @@ import Logging
 import SwiftBlake2
 import AsyncAlgorithms
 
-
-
-
 class UE:ObservableObject {
 	/// stores the primary root view that the user is currently viewing
 	enum ViewMode:Int, MDB_convertible, Codable {
@@ -131,7 +128,6 @@ class UE:ObservableObject {
 			self.keypair = keypair
 			
 			let homeSubs = try self.buildMainUserFilters(tx:newTrans)
-//			Task.detached { [mrdb = makeRelaysDB, myRs = myRelays, subs = buildSubscribe] in
 			for curRelay in myRelays {
 				try makeRelaysDB.add(subscriptions:[nostr.Subscribe(sub_id:UUID().uuidString, filters:homeSubs)], to:curRelay, tx:newTrans)
 			}
@@ -139,14 +135,46 @@ class UE:ObservableObject {
 				guard let self = self else {
 					return
 				}
+				let decoder = JSONDecoder()
 				for try await curEvs in hol {
-					self.logger.notice("flushing event holder")
+					self.logger.notice("flushing event holder.")
 					defer {
-						self.logger.info("done")
+						self.logger.info("done.")
 					}
 					let newTrans = try Transaction(self.env, readOnly:false)
+					var buildProfiles = [String:nostr.Profile]()
+					for curEv in curEvs {
+						switch curEv.kind {
+						case .metadata:
+							do {
+								let asData = Data(curEv.content.utf8)
+								let decoded = try decoder.decode(nostr.Profile.self, from:asData)
+								self.logger.info("successfully decoded profile", metadata:["pubkey":"\(curEv.pubkey)"])
+								buildProfiles[curEv.pubkey] = decoded
+							} catch {
+								self.logger.error("failed to decode profile.")
+							}
+						case .contacts:
+							do {
+								let asData = Data(curEv.content.utf8)
+								let relays = Set(try decoder.decode([String:[String:Bool]].self, from:asData).keys)
+								var following = Set<String>()
+								for curTag in curEv.tags {
+									if case curTag.kind = nostr.Event.Tag.Kind.pubkey, let getPubKey = curTag.info.first {
+										following.update(with:getPubKey)
+									}
+								}
+								try self.relaysDB.setRelays(relays, pubkey:curEv.pubkey, tx:newTrans)
+								try self.contactsDB.followDB.set(pubkey:curEv.pubkey, follows:following, tx:newTrans)
+								self.logger.info("updated contact information for ")
+							} catch {}
+						default:
+							self.logger.debug("got event.", metadata:["kind":"\(curEv.kind)"])
+						}
+					}
 					let newEvsSet = Set(curEvs)
 					try self.eventsDB.writeEvents(newEvsSet, tx:newTrans)
+					try self.profilesDB.setPublicKeys(buildProfiles, tx:newTrans)
 					try newTrans.commit()
 				}
 			}
@@ -155,6 +183,15 @@ class UE:ObservableObject {
 		case let .failure(err):
 			throw err
 		}
+	}
+
+	func getHomeTimelineState() -> ([nostr.Event], [String:nostr.Profile]) {
+		let readTX = try! Transaction(self.env, readOnly:true)
+		let myEvents = try! self.eventsDB.getEvent(kind: .text_note, tx:readTX)
+		let pubkeys = Set(myEvents.compactMap { $0.pubkey })
+		let profiles = try! self.profilesDB.getPublicKeys(publicKeys:pubkeys, tx:readTX)
+		try! readTX.commit()
+		return (myEvents, profiles)
 	}
 
 	func buildMainUserFilters(tx someTrans:QuickLMDB.Transaction) throws -> [nostr.Filter] {
@@ -169,7 +206,8 @@ class UE:ObservableObject {
 		// build the "our contacts" filter
 		var ourContactsFilter = nostr.Filter()
 		ourContactsFilter.kinds = [.metadata, .contacts]
-
+		ourContactsFilter.authors = [self.keypair.pubkey]
+		
 		// build "blocklist" filter
 		var blocklistFilter = nostr.Filter()
 		blocklistFilter.kinds = [.list_categorized]
@@ -191,13 +229,13 @@ class UE:ObservableObject {
 		homeFilter.kinds = [.text_note, .like, .boost]
 		homeFilter.authors = Array(myFriends)
 
-		// create "notifications" filter
-		var notificationsFilter = nostr.Filter()
-		notificationsFilter.kinds = [.like, .boost, .text_note, .zap]
-		notificationsFilter.limit = 500
+		// // create "notifications" filter
+		// var notificationsFilter = nostr.Filter()
+		// notificationsFilter.kinds = [.like, .boost, .text_note, .zap]
+		// notificationsFilter.limit = 500
 
 		// return [contactsFilter]
-		return [contactsFilter, ourContactsFilter, blocklistFilter, dmsFilter, ourDMsFilter, homeFilter, notificationsFilter]
+		return [contactsFilter, ourContactsFilter, blocklistFilter, dmsFilter, ourDMsFilter, homeFilter]
 	}
 
 	/// opens a new transaction for the user environment

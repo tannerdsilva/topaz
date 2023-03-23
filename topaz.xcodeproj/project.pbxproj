@@ -65,6 +65,7 @@
 		AEB899F129B4FE4E004361B8 /* ApplicationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB899F029B4FE4E004361B8 /* ApplicationModel.swift */; };
 		AEB899FB29B50602004361B8 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899FA29B50602004361B8 /* Markdown */; };
 		AEB899FE29B50720004361B8 /* SystemPackage in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899FD29B50720004361B8 /* SystemPackage */; };
+		AEBA325A29CCC28F00FC2CD2 /* TextNoteContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBA325929CCC28F00FC2CD2 /* TextNoteContentView.swift */; };
 		AED9D12F29BA9730004AE0AE /* LocalizationHelp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED9D12E29BA9730004AE0AE /* LocalizationHelp.swift */; };
 		AED9D13429BA9828004AE0AE /* NIP05.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED9D13329BA9828004AE0AE /* NIP05.swift */; };
 		AEEAF2A629C97CC7002B3C37 /* ZapsDB.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEEAF2A529C97CC7002B3C37 /* ZapsDB.swift */; };
@@ -144,6 +145,7 @@
 		AEB39B8329B5C3F300F3C92E /* RelayConnection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RelayConnection.swift; sourceTree = "<group>"; };
 		AEB39B8729B68D6A00F3C92E /* UserExperienceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserExperienceView.swift; sourceTree = "<group>"; };
 		AEB899F029B4FE4E004361B8 /* ApplicationModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ApplicationModel.swift; sourceTree = "<group>"; };
+		AEBA325929CCC28F00FC2CD2 /* TextNoteContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextNoteContentView.swift; sourceTree = "<group>"; };
 		AED9D12E29BA9730004AE0AE /* LocalizationHelp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationHelp.swift; sourceTree = "<group>"; };
 		AED9D13329BA9828004AE0AE /* NIP05.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NIP05.swift; sourceTree = "<group>"; };
 		AEEAF2A529C97CC7002B3C37 /* ZapsDB.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZapsDB.swift; sourceTree = "<group>"; };
@@ -220,6 +222,7 @@
 				AEB39B8729B68D6A00F3C92E /* UserExperienceView.swift */,
 				AE010B5329C674A600ADECCA /* ConnectionDetailsView.swift */,
 				AEEAF2AF29CA1A0B002B3C37 /* TimelineView.swift */,
+				AEBA325929CCC28F00FC2CD2 /* TextNoteContentView.swift */,
 			);
 			path = UserExperience;
 			sourceTree = "<group>";
@@ -573,6 +576,7 @@
 				AE0F153229C509B4009E3297 /* Context.swift in Sources */,
 				AE1A59C829B7B1EA00D21AA0 /* Mention.swift in Sources */,
 				AE0F153429C5553A009E3297 /* SettingsDB.swift in Sources */,
+				AEBA325A29CCC28F00FC2CD2 /* TextNoteContentView.swift in Sources */,
 				AEB39B7B29B5417D00F3C92E /* POW.swift in Sources */,
 				AE1A59CE29B7C02D00D21AA0 /* ScheduledTask.swift in Sources */,
 				AE7FE83929BBB7F80060DCE3 /* Parser.swift in Sources */,
@@ -969,8 +973,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/tannerdsilva/QuickLMDB";
 			requirement = {
-				branch = "object-db";
-				kind = branch;
+				kind = revision;
+				revision = 0d93ad143bf009ebf0c2fbfa1f3dc287df27b3a7;
 			};
 		};
 		AEB899A829B4F84C004361B8 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */ = {

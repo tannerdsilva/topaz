@@ -12,6 +12,7 @@ import QuickLMDB
 // a user may be considered a friend to the current user if the current user is following them
 extension UE {
 	class Profiles:ObservableObject {
+		static let logger = Topaz.makeDefaultLogger(label:"db.profile")
 		enum Databases:String {
 			case profile_main = "_profiles-core"
 		}
@@ -19,7 +20,7 @@ extension UE {
 		let env:QuickLMDB.Environment
 		fileprivate let decoder = JSONDecoder()
 		
-		let profilesDB:Database  // [String:Pofile] where the key is the pubkey
+		let profilesDB:Database  // [String:Profile] where the key is the pubkey
 		
 		init(_ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
 			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
@@ -29,25 +30,29 @@ extension UE {
 		}
 
 		/// gets a profile from the database
-		func getPublicKeys(publicKeys:Set<String>) throws -> [String:nostr.Profile] {
-			let newTrans = try QuickLMDB.Transaction(self.env, readOnly:true)
-			let getCursor = try self.profilesDB.cursor(tx:newTrans)
+		func getPublicKeys(publicKeys:Set<String>, tx someTrans:QuickLMDB.Transaction) throws -> [String:nostr.Profile] {
+			let getCursor = try self.profilesDB.cursor(tx:someTrans)
 			var profiles = [String:nostr.Profile]()
 			for curID in publicKeys {
-				let getProfile = Data(try getCursor.getEntry(.set, key:curID).value)!
-				let decoded = try self.decoder.decode(nostr.Profile.self, from:getProfile)
-				profiles[curID] = decoded
+				do {
+					let getProfile = Data(try getCursor.getEntry(.set, key:curID).value)!
+					let decoded = try self.decoder.decode(nostr.Profile.self, from:getProfile)
+					profiles[curID] = decoded
+				} catch LMDBError.notFound {
+					continue
+				}
+				
 			}
-			try newTrans.commit()
 			return profiles
 		}
 
 		/// set a profile in the database
-		func setPublicKeys(_ profiles:[String:nostr.Profile]) throws {
-			let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false)
+		func setPublicKeys(_ profiles:[String:nostr.Profile], tx someTrans:QuickLMDB.Transaction) throws {
+			let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
 			let encoder = JSONEncoder()
 			let profileCursor = try self.profilesDB.cursor(tx:newTrans)
 			for (pubkey, curProfile) in profiles {
+				UE.Profiles.logger.info("writing info for profile", metadata:["pubkey":"\(pubkey)"])
 				let encoded = try encoder.encode(curProfile)
 				try profileCursor.setEntry(value:encoded, forKey:pubkey)
 			}

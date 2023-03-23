@@ -56,8 +56,9 @@ struct EventView: View {
 
 	var body: some View {
 		VStack {
-			TextEvent(ue:ue, event: event, pubkey: pubkey, options: options)
-					.padding([.top], 6)
+			Text("GTFO")
+//			TextEvent(ue:ue, event: event, pubkey: pubkey, options: options)
+//					.padding([.top], 6)
 		}
 	}
 }

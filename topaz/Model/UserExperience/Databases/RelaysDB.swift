@@ -70,7 +70,9 @@ extension UE {
 			let newHolder = RelayConnection.EventHolder(holdInterval:0.25)
 			self.holder = newHolder
 			
-			let newLogger = Logger(label:"relay-db")
+			var newLogger = Logger(label:"relay-db")
+			newLogger.logLevel = .debug
+			
 			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
 			let pubRelaysDB = try env.openDatabase(named:Databases.pubkey_relayHash.rawValue, flags:[.create, .dupSort], tx:subTrans)
 			let relayStringDB = try env.openDatabase(named:Databases.relayHash_relayString.rawValue, flags:[.create], tx:subTrans)
@@ -124,12 +126,23 @@ extension UE {
 			var buildStates = [String:RelayConnection.State]()
 			for curRelay in getRelays {
 				let newConnection = RelayConnection(url:curRelay, stateChannel:stateC, eventChannel:eventC)
-				buildConnections[curRelay] = newConnection
-				buildStates[curRelay] = .disconnected
+				newLogger.info("new connection retain value: \(_getRetainCount(newConnection))")
 				let relayHash = try RelaysDB.produceRelayHash(url:Data(curRelay.utf8))
+//				try relayConnectionDB.setObject(value:newConnection, forKey:relayHash, tx:subTrans)
+//				newLogger.info("then connection retain value: \(_getRetainCount(newConnection))")
+//				let oldRetain = _getRetainCount(newConnection)
+//				newLogger.info("then connection retain value: \(_getRetainCount(newConnection))")
+//				let relayGet = try relayConnectionDB.getObject(type:RelayConnection.self, forKey:relayHash, tx:subTrans)!
+//				newLogger.info("then connection retain value: \(_getRetainCount(newConnection))")
+//				let relayGet2 = try relayConnectionDB.getObject(type:RelayConnection.self, forKey:relayHash, tx:subTrans)!
+//				let newretain = _getRetainCount(relayGet)
+				buildConnections[curRelay] = newConnection
+//				newLogger.info("RETAIN VALUE", metadata:["1":"\(oldRetain)", "2":"\(newretain)"])
+				
+				buildStates[curRelay] = .disconnected
+				
 				try relayStatusCursor.setEntry(value:RelayConnection.State.disconnected, forKey:relayHash)
 				try relaySubscriptionsDB.setEntry(value:[] as [nostr.Subscribe], forKey: pubkey, tx:subTrans)
-				try relayConnectionDB.setObject(value:newConnection, forKey:relayHash, tx:subTrans)
 			}
 			_userRelayConnections = Published(wrappedValue:buildConnections)
 			_userRelayConnectionStates = Published(initialValue:buildStates)
@@ -166,6 +179,7 @@ extension UE {
 						for await curEvent in ec {
 							switch curEvent.1 {
 							case let .event(subID, myEvent):
+								logThing.debug("got event.", metadata:["kind":"\(myEvent.kind.rawValue)", "pubkey":"\(myEvent.pubkey)"])
 								await self.holder.append(event: myEvent)
 								break;
 							case .endOfStoredEvents(let subID):
@@ -205,6 +219,8 @@ extension UE {
 		//  - if the relay information is already in the database, it will be updated silently and any keys that existed previously will be dropped
 		func setRelays(_ relays:Set<String>, pubkey:String, tx someTrans:QuickLMDB.Transaction) throws {
 			let newTrans = try Transaction(self.env, readOnly:false, parent:someTrans)
+			var didModify = false
+			
 			// hash-pubkey associations
 			let relayHashCursor = try self.pubkey_relayHash.cursor(tx:newTrans)
 			let relayHashPubKeyCursor = try self.relayHash_pubKey.cursor(tx:newTrans)
@@ -222,6 +238,7 @@ extension UE {
 					// check if the relay is still in the list of relays that we are setting
 					let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
 					if !assignRelays.contains(String(relayString)!) {
+						didModify = true
 						// check if there are any other public keys that are using this relay
 						do {
 							try relayHashPubKeyCursor.getEntry(.getBoth, key:curRelayHash, value:pubkey)
@@ -230,7 +247,7 @@ extension UE {
 								// this is the only public key that is using this relay, so we can remove it from the database
 								// - remove the relay connection object
 								do {
-									try self.relayHash_relayConnection.deleteObject(forKey:curRelayHash, tx:newTrans)
+									try self.relayHash_relayConnection.deleteObject(type:RelayConnection.self, forKey:curRelayHash, tx:newTrans)
 								} catch LMDBError.notFound {}
 								// - remove the public key associations
 								try relayHashPubKeyCursor.deleteEntry()
@@ -255,7 +272,7 @@ extension UE {
 							// this should never happen, but if it does, we can just remove the relay from the database
 							// - remove the relay connection object
 							do {
-								try self.relayHash_relayConnection.deleteObject(forKey:curRelayHash, tx:newTrans)
+								try self.relayHash_relayConnection.deleteObject(type:RelayConnection.self, forKey:curRelayHash, tx:newTrans)
 							} catch LMDBError.notFound {}
 							// - remove the public key associations
 							try relayHashPubKeyCursor.deleteEntry()
@@ -278,7 +295,8 @@ extension UE {
 					}
 				}
 			} catch LMDBError.notFound {}
-
+			var buildConnections = [String:RelayConnection]()
+			var buildStates = [String:RelayConnection.State]()
 			// iterate through the list of relays that we are setting and add them to the database
 			for curRelay in assignRelays {
 				let curRelayHash = try RelaysDB.produceRelayHash(url:Data(curRelay.utf8))
@@ -288,35 +306,28 @@ extension UE {
 				try relayStateCursor.setEntry(value:RelayConnection.State.disconnected, forKey:curRelayHash)
 				try relaySubsCursor.setEntry(value:([] as [nostr.Subscription]), forKey:curRelayHash)
 				try relayEventsCursor.setEntry(value:([] as [nostr.Event]), forKey:curRelayHash)
+				if pubkey == myPubkey {
+					let newRelayConnection = RelayConnection(url:curRelay, stateChannel:stateChannel, eventChannel:eventChannel)
+					try self.relayHash_relayConnection.setObject(value:newRelayConnection, forKey:curRelayHash, tx:newTrans)
+					try relayStateCursor.setEntry(value:RelayConnection.State.disconnected, forKey:curRelayHash)
+					buildStates[curRelay] = RelayConnection.State.disconnected
+					buildConnections[curRelay] = newRelayConnection
+				}
+			}
+			if assignRelays.count > 0 {
+				didModify = true
 			}
 
 			// if these are the relays that belong to the current user, manage the current connections so that they can become an updated list of connections
 			if pubkey == myPubkey {
-				// go through every relay that is listed for our public key and ensure there is a connection reference in the database
-				let dupIterator = try relayHashCursor.makeDupIterator(key:pubkey)
-				var buildConnections = [String:RelayConnection]()
-				var buildStates = [String:RelayConnection.State]()
-				for curEntry in dupIterator {
-					let curRelayHash = curEntry.value
-					let relayString = String(try relayStringCursor.getEntry(.set, key:curRelayHash).value)!
-					do {
-						buildConnections[relayString] = try self.relayHash_relayConnection.getObject(type:RelayConnection.self, forKey:curRelayHash, tx:newTrans)
-						buildStates[relayString] = RelayConnection.State(try relayStateCursor.getEntry(.set, key:curRelayHash).value)
-					} catch LMDBError.notFound {
-						// there is no connection object for this relay, so we need to create one
-						let newRelayConnection = RelayConnection(url:relayString, stateChannel:stateChannel, eventChannel:eventChannel)
-						try self.relayHash_relayConnection.setObject(value:newRelayConnection, forKey:curRelayHash, tx:newTrans)
-						try relayStateCursor.setEntry(value:RelayConnection.State.disconnected, forKey:curRelayHash)
-						buildStates[relayString] = RelayConnection.State.disconnected
-						buildConnections[relayString] = newRelayConnection
+				if didModify == true {
+					Task.detached { @MainActor [weak self, buildConns = buildConnections, buildStates = buildStates] in
+						guard let self = self else {
+							return
+						}
+						self.userRelayConnections = buildConns
+						self.userRelayConnectionStates = buildStates
 					}
-				}
-				Task.detached { @MainActor [weak self, buildConns = buildConnections, buildStates = buildStates] in
-					guard let self = self else {
-						return
-					}
-					self.userRelayConnections = buildConns
-					self.userRelayConnectionStates = buildStates
 				}
 			}
 			try newTrans.commit()

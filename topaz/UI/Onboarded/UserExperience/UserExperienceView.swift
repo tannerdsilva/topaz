@@ -47,38 +47,6 @@ struct UserExperienceView: View {
     }
 }
 
-
-//
-//import SwiftUI
-//
-//struct UserExperienceView: View {
-//	@ObservedObject var ue:UE
-//
-//	var body: some View {
-//		VStack {
-//			Spacer()
-//
-//			NavigationView {
-//				switch ue.viewMode {
-//				case .home:
-//					HomeView()
-//				case .notifications:
-//					MentionsView()
-//				case .dms:
-//					MessagesView()
-//				case .search:
-//					SearchView()
-//				case .profile:
-//					PV()
-//				}
-//			}
-//
-//			CustomTabBar(viewMode:$ue.viewMode)
-//		}
-//		.edgesIgnoringSafeArea(.bottom)
-//	}
-//}
-
 struct TabButton: View {
 	let myView:UE.ViewMode
 	let icon: String
@@ -191,6 +159,17 @@ struct PV: View {
 	}
 }
 
+struct DisplayNameText: View {
+	let text: String
+
+	var body: some View {
+		Text(text)
+			.font(.system(size: 18, weight: .bold, design: .rounded))
+			.foregroundColor(.primary)
+	}
+}
+
+
 struct EventViewCell: View {
 	let event: nostr.Event
 	let profile: nostr.Profile?
@@ -224,8 +203,7 @@ struct EventViewCell: View {
 
 				VStack(alignment: .leading, spacing: 2) {
 					HStack(spacing: 4) {
-						Text(profile?.display_name ?? profile?.name ?? "Unknown")
-							.font(.headline)
+						DisplayNameText(text: profile?.display_name ?? profile?.name ?? "Unknown")
 						
 						if profile?.nip05 != nil {
 							Image(systemName: "checkmark.circle.fill")
@@ -240,8 +218,8 @@ struct EventViewCell: View {
 				}
 			}
 
-			Text(event.content)
-				.font(.body)
+			TextNoteContentView(content: event.content)
+
 
 			HStack {
 				Text(dateFormatter.string(from: event.created))
@@ -258,12 +236,15 @@ struct EventViewCell: View {
 					.font(.caption)
 					.foregroundColor(.accentColor)
 				}
+				Spacer()
+				
+				Text("Kind: \(event.kind.rawValue)").font(.caption).foregroundColor(.gray)
+				Spacer()
+				Text("Tags: \(event.tags.count)").font(.caption).foregroundColor(.gray)
 			}
 		}
 		.padding()
 		.background(Color(.systemBackground))
-		.cornerRadius(8)
-		.shadow(color: Color(.systemGray6), radius: 4, x: 0, y: 2)
 	}
 }
 

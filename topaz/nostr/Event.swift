@@ -11,6 +11,7 @@ import CommonCrypto
 import secp256k1
 import secp256k1_implementation
 import CryptoKit
+import SwiftBlake2
 
 extension nostr {
 	enum EncEncoding {
@@ -108,7 +109,7 @@ extension nostr {
 			}
 			static let logger = Topaz.makeDefaultLogger(label:"nostr.Event.Tag")
 
-			enum Kind:Codable, LosslessStringConvertible {
+			enum Kind:Codable, LosslessStringConvertible, Equatable {
 				/// a tag that references another nostr event
 				case event
 				/// a tag that references a user
@@ -162,6 +163,19 @@ extension nostr {
 						try container.encode("p")
 					case .unknown(let str):
 						try container.encode(str)
+					}
+				}
+
+				static func == (lhs: Self, rhs: Self) -> Bool {
+					switch (lhs, rhs) {
+					case (.event, .event):
+						return true
+					case (.pubkey, .pubkey):
+						return true
+					case (.unknown(let lstr), .unknown(let rstr)):
+						return lstr == rstr
+					default:
+						return false
 					}
 				}
 			}
@@ -243,6 +257,9 @@ extension nostr {
 			case content = "content"
 		}
 		
+		private static let df = ISO8601DateFormatter()
+		let keySignature:Data
+
 		let uid:String
 		let sig:String
 		let tags:[Tag]
@@ -259,6 +276,11 @@ extension nostr {
 		}
 		
 		fileprivate init(uid:String, sig:String, tags:[Tag], boosted_by:String?, pubkey:String, created:Date, kind:Kind, content:String) {
+			let formattedDate = Data(Self.df.string(from: created).utf8)
+			var eventUIDHash = try! Blake2bHasher(outputLength:48)
+			try! eventUIDHash.update(Data(sig.utf8))
+			let finalUID = try! eventUIDHash.export()
+			self.keySignature = formattedDate + finalUID
 			self.uid = uid
 			self.sig = sig
 			self.tags = tags
@@ -272,14 +294,21 @@ extension nostr {
 		init(from decoder:Decoder) throws {
 			let container = try decoder.container(keyedBy: CodingKeys.self)
 			self.uid = try container.decode(String.self, forKey: .uid)
-			self.sig = try container.decode(String.self, forKey: .sig)
+			let getSig = try container.decode(String.self, forKey: .sig)
+			self.sig = getSig
 			self.tags = try container.decode([Tag].self, forKey: .tags)
 			self.boosted_by = try container.decodeIfPresent(String.self, forKey: .boosted_by)
 			self.pubkey = try container.decode(String.self, forKey: .pubkey)
 			let getTI = try container.decode(TimeInterval.self, forKey: .created)
-			self.created = Date(timeIntervalSince1970:getTI)
+			let getCreateDate = Date(timeIntervalSince1970:getTI)
+			self.created = getCreateDate
 			self.kind = Kind(rawValue:try container.decode(Int.self, forKey: .kind))!
 			self.content = try container.decode(String.self, forKey: .content)
+			let formattedDate = Data(Self.df.string(from: self.created).utf8)
+			var eventUIDHash = try Blake2bHasher(outputLength:48)
+			try eventUIDHash.update(Data(self.sig.utf8))
+			let finalUID = try eventUIDHash.export()
+			self.keySignature = formattedDate + finalUID
 		}
 
 		func encode(to encoder:Encoder) throws {
