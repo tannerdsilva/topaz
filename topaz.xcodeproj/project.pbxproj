@@ -56,8 +56,6 @@
 		AEB39B8429B5C3F300F3C92E /* RelayConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB39B8329B5C3F300F3C92E /* RelayConnection.swift */; };
 		AEB39B8829B68D6A00F3C92E /* UserExperienceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB39B8729B68D6A00F3C92E /* UserExperienceView.swift */; };
 		AEB899A629B4F81E004361B8 /* QuickLMDB in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899A529B4F81E004361B8 /* QuickLMDB */; };
-		AEB899AA29B4F84C004361B8 /* HummingbirdWSClient in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899A929B4F84C004361B8 /* HummingbirdWSClient */; };
-		AEB899AC29B4F84C004361B8 /* HummingbirdWSCore in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899AB29B4F84C004361B8 /* HummingbirdWSCore */; };
 		AEB899B229B4F89A004361B8 /* AsyncHTTPClient in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899B129B4F89A004361B8 /* AsyncHTTPClient */; };
 		AEB899B529B4F8A6004361B8 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899B429B4F8A6004361B8 /* Logging */; };
 		AEB899B829B4F8BA004361B8 /* secp256k1 in Frameworks */ = {isa = PBXBuildFile; productRef = AEB899B729B4F8BA004361B8 /* secp256k1 */; };
@@ -75,6 +73,9 @@
 		AEEAF2AC29CA1932002B3C37 /* EventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEEAF2AA29CA1932002B3C37 /* EventView.swift */; };
 		AEEAF2AE29CA19D2002B3C37 /* TextEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEEAF2AD29CA19D2002B3C37 /* TextEvent.swift */; };
 		AEEAF2B029CA1A0B002B3C37 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEEAF2AF29CA1A0B002B3C37 /* TimelineView.swift */; };
+		AEFA59F129CE29F100554224 /* HummingbirdWSClient in Frameworks */ = {isa = PBXBuildFile; productRef = AEFA59F029CE29F100554224 /* HummingbirdWSClient */; };
+		AEFA59F329CE29F100554224 /* HummingbirdWSCore in Frameworks */ = {isa = PBXBuildFile; productRef = AEFA59F229CE29F100554224 /* HummingbirdWSCore */; };
+		AEFA59F529CE29F100554224 /* HummingbirdWebSocket in Frameworks */ = {isa = PBXBuildFile; productRef = AEFA59F429CE29F100554224 /* HummingbirdWebSocket */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -164,16 +165,17 @@
 			buildActionMask = 2147483647;
 			files = (
 				AEB899B529B4F8A6004361B8 /* Logging in Frameworks */,
+				AEFA59F529CE29F100554224 /* HummingbirdWebSocket in Frameworks */,
+				AEFA59F329CE29F100554224 /* HummingbirdWSCore in Frameworks */,
 				AE717AC529C0344B002D6A52 /* AsyncAlgorithms in Frameworks */,
+				AEFA59F129CE29F100554224 /* HummingbirdWSClient in Frameworks */,
 				AEB899B229B4F89A004361B8 /* AsyncHTTPClient in Frameworks */,
 				AEB899BE29B4F8E5004361B8 /* SwiftBlake2 in Frameworks */,
 				AEB899C129B4F91A004361B8 /* Ctopaz in Frameworks */,
 				AEB899FB29B50602004361B8 /* Markdown in Frameworks */,
-				AEB899AA29B4F84C004361B8 /* HummingbirdWSClient in Frameworks */,
 				AEB899A629B4F81E004361B8 /* QuickLMDB in Frameworks */,
 				AEB899B829B4F8BA004361B8 /* secp256k1 in Frameworks */,
 				AEB899FE29B50720004361B8 /* SystemPackage in Frameworks */,
-				AEB899AC29B4F84C004361B8 /* HummingbirdWSCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -423,8 +425,6 @@
 			name = topaz;
 			packageProductDependencies = (
 				AEB899A529B4F81E004361B8 /* QuickLMDB */,
-				AEB899A929B4F84C004361B8 /* HummingbirdWSClient */,
-				AEB899AB29B4F84C004361B8 /* HummingbirdWSCore */,
 				AEB899B129B4F89A004361B8 /* AsyncHTTPClient */,
 				AEB899B429B4F8A6004361B8 /* Logging */,
 				AEB899B729B4F8BA004361B8 /* secp256k1 */,
@@ -433,6 +433,9 @@
 				AEB899FA29B50602004361B8 /* Markdown */,
 				AEB899FD29B50720004361B8 /* SystemPackage */,
 				AE717AC429C0344B002D6A52 /* AsyncAlgorithms */,
+				AEFA59F029CE29F100554224 /* HummingbirdWSClient */,
+				AEFA59F229CE29F100554224 /* HummingbirdWSCore */,
+				AEFA59F429CE29F100554224 /* HummingbirdWebSocket */,
 			);
 			productName = topaz;
 			productReference = AE26C07429B4F77600B85600 /* topaz.app */;
@@ -508,7 +511,6 @@
 			mainGroup = AE26C06B29B4F77600B85600;
 			packageReferences = (
 				AEB899A429B4F81E004361B8 /* XCRemoteSwiftPackageReference "QuickLMDB" */,
-				AEB899A829B4F84C004361B8 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */,
 				AEB899B029B4F89A004361B8 /* XCRemoteSwiftPackageReference "async-http-client" */,
 				AEB899B329B4F8A6004361B8 /* XCRemoteSwiftPackageReference "swift-log" */,
 				AEB899B629B4F8BA004361B8 /* XCRemoteSwiftPackageReference "secp256k1" */,
@@ -517,6 +519,7 @@
 				AEB899F929B50602004361B8 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				AEB899FC29B50720004361B8 /* XCRemoteSwiftPackageReference "swift-system" */,
 				AE717AC329C0344B002D6A52 /* XCRemoteSwiftPackageReference "swift-async-algorithms" */,
+				AEFA59EF29CE29F100554224 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */,
 			);
 			productRefGroup = AE26C07529B4F77600B85600 /* Products */;
 			projectDirPath = "";
@@ -770,7 +773,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = topaz/topaz.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = t;
 				DEVELOPMENT_ASSET_PATHS = "\"topaz/Preview Content\"";
 				DEVELOPMENT_TEAM = 32J6BB6VUS;
 				ENABLE_PREVIEWS = YES;
@@ -783,13 +786,13 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.0.1;
+				MARKETING_VERSION = 0.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -809,7 +812,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = topaz/topaz.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = t;
 				DEVELOPMENT_ASSET_PATHS = "\"topaz/Preview Content\"";
 				DEVELOPMENT_TEAM = 32J6BB6VUS;
 				ENABLE_PREVIEWS = YES;
@@ -822,13 +825,13 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.0.1;
+				MARKETING_VERSION = 0.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -985,14 +988,6 @@
 				revision = 0d93ad143bf009ebf0c2fbfa1f3dc287df27b3a7;
 			};
 		};
-		AEB899A829B4F84C004361B8 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/hummingbird-project/hummingbird-websocket.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
-			};
-		};
 		AEB899B029B4F89A004361B8 /* XCRemoteSwiftPackageReference "async-http-client" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/swift-server/async-http-client.git";
@@ -1049,6 +1044,14 @@
 				minimumVersion = 1.0.0;
 			};
 		};
+		AEFA59EF29CE29F100554224 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tannerdsilva/hummingbird-websocket.git";
+			requirement = {
+				kind = revision;
+				revision = 48e7dbefb478d7910b73c454bfec28b3a43112fc;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1061,16 +1064,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AEB899A429B4F81E004361B8 /* XCRemoteSwiftPackageReference "QuickLMDB" */;
 			productName = QuickLMDB;
-		};
-		AEB899A929B4F84C004361B8 /* HummingbirdWSClient */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AEB899A829B4F84C004361B8 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */;
-			productName = HummingbirdWSClient;
-		};
-		AEB899AB29B4F84C004361B8 /* HummingbirdWSCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AEB899A829B4F84C004361B8 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */;
-			productName = HummingbirdWSCore;
 		};
 		AEB899B129B4F89A004361B8 /* AsyncHTTPClient */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1106,6 +1099,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AEB899FC29B50720004361B8 /* XCRemoteSwiftPackageReference "swift-system" */;
 			productName = SystemPackage;
+		};
+		AEFA59F029CE29F100554224 /* HummingbirdWSClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AEFA59EF29CE29F100554224 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */;
+			productName = HummingbirdWSClient;
+		};
+		AEFA59F229CE29F100554224 /* HummingbirdWSCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AEFA59EF29CE29F100554224 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */;
+			productName = HummingbirdWSCore;
+		};
+		AEFA59F429CE29F100554224 /* HummingbirdWebSocket */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AEFA59EF29CE29F100554224 /* XCRemoteSwiftPackageReference "hummingbird-websocket" */;
+			productName = HummingbirdWebSocket;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

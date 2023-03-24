@@ -161,7 +161,7 @@ extension UE {
 								let getSubs = try self.relayHash_currentSubscriptions.getEntry(type:[nostr.Subscribe].self, forKey:relayHash, tx:newTrans)!
 								for curSub in getSubs {
 									do {
-										try await curChanger.send(.subscribe(curSub))
+//										try await curChanger.send(.subscribe(curSub))
 									} catch let error {
 										logThing.critical("there was a problem writing the message to the relay", metadata:["error":"\(error)"])
 									}
@@ -308,7 +308,7 @@ extension UE {
 				try relayEventsCursor.setEntry(value:([] as [nostr.Event]), forKey:curRelayHash)
 				if pubkey == myPubkey {
 					let newRelayConnection = RelayConnection(url:curRelay, stateChannel:stateChannel, eventChannel:eventChannel)
-					try self.relayHash_relayConnection.setObject(value:newRelayConnection, forKey:curRelayHash, tx:newTrans)
+//					try self.relayHash_relayConnection.setObject(value:newRelayConnection, forKey:curRelayHash, tx:newTrans)
 					try relayStateCursor.setEntry(value:RelayConnection.State.disconnected, forKey:curRelayHash)
 					buildStates[curRelay] = RelayConnection.State.disconnected
 					buildConnections[curRelay] = newRelayConnection

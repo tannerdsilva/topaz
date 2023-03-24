@@ -210,7 +210,7 @@ final actor RelayConnection:ObservableObject {
 								await ec.send((self.url, decodedItem))
 							} catch let error {
 								print(someString!)
-								print("\(error)")
+								self.logger.error("error trying to decode subscription", metadata:["error":"\(error)"])
 							}
 							
 					case .pingPong:

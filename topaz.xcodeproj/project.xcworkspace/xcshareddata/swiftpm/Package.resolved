@@ -40,8 +40,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/hummingbird-project/hummingbird.git",
       "state" : {
-        "revision" : "91256df9fa3f1ab63f34c6fdd8eab989a53b3038",
-        "version" : "1.2.0"
+        "revision" : "3c0766502f21ea4532506658b9af9fb700bfe353",
+        "version" : "1.4.0"
       }
     },
     {
@@ -49,17 +49,16 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/hummingbird-project/hummingbird-core.git",
       "state" : {
-        "revision" : "c62bc2a257bed524990c3caf6c87c3e0e286e79b",
-        "version" : "1.1.1"
+        "revision" : "b1f07ff02ea17ca4d6e23c233149fafb77bb8bd2",
+        "version" : "1.2.1"
       }
     },
     {
       "identity" : "hummingbird-websocket",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/hummingbird-project/hummingbird-websocket.git",
+      "location" : "https://github.com/tannerdsilva/hummingbird-websocket.git",
       "state" : {
-        "revision" : "8cb4bf546e0215f2b6294e0964d1de4adb496ddd",
-        "version" : "1.0.1"
+        "revision" : "48e7dbefb478d7910b73c454bfec28b3a43112fc"
       }
     },
     {
@@ -122,6 +121,15 @@
       "state" : {
         "revision" : "937e904258d22af6e447a0b72c0bc67583ef64a2",
         "version" : "1.0.4"
+      }
+    },
+    {
+      "identity" : "swift-crypto",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-crypto.git",
+      "state" : {
+        "revision" : "da0fe44138ab86e380f40a2acbd8a611b07d3f64",
+        "version" : "2.4.0"
       }
     },
     {
