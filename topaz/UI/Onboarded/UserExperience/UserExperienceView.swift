@@ -171,28 +171,20 @@ struct MessagesView: View {
 	@Binding var isUnread:Bool
 	
 	var body: some View {
-		VStack {
-			Text("Messages")
-			
-			if (isUnread == false) {
-				Button(action: {
-					isUnread = true
-				}, label: { Text("Mark as unread") })
-			}
-		}
+		UnderConstructionView(unavailableViewName:"Direct Messages")
 		
 	}
 }
 
 struct SearchView: View {
 	var body: some View {
-		Text("Search")
+		UnderConstructionView(unavailableViewName:"Search and Explore")
 	}
 }
 
 struct PV: View {
 	var body: some View {
-		Text("Profile")
+		UnderConstructionView(unavailableViewName:"Profile and Settings")
 	}
 }
 
@@ -441,10 +433,6 @@ struct CustomTitleBar: View {
 	let ue:UE
 	var body: some View {
 		HStack {
-			Spacer()
-			Text("Your App Name")
-				.font(.system(size: 16, weight: .bold))
-				.foregroundColor(Color(.lightText))
 			Spacer()
 			ConnectionStatusIndicator(relays: ue.relaysDB)
 		}

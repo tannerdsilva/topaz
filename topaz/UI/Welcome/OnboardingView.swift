@@ -70,12 +70,6 @@ struct OnboardingView: View {
 		@FocusState var tfFocus: Bool
 		
 		func textFieldStrokeColor(tfFocus: Bool, tfDisabled: Bool) -> Color {
-			if tfDisabled {
-				if tfFocus == true {
-					
-				}
-				return Color.green
-			}
 			if tfFocus {
 				if tfDisabled {
 					return Color.green

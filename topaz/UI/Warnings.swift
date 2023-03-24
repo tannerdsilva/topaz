@@ -62,7 +62,7 @@ struct UnderConstructionView: View {
 					.onChange(of: isFlashing) { _ in
 						flashingTask?.cancel()
 						flashingTask = Task {
-							while true {
+							while Task.isCancelled == false {
 								await Task.sleep(400_000_000)
 								withAnimation(Animation.linear(duration:0.4)) {
 									isFlashing.toggle()
