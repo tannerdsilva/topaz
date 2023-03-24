@@ -9,6 +9,7 @@ import SwiftUI
 import QuickLMDB
 import Logging
 import SystemPackage
+import NIO
 
 @main
 struct Topaz:App {
@@ -18,6 +19,9 @@ struct Topaz:App {
 		Relay("wss://relay.damus.io")
 	])
 	
+	/// the default event loop group used for all relay connections (unless otherwise specified for a particular connection)
+	public static let defaultPool = MultiThreadedEventLoopGroup(numberOfThreads:System.coreCount)
+
 	public static let tester_account = try! KeyPair.from(nsec:"nsec1s23j6z0x4w2y35c5zkf6le539sdmkmw4r7mm9jj22gnltrllqxzqjnh2wm")
 	
 	public static func makeDefaultLogger(label:String) -> Logger {

@@ -32,9 +32,6 @@ final actor RelayConnection:ObservableObject {
         case connectionCanceled
 	}
 
-    /// the default event loop group used for all relay connections (unless otherwise specified for a particular connection)
-    public static let defaultPool = MultiThreadedEventLoopGroup(numberOfThreads:System.coreCount)
-
     /// the logger used by all relay connections
     public let logger:Logger
 
@@ -49,7 +46,7 @@ final actor RelayConnection:ObservableObject {
 	}
 
     /// the multi-threaded event loop group used for this connection
-    fileprivate let loopGroup:MultiThreadedEventLoopGroup = RelayConnection.defaultPool
+    fileprivate let loopGroup:MultiThreadedEventLoopGroup = Topaz.defaultPool
 
     /// the websocket connection to the relay (if it exists)
 	/// - assumed to never be nil when state == ``State/connected(_:)``

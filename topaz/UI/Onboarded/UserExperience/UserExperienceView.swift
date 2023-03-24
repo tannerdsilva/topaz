@@ -16,99 +16,136 @@ struct UserExperienceView: View {
 		self.context = ue.contextDB
 	}
     var body: some View {
-		NavigationStack {
-			VStack {
-				// Title Bar
-				CustomTitleBar(ue:ue)
-				
-				Spacer()
-				
-				switch context.viewMode {
-				case .home:
-					HomeView(ue:ue)
-				case .notifications:
-					MentionsView()
-				case .dms:
-					MessagesView(isUnread:$ue.contextDB.badgeStatus.dmsBadge)
-				case .search:
-					SearchView()
-				case .profile:
-					PV()
-				}
-				
-				Spacer()
-				
-			}.background(.gray).frame(maxWidth:.infinity)
-		}
-		// Navigation Bar
-		HStack {
-			CustomTabBar(viewMode:$context.viewMode, badgeStatus:$context.badgeStatus)
-		}
+		VStack {
+			HStack {
+				NoticeView()
+			}
+			NavigationStack {
+				VStack {
+					// Title Bar
+					CustomTitleBar(ue:ue)
+					
+					Spacer()
+					
+					switch context.viewMode {
+					case .home:
+						HomeView(ue:ue)
+					case .notifications:
+						MentionsView()
+					case .dms:
+						MessagesView(isUnread:$ue.contextDB.badgeStatus.dmsBadge)
+					case .search:
+						SearchView()
+					case .profile:
+						PV()
+					}
+					
+					Spacer()
+					
+				}.frame(maxWidth:.infinity)
+			}
+			// Navigation Bar
+			HStack {
+				CustomTabBar(ue:ue, viewMode:$context.viewMode, badgeStatus:$context.badgeStatus)
+			}
+		}.background(Color(.systemBackground))
+		
     }
 }
 
+import SwiftUI
+
 struct TabButton: View {
-	let myView:UE.ViewMode
+	let myView: UE.ViewMode
 	let icon: String
 	let index: Int
 	@Binding var selectedTab: UE.ViewMode
 	let accentColor: Color
 	@Binding var showBadge: Bool
-	let profileImage: Image?
+	@State var profileIndicate: nostr.Profile?
+	@Environment(\.sizeCategory) var sizeCategory
 
-	var body: some View {
-		Button(action: {
-			selectedTab = myView
-			showBadge = false
-		}) {
-			ZStack {
-				// Use this conditional to display the profile image or the default icon
-				if myView == .profile, let profileImg = profileImage {
-					profileImg
-						.resizable()
-						.aspectRatio(contentMode: .fill)
-						.clipShape(Circle())
-						.frame(width: 44, height: 44)
-				} else {
-					Image(systemName: icon)
-						.foregroundColor(selectedTab == myView ? accentColor : .gray)
-						.frame(width: 44, height: 44)
-				}
-				
-				if showBadge {
-					ZStack {
-						Circle()
-							.fill(Color.red)
-							.frame(width: 10, height: 10)
-					}
-					.offset(x: 10, y: -10)
-				}
-			}
+	var imageSize: CGFloat {
+		switch sizeCategory {
+		case .accessibilityExtraExtraExtraLarge:
+			return 45
+		case .accessibilityExtraExtraLarge, .accessibilityExtraLarge, .accessibilityLarge, .accessibilityMedium:
+			return 32
+		default:
+			return 22
 		}
 	}
+	
+	var badgeSize: CGFloat {
+		return imageSize * 0.420
+	}
+	
+	var body: some View {
+			Button(action: {
+				selectedTab = myView
+				showBadge = false
+			}) {
+				ZStack {
+					if let profileImgUrl = profileIndicate?.picture {
+						AsyncImage(url: URL(string:profileImgUrl), content: { image in
+							image
+								.resizable()
+								.aspectRatio(contentMode: .fill)
+								.frame(width: imageSize, height: imageSize)
+								.clipShape(Circle())
+						}, placeholder: {
+							ProgressView()
+								.frame(width: imageSize, height: imageSize)
+						})
+					} else {
+						Image(systemName: icon)
+							.resizable()
+							.scaledToFit()
+							.foregroundColor(selectedTab == myView ? accentColor : .gray)
+							.frame(width: imageSize, height: imageSize)
+					}
+					
+					if showBadge {
+						GeometryReader { geometry in
+							ZStack {
+								Circle()
+									.fill(Color.red)
+									.frame(width: badgeSize, height: badgeSize)
+							}
+							.position(x: geometry.size.width, y: geometry.size.height * 0.11)
+						}
+					}
+				}
+				.frame(width: imageSize, height: imageSize)
+			}
+		}
 }
 
 struct CustomTabBar: View {
+	let ue:UE
 	@Binding var viewMode: UE.ViewMode
 	@Binding var badgeStatus: UE.ViewBadgeStatus
-	let profileImage: Image? = nil // Add this parameter for the profile image
-
+	@State private var showAccountPicker = false
+	
 	var body: some View {
 		HStack {
-			TabButton(myView: .home, icon: "house.fill", index: 0, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.homeBadge, profileImage: nil)
+			TabButton(myView: .home, icon: "house.fill", index: 0, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.homeBadge, profileIndicate: nil)
 				.frame(maxWidth: .infinity)
 
-			TabButton(myView: .notifications, icon: "bell.fill", index: 1, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.notificationsBadge, profileImage: nil)
+			TabButton(myView: .notifications, icon: "bell.fill", index: 1, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.notificationsBadge, profileIndicate: nil)
 				.frame(maxWidth: .infinity)
 
-			TabButton(myView: .dms, icon: "envelope.fill", index: 2, selectedTab: $viewMode, accentColor: .pink, showBadge: $badgeStatus.dmsBadge, profileImage: nil)
+			TabButton(myView: .dms, icon: "envelope.fill", index: 2, selectedTab: $viewMode, accentColor: .pink, showBadge: $badgeStatus.dmsBadge, profileIndicate: nil)
 				.frame(maxWidth: .infinity)
 
-			TabButton(myView: .search, icon: "magnifyingglass", index: 3, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.searchBadge, profileImage: nil)
+			TabButton(myView: .search, icon: "magnifyingglass", index: 3, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.searchBadge, profileIndicate: nil)
 				.frame(maxWidth: .infinity)
 
-			TabButton(myView: .profile, icon: "person.fill", index: 4, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.profileBadge, profileImage: profileImage) // Pass the profile image here
+			TabButton(myView: .profile, icon: "person.fill", index: 4, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.profileBadge, profileIndicate:ue.profilesDB.currentUserProfile) // Pass the profile image here
 				.frame(maxWidth: .infinity)
+				.onLongPressGesture {
+				showAccountPicker.toggle()
+			}
 		}
 		.padding(.top)
 		.frame(maxWidth: .infinity).background(Color(.systemBackground))
@@ -126,7 +163,7 @@ struct HomeView: View {
 
 struct MentionsView: View {
 	var body: some View {
-		Text("Mentions")
+		UnderConstructionView(unavailableViewName:"Notifications View")
 	}
 }
 
@@ -236,9 +273,7 @@ struct EventViewCell: View {
 					.font(.caption)
 					.foregroundColor(.accentColor)
 				}
-				Spacer()
-				
-				Text("Kind: \(event.kind.rawValue)").font(.caption).foregroundColor(.gray)
+
 				Spacer()
 				Text("Tags: \(event.tags.count)").font(.caption).foregroundColor(.gray)
 			}

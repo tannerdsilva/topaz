@@ -23,6 +23,10 @@ struct OnboardingView: View {
 		
 		var body: some View {
 			VStack {
+				Spacer()
+				RedWarningView()
+				Spacer()
+				
 				Text(verbatim: "WELCOME! You are here early.")
 					.padding(.bottom)
 				HStack {
@@ -47,9 +51,10 @@ struct OnboardingView: View {
 						progress = .createNewAcknowledge
 					}, label: {
 						Text("Create New")
-					}).disabled(!appData.isTOSAcknowledged)
+					}).disabled(true)
 				}
 				.padding(.horizontal, 12.0)
+				Spacer()
 			}
 		}
 	}
@@ -63,7 +68,25 @@ struct OnboardingView: View {
 		@State var tfDisabled: Bool = false
 
 		@FocusState var tfFocus: Bool
-
+		
+		func textFieldStrokeColor(tfFocus: Bool, tfDisabled: Bool) -> Color {
+			if tfDisabled {
+				if tfFocus == true {
+					
+				}
+				return Color.green
+			}
+			if tfFocus {
+				if tfDisabled {
+					return Color.green
+				} else {
+					return Color.blue
+				}
+			} else {
+				return Color(.darkGray)
+			}
+		}
+		
 		var body: some View {
 			VStack {
 				if case .priv(_) = parsedKey {
@@ -105,6 +128,7 @@ struct OnboardingView: View {
 					.cornerRadius(8)
 					.disabled(tfDisabled)
 					.focused($tfFocus)
+					.overlay(RoundedRectangle(cornerRadius: 8).stroke(textFieldStrokeColor(tfFocus:tfFocus, tfDisabled: tfDisabled), lineWidth: 2))
 				}.padding(.horizontal, 16.0)
 				if case let .priv(pk) = parsedKey {
 					if let getPub = privkey_to_pubkey(privkey: pk) {
@@ -128,7 +152,6 @@ struct OnboardingView: View {
 			}
 		}
 	}
-	
     var body: some View {
 		switch progress {
 		case .hello:

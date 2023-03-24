@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-
 struct ConnectionDetailsView: View {
 	@ObservedObject var relayDB: UE.RelaysDB
 
@@ -36,24 +35,26 @@ struct ConnectionDetailsView: View {
 
 	var body: some View {
 		NavigationView {
-			List {
-				ForEach(connectionGroups, id: \.0) { state, connections in
-					Section(header: Text(state.description).font(.subheadline).foregroundColor(state.color).padding(.top)) {
-						ForEach(connections, id: \.0) { key, _ in
-							HStack {
-								VStack(alignment: .leading) {
-									Text("\(key)")
-										.font(.system(size: 14))
+			VStack {
+				NoticeView().padding()
+				List {
+					ForEach(connectionGroups, id: \.0) { state, connections in
+						Section(header: Text(state.description).font(.subheadline).foregroundColor(state.color).padding(.top)) {
+							ForEach(connections, id: \.0) { key, _ in
+								HStack {
+									VStack(alignment: .leading) {
+										Text("\(key)")
+											.font(.system(size: 14))
+									}
+									Spacer()
 								}
-								Spacer()
+								.padding(.vertical, 6)
 							}
-							.padding(.vertical, 6)
 						}
 					}
 				}
+				.listStyle(InsetGroupedListStyle())
 			}
-			.listStyle(InsetGroupedListStyle())
-			.navigationTitle("Connection Details")
 		}
 	}
 }

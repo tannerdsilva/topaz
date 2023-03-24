@@ -116,7 +116,7 @@ class UE:ObservableObject {
 			self.contextDB = makeContextDB
 			
 			// initialize the profiles database
-			let makeProfilesDB = try Profiles(env, tx:newTrans)
+			let makeProfilesDB = try Profiles(pubkey:keypair.pubkey, env, tx:newTrans)
 
 			// initialize the relays database
 			let makeRelaysDB = try UE.RelaysDB(pubkey:keypair.pubkey, env:env, tx:newTrans)

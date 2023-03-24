@@ -2,37 +2,40 @@ import SwiftUI
 
 struct TextNoteContentView: View {
 	let content: String
-
-//	private var richText: AttributedString {
-//		var attributedString = AttributedString(content)
-//		let urlPattern = "((https|http)://)((\\w|-)+)(([.]|[/])((\\w|-)+))+"
-//		let hashtagPattern = "#[\\p{L}0-9_]*"
-//
-//		let fullPattern = "(\(urlPattern)|\(hashtagPattern))"
-//		let regex = try? NSRegularExpression(pattern: fullPattern, options: [])
-//
-//		if let regex = regex {
-//			let matches = regex.matches(in: content)
-//			for match in matches {
-//				if let range = Range(match.range, in: content) {
-//					let specialText = String(content[range])
-//
-//					if specialText.starts(with: "http") {
-//						attributedString[range].foregroundColor = .blue
-//						attributedString[range].underlineStyle = .thick
-//					} else {
-//						attributedString[range].foregroundColor = .purple
-//					}
-//				}
-//			}
-//		}
-//
-//		return attributedString
-//	}
-
+	
+	private func renderRichText()  -> Result<AttributedString, Swift.Error> {
+		do {
+			var attributedString = AttributedString(content)
+			let urlRegex = try Regex("((https|http)://)((\\w|-)+)(([.]|[/])((\\w|-)+))+")
+			let hashtagPattern = try Regex("#[\\p{L}0-9_]*")
+			
+			for curHTTPMatch in content.matches(of:urlRegex) {
+				let asAttributedRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString)!
+				attributedString[asAttributedRange].foregroundColor = .blue
+				attributedString[asAttributedRange].underlineStyle = .thick
+			}
+			for curHashTagMatch in content.matches(of:hashtagPattern) {
+				let asAttributedRange = Range<AttributedString.Index>(curHashTagMatch.range, in: attributedString)!
+				attributedString[asAttributedRange].foregroundColor = .purple
+			}
+			return .success(attributedString)
+		} catch let error {
+			return .failure(error)
+		}
+	}
 	
 	var body: some View {
-		Text(content)
+		Group {
+			switch renderRichText() {
+			case .success(let richText):
+				Text(richText)
+					.font(.body) // Set your desired font
+					.foregroundColor(.primary) // Set your desired color
+					.multilineTextAlignment(.leading) // Set the desired alignment
+			case .failure:
+				Text(content) // Fallback to plain text if rich text rendering fails
+			}
+		}
 	}
 }
 

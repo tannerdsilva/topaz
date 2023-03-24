@@ -30,10 +30,154 @@ struct EventDetailView: View {
 	let profile: nostr.Profile?
 
 	var body: some View {
-		VStack {
-			Text("Event Detail View")
-			// Add more content as needed
+		ScrollView {
+			VStack(alignment: .leading, spacing: 20) {
+				profileBanner
+				eventInfo
+				eventContent
+				Spacer()
+			}
+			.padding()
 		}
+	}
+
+	private var profileBanner: some View {
+		ZStack {
+			if let bannerURL = profile?.banner, let url = URL(string: bannerURL) {
+				AsyncImage(url: url, scale: 1.0) { image in
+					image
+						.resizable()
+						.scaledToFill()
+				} placeholder: {
+					RoundedRectangle(cornerRadius: 10)
+						.fill(Color.gray)
+				}
+			} else {
+				RoundedRectangle(cornerRadius: 10)
+					.fill(Color.gray)
+			}
+		}
+		.frame(height: 200)
+		.cornerRadius(10)
+		.overlay(
+			VStack(alignment: .leading, spacing: 10) {
+				if let displayName = profile?.display_name {
+					Text(displayName)
+						.font(.largeTitle)
+						.fontWeight(.bold)
+						.foregroundColor(.white)
+				}
+				if let about = profile?.about {
+					Text(about)
+						.font(.subheadline)
+						.fontWeight(.medium)
+						.foregroundColor(.white)
+				}
+			}
+			.padding(),
+			alignment: .bottomLeading
+		)
+	}
+
+/*
+ private var eventInfo: some View {
+		 VStack(alignment: .leading, spacing: 8) {
+			 HStack {
+				 Text("Created on")
+					 .font(.headline)
+				 Spacer()
+				 Text("\(event.created, formatter: dateFormatter)")
+					 .font(.subheadline)
+			 }
+
+			 HStack {
+				 Text("Event ID")
+					 .font(.headline)
+				 Spacer()
+				 Text(event.uid)
+					 .font(.subheadline)
+					 .lineLimit(1)
+			 }
+
+			 if let boosted_by = event.boosted_by {
+				 HStack {
+					 Text("Boosted by")
+						 .font(.headline)
+					 Spacer()
+					 Text(boosted_by)
+						 .font(.subheadline)
+						 .lineLimit(1)
+				 }
+			 }
+
+			 Text("Tags")
+				 .font(.headline)
+			 ForEach(event.tags) { tag in
+				 VStack(alignment: .leading) {
+					 Text(tag.kind.rawValue.capitalized)
+						 .font(.subheadline)
+						 .fontWeight(.bold)
+					 ForEach(tag.info, id: \.self) { tagInfo in
+						 Text(tagInfo)
+							 .font(.body)
+							 .padding(.leading, 10)
+					 }
+				 }
+				 .padding(.bottom, 5)
+			 }
+		 }
+	 }
+ */
+	private var eventInfo: some View {
+		VStack(alignment: .leading, spacing: 8) {
+			HStack {
+				Text("Created on")
+					.font(.headline)
+				Spacer()
+				Text("\(event.created, formatter: dateFormatter)")
+					.font(.subheadline)
+			}
+
+			HStack {
+				Text("Event ID")
+					.font(.headline)
+				Spacer()
+				Text(event.uid)
+					.font(.subheadline)
+					.lineLimit(1)
+			}
+
+			if let boosted_by = event.boosted_by {
+				HStack {
+					Text("Boosted by")
+						.font(.headline)
+					Spacer()
+					Text(boosted_by)
+						.font(.subheadline)
+						.lineLimit(1)
+				}
+			}
+		}
+	}
+
+	private var eventContent: some View {
+		VStack(alignment: .leading, spacing: 16) {
+			Text("Event Content")
+				.font(.title)
+				.fontWeight(.bold)
+			Text(event.content)
+				.font(.body)
+				.padding(.all, 10)
+				.background(Color.gray.opacity(0.1))
+				.cornerRadius(8)
+		}
+	}
+
+	private var dateFormatter: DateFormatter {
+		let formatter = DateFormatter()
+		formatter.dateStyle = .medium
+		formatter.timeStyle = .short
+		return formatter
 	}
 }
 
