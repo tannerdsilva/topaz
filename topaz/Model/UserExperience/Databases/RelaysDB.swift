@@ -161,7 +161,7 @@ extension UE {
 								let getSubs = try self.relayHash_currentSubscriptions.getEntry(type:[nostr.Subscribe].self, forKey:relayHash, tx:newTrans)!
 								for curSub in getSubs {
 									do {
-//										try await curChanger.send(.subscribe(curSub))
+										try await curChanger.send(.subscribe(curSub))
 									} catch let error {
 										logThing.critical("there was a problem writing the message to the relay", metadata:["error":"\(error)"])
 									}

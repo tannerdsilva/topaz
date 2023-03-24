@@ -773,7 +773,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = topaz/topaz.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = t;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"topaz/Preview Content\"";
 				DEVELOPMENT_TEAM = 32J6BB6VUS;
 				ENABLE_PREVIEWS = YES;
@@ -812,7 +812,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = topaz/topaz.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = t;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"topaz/Preview Content\"";
 				DEVELOPMENT_TEAM = 32J6BB6VUS;
 				ENABLE_PREVIEWS = YES;
@@ -1049,7 +1049,7 @@
 			repositoryURL = "https://github.com/tannerdsilva/hummingbird-websocket.git";
 			requirement = {
 				kind = revision;
-				revision = 48e7dbefb478d7910b73c454bfec28b3a43112fc;
+				revision = 577ae5630192f8de6b2e54c6b507603559f6c3d3;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
