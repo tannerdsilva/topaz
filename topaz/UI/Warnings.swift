@@ -25,23 +25,23 @@ struct RedWarningView: View {
 	}
 }
 
-struct NoticeView: View {
-	var body: some View {
-		HStack(alignment: .center) {
-			Image(systemName: "exclamationmark.triangle.fill")
-				.foregroundColor(.yellow)
-				.font(.system(size: 20))
-			Text("Please note that this is an early technical preview of Topaz. As we continue to develop the vision for this product, your feedback is appreciated.")
-				.font(.system(size: 14))
-				.foregroundColor(.secondary)
-				.fixedSize(horizontal: false, vertical: true)
-		}
-		.padding()
-		.background(Color(.secondarySystemBackground))
-		.cornerRadius(8)
-		.overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.yellow.opacity(0.4), lineWidth: 2))
-	}
-}
+//struct NoticeView: View {
+//	var body: some View {
+//		HStack(alignment: .center) {
+//			Image(systemName: "exclamationmark.triangle.fill")
+//				.foregroundColor(.yellow)
+//				.font(.system(size: 20))
+//			Text("Please note that this is an early technical preview of Topaz. As we continue to develop the vision for this product, your feedback is appreciated.")
+//				.font(.system(size: 14))
+//				.foregroundColor(.secondary)
+//				.fixedSize(horizontal: false, vertical: true)
+//		}
+//		.padding()
+//		.background(Color(.secondarySystemBackground))
+//		.cornerRadius(8)
+//		.overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.yellow.opacity(0.4), lineWidth: 2))
+//	}
+//}
 
 struct UnderConstructionView: View {
 	let unavailableViewName: String

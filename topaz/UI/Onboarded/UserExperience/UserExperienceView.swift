@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct UserExperienceView: View {
+	@Environment(\.scenePhase) private var scenePhase
+	
 	@ObservedObject var ue:UE
 	@ObservedObject var context:UE.Context
 	
@@ -17,10 +19,7 @@ struct UserExperienceView: View {
 	}
     var body: some View {
 		VStack {
-			HStack {
-				NoticeView()
-			}
-			NavigationStack {
+//			NavigationStack {
 				VStack {
 					// Title Bar
 					CustomTitleBar(ue:ue)
@@ -43,17 +42,37 @@ struct UserExperienceView: View {
 					Spacer()
 					
 				}.frame(maxWidth:.infinity)
-			}
+//			}
 			// Navigation Bar
 			HStack {
 				CustomTabBar(ue:ue, viewMode:$context.viewMode, badgeStatus:$context.badgeStatus)
 			}
-		}.background(Color(.systemBackground))
-		
-    }
+		}.background(Color(.systemBackground)).onChange(of:scenePhase) { newValue in
+				switch newValue {
+				case .active:
+					let getDisconnected = ue.relaysDB.userRelayConnectionStates.values.filter({ $0 == .disconnected })
+					if getDisconnected.count > 0 {
+						Task.detached { [relays = ue.relaysDB.userRelayConnections] in
+							await withTaskGroup(of:Void.self) { tg in
+								for curRelay in relays {
+									tg.addTask { [cr = curRelay] in
+										try? await cr.value.connect()
+									}
+								}
+							}
+						}
+					}
+					
+				case .inactive:
+					break;
+				case .background:
+					break;
+				@unknown default:
+					break;
+				}
+			}
+		}
 }
-
-import SwiftUI
 
 struct TabButton: View {
 	let myView: UE.ViewMode
@@ -289,9 +308,7 @@ struct ConnectionStatusIndicator: View {
 
 			VStack {
 				if succ.count <= ConnectionDotView.maxShapesInFrame(maxWidth:geometry.size.width, maxHeight:geometry.size.height, shapeSize:circleSize, spacing:spacing) {
-					ConnectionDotView(spacing:spacing, shapeSize:circleSize, status:succ).sheet(isPresented: $showModal) {
-						ConnectionDetailsView(relayDB: relays)
-				  }
+					ConnectionDotView(spacing:spacing, shapeSize:circleSize, status:succ)
 				} else {
 					ProgressRing(progress: Double(connCount.count) / Double(succ.count))
 						.stroke(Color.green, lineWidth: 4)
@@ -305,7 +322,9 @@ struct ConnectionStatusIndicator: View {
 						.transition(.opacity)
 				}
 			}
-			.frame(width: geometry.size.width, height: geometry.size.height)
+			.frame(width: geometry.size.width, height: geometry.size.height).sheet(isPresented: $showModal) {
+				ConnectionDetailsView(relayDB: relays)
+			}
 		}
 		.frame(width: 45, height: 30)
 		.onTapGesture {

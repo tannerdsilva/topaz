@@ -36,17 +36,36 @@ struct ConnectionDetailsView: View {
 	var body: some View {
 		NavigationView {
 			VStack {
-				NoticeView().padding()
 				List {
 					ForEach(connectionGroups, id: \.0) { state, connections in
 						Section(header: Text(state.description).font(.subheadline).foregroundColor(state.color).padding(.top)) {
-							ForEach(connections, id: \.0) { key, _ in
+							ForEach(connections, id: \.0) { key, value in
 								HStack {
 									VStack(alignment: .leading) {
 										Text("\(key)")
 											.font(.system(size: 14))
 									}
 									Spacer()
+									
+									// Add the reconnect button for disconnected relays
+									if state == .disconnected {
+										Button(action: {
+											Task.detached { [relay = relayDB.userRelayConnections[key]!] in
+												do {
+													try await relay.connect(retryLaterIfFailed:true)
+												} catch {
+													print("Error reconnecting: \(error)")
+												}
+											}
+										}, label: {
+											Text("Reconnect")
+												.padding(.horizontal, 4)
+												.padding(.vertical, 1)
+												.background(.blue)
+												.foregroundColor(.primary)
+												.cornerRadius(4)
+										})
+									}
 								}
 								.padding(.vertical, 6)
 							}
