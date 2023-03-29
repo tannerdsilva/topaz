@@ -58,7 +58,7 @@ extension UE {
 		// stores the relay connection states for the current user
 		@MainActor @Published public private(set) var userRelayConnectionStates:[String:RelayConnection.State]
 
-		let holder:RelayConnection.EventHolder
+		let holder:Holder<nostr.Event>
 		
 		private let eventChannel:AsyncChannel<RelayConnection.EventCapture>
 		private let stateChannel:AsyncChannel<RelayConnection.StateChangeEvent>
@@ -67,7 +67,7 @@ extension UE {
 		init(pubkey:String, env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
 			self.env = env
 			self.myPubkey = pubkey
-			let newHolder = RelayConnection.EventHolder(holdInterval:0.25)
+			let newHolder = Holder<nostr.Event>(holdInterval:0.25)
 			self.holder = newHolder
 			
 			var newLogger = Logger(label:"relay-db")
@@ -180,7 +180,7 @@ extension UE {
 							switch curEvent.1 {
 							case let .event(subID, myEvent):
 								logThing.debug("got event.", metadata:["kind":"\(myEvent.kind.rawValue)", "pubkey":"\(myEvent.pubkey)"])
-								await self.holder.append(event: myEvent)
+								await self.holder.append(element: myEvent)
 								break;
 							case .endOfStoredEvents(let subID):
 								logThing.notice("end of events", metadata:["sub_id":"\(subID)"])
