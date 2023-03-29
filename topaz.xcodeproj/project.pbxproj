@@ -75,6 +75,7 @@
 		AEEAF2B029CA1A0B002B3C37 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEEAF2AF29CA1A0B002B3C37 /* TimelineView.swift */; };
 		AEF298E529D4BE1600E50654 /* Holder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF298E429D4BE1600E50654 /* Holder.swift */; };
 		AEF298E729D4BE2800E50654 /* HTTPTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF298E629D4BE2800E50654 /* HTTPTool.swift */; };
+		AEF298E929D4C0EE00E50654 /* Fetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF298E829D4C0EE00E50654 /* Fetcher.swift */; };
 		AEFA59F129CE29F100554224 /* HummingbirdWSClient in Frameworks */ = {isa = PBXBuildFile; productRef = AEFA59F029CE29F100554224 /* HummingbirdWSClient */; };
 		AEFA59F329CE29F100554224 /* HummingbirdWSCore in Frameworks */ = {isa = PBXBuildFile; productRef = AEFA59F229CE29F100554224 /* HummingbirdWSCore */; };
 		AEFA59F529CE29F100554224 /* HummingbirdWebSocket in Frameworks */ = {isa = PBXBuildFile; productRef = AEFA59F429CE29F100554224 /* HummingbirdWebSocket */; };
@@ -161,6 +162,7 @@
 		AEEAF2AF29CA1A0B002B3C37 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		AEF298E429D4BE1600E50654 /* Holder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Holder.swift; sourceTree = "<group>"; };
 		AEF298E629D4BE2800E50654 /* HTTPTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPTool.swift; sourceTree = "<group>"; };
+		AEF298E829D4C0EE00E50654 /* Fetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fetcher.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -368,6 +370,7 @@
 				AE0F152B29C4E176009E3297 /* Stream.swift */,
 				AEF298E429D4BE1600E50654 /* Holder.swift */,
 				AEF298E629D4BE2800E50654 /* HTTPTool.swift */,
+				AEF298E829D4C0EE00E50654 /* Fetcher.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -592,6 +595,7 @@
 				AEB39B7B29B5417D00F3C92E /* POW.swift in Sources */,
 				AE1A59CE29B7C02D00D21AA0 /* ScheduledTask.swift in Sources */,
 				AEF298E529D4BE1600E50654 /* Holder.swift in Sources */,
+				AEF298E929D4C0EE00E50654 /* Fetcher.swift in Sources */,
 				AE7FE83929BBB7F80060DCE3 /* Parser.swift in Sources */,
 				AE2C0EEE29BA71B100C0B87C /* ActionBarModel.swift in Sources */,
 				AE1A59C229B7A20600D21AA0 /* Event.swift in Sources */,

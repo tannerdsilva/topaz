@@ -18,7 +18,7 @@ struct HTTP {
 
 	static let logger = Topaz.makeDefaultLogger(label: "http-client")
 
-	static func getImage(url: URL) async throws -> (Data, String?) {
+	static func get(url: URL) async throws -> (Data, String?) {
 		let httpClient = HTTPClient(eventLoopGroupProvider: .shared(Topaz.defaultPool), configuration: HTTPClient.Configuration(timeout: HTTPClient.Configuration.Timeout(connect: .seconds(15), read: .seconds(60))))
 		defer { try? httpClient.syncShutdown() }
 
