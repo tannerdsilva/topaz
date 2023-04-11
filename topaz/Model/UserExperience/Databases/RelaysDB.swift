@@ -64,16 +64,20 @@ extension UE {
 		private let stateChannel:AsyncChannel<RelayConnection.StateChangeEvent>
 		private var digestTask:Task<Void, Never>? = nil
 
-		init(pubkey:String, env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
-			self.env = env
+		init(base:URL, pubkey:String) throws {
+			
 			self.myPubkey = pubkey
 			let newHolder = Holder<nostr.Event>(holdInterval:0.25)
 			self.holder = newHolder
+			let targetURL = base.appendingPathComponent("ux-relays.mdb", isDirectory:false)
+			let envSize:size_t = size_t(targetURL.getFileSize()) + size_t(1e+9)
+			let env = try QuickLMDB.Environment(path:targetURL.path, flags:[.noSubDir], mapSize:envSize, maxDBs:8)
+			self.env = env
 			
-			var newLogger = Logger(label:"relay-db")
+			var newLogger = Logger(label:"ux-relays.mdb")
 			newLogger.logLevel = .debug
 			
-			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
+			let subTrans = try Transaction(env, readOnly:false)
 			let pubRelaysDB = try env.openDatabase(named:Databases.pubkey_relayHash.rawValue, flags:[.create, .dupSort], tx:subTrans)
 			let relayStringDB = try env.openDatabase(named:Databases.relayHash_relayString.rawValue, flags:[.create], tx:subTrans)
 			let relayConnectionDB = try env.openDatabase(named:Databases.relayHash_relayConnection.rawValue, flags:[.create], tx:subTrans)
@@ -126,7 +130,6 @@ extension UE {
 			var buildStates = [String:RelayConnection.State]()
 			for curRelay in getRelays {
 				let newConnection = RelayConnection(url:curRelay, stateChannel:stateC, eventChannel:eventC)
-				newLogger.info("new connection retain value: \(_getRetainCount(newConnection))")
 				let relayHash = try RelaysDB.produceRelayHash(url:Data(curRelay.utf8))
 //				try relayConnectionDB.setObject(value:newConnection, forKey:relayHash, tx:subTrans)
 //				newLogger.info("then connection retain value: \(_getRetainCount(newConnection))")
@@ -149,6 +152,7 @@ extension UE {
 			self.logger = newLogger
 			try subTrans.commit()
 			
+			// launch the digest task
 			self.digestTask = Task.detached { [weak self, sc = stateC, newEnv = env, logThing = newLogger, eventC = eventC] in
 				await withThrowingTaskGroup(of:Void.self, body: { [weak self, sc = sc, newEnv = newEnv, ec = eventC] tg in
 					// status
@@ -204,21 +208,23 @@ extension UE {
 
 		// gets the relays for a given pubkey
 		//  - throws LMDBError.notFound if the pubkey is not found
-		func getRelays(pubkey:String, tx someTrans:QuickLMDB.Transaction) throws -> Set<String> {
-			var buildRelays = Set<String>()
-			let relayHashCursor = try self.pubkey_relayHash.cursor(tx:someTrans)
-			let relayStringCursor = try self.relayHash_relayString.cursor(tx:someTrans)
-			for (_, curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
-				let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
-				buildRelays.update(with:String(relayString)!)
+		func getRelays(pubkey:String) throws -> Set<String> {
+			try env.transact(readOnly:true) { someTrans in
+				var buildRelays = Set<String>()
+				let relayHashCursor = try self.pubkey_relayHash.cursor(tx:someTrans)
+				let relayStringCursor = try self.relayHash_relayString.cursor(tx:someTrans)
+				for (_, curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
+					let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
+					buildRelays.update(with:String(relayString)!)
+				}
+				return buildRelays
 			}
-			return buildRelays
 		}
 
 		// sets the relays for a given pubkey
 		//  - if the relay information is already in the database, it will be updated silently and any keys that existed previously will be dropped
-		func setRelays(_ relays:Set<String>, pubkey:String, tx someTrans:QuickLMDB.Transaction) throws {
-			let newTrans = try Transaction(self.env, readOnly:false, parent:someTrans)
+		func setRelays(_ relays:Set<String>, pubkey:String) throws {
+			let newTrans = try Transaction(self.env, readOnly:false)
 			var didModify = false
 			
 			// hash-pubkey associations
@@ -333,13 +339,13 @@ extension UE {
 			try newTrans.commit()
 		}
 
-		func getConnection(relay url:String, tx someTrans:Transaction) throws -> RelayConnection {
-			let newConnection = try self.relayHash_relayConnection.getObject(type:RelayConnection.self, forKey:try Self.produceRelayHash(url:Data(url.utf8)), tx:someTrans)!
+		func getConnection(relay url:String) throws -> RelayConnection {
+			let newConnection = try self.relayHash_relayConnection.getObject(type:RelayConnection.self, forKey:try Self.produceRelayHash(url:Data(url.utf8)), tx:nil)!
 			return newConnection
 		}
 
-		func add(subscriptions:[nostr.Subscribe], to relayURL:String, tx someTrans:Transaction) throws {
-			let newTransaction = try Transaction(self.env, readOnly:false, parent:someTrans)
+		func add(subscriptions:[nostr.Subscribe], to relayURL:String) throws {
+			let newTransaction = try Transaction(self.env, readOnly:false)
 			let relayHash = try Self.produceRelayHash(url:Data(relayURL.utf8))
 			let relaySubscriptionsCursor = try self.relayHash_currentSubscriptions.cursor(tx:newTransaction)
 			// load the existing subscriptions
@@ -355,7 +361,7 @@ extension UE {
 			// check if this relay is connected, and if it is, send the subscriptions to the relay
 			let checkStatus = try self.relayHash_relayState.getEntry(type:RelayConnection.State.self, forKey:relayHash, tx:newTransaction)!
 			if checkStatus == .connected {
-				let relayConnection = try self.getConnection(relay:relayURL, tx:newTransaction)
+				let relayConnection = try self.getConnection(relay:relayURL)
 				try newTransaction.commit()
 				Task.detached { [rc = relayConnection] in
 					for curSub in subscriptions {

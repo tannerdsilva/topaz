@@ -119,8 +119,9 @@ class UE:ObservableObject {
 			let makeProfilesDB = try Profiles(pubkey:keypair.pubkey, env, tx:newTrans)
 
 			// initialize the relays database
-			let makeRelaysDB = try UE.RelaysDB(pubkey:keypair.pubkey, env:env, tx:newTrans)
-			let myRelays = try makeRelaysDB.getRelays(pubkey:keypair.pubkey, tx:newTrans)
+			let base = try FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true)
+			let makeRelaysDB = try UE.RelaysDB(base:base, pubkey:keypair.pubkey)
+			let myRelays = try makeRelaysDB.getRelays(pubkey:keypair.pubkey)
 			
 			self.relaysDB = makeRelaysDB
 
@@ -129,7 +130,7 @@ class UE:ObservableObject {
 			
 			let homeSubs = try self.buildMainUserFilters(tx:newTrans)
 			for curRelay in myRelays {
-				try makeRelaysDB.add(subscriptions:[nostr.Subscribe(sub_id:UUID().uuidString, filters:homeSubs)], to:curRelay, tx:newTrans)
+				try makeRelaysDB.add(subscriptions:[nostr.Subscribe(sub_id:UUID().uuidString, filters:homeSubs)], to:curRelay)
 			}
 			Task.detached { [weak self, hol = makeRelaysDB.holder] in
 				guard let self = self else {
@@ -164,7 +165,7 @@ class UE:ObservableObject {
 										following.update(with:getPubKey)
 									}
 								}
-								try self.relaysDB.setRelays(relays, pubkey:curEv.pubkey, tx:newTrans)
+								try self.relaysDB.setRelays(relays, pubkey:curEv.pubkey)
 								try self.contactsDB.followDB.set(pubkey:curEv.pubkey, follows:following, tx:newTrans)
 								self.logger.info("updated contact information for ")
 							} catch {}

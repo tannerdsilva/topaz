@@ -13,9 +13,12 @@ import NIO
 
 @main
 struct Topaz:App {
+	enum Error:Swift.Error {
+		case systemReadError
+		case memoryAllocationError
+	}
 	public static let defaultRelays:Set<Relay> = Set([
 		Relay("wss://relay.snort.social"),
-		Relay("wss://relay.topaz.place"),
 		Relay("wss://relay.damus.io")
 	])
 	
@@ -23,6 +26,26 @@ struct Topaz:App {
 	public static let defaultPool = MultiThreadedEventLoopGroup(numberOfThreads:System.coreCount)
 
 	public static let tester_account = try! KeyPair.from(nsec:"nsec1s23j6z0x4w2y35c5zkf6le539sdmkmw4r7mm9jj22gnltrllqxzqjnh2wm")
+	
+	public static func readSystemSecureData(length:size_t) throws -> Data {
+		// open a file descriptor to secure random data
+		let fd = try FileDescriptor.open("/dev/random", .readOnly)
+		defer {
+			try? fd.close()
+		}
+		// open a buffer to read the secure data into
+		guard let readBuffer = malloc(length) else {
+			throw Error.memoryAllocationError
+		}
+		defer {
+			free(readBuffer)
+		}
+		// read the data, and make sure all 128 bytes have been read
+		guard read(fd.rawValue, readBuffer, length) == length else {
+			throw Error.systemReadError
+		}
+		return Data(bytes:readBuffer, count:length)
+	}
 	
 	public static func makeDefaultLogger(label:String) -> Logger {
 		var logger = Logger(label:label)
@@ -35,7 +58,7 @@ struct Topaz:App {
 	}
 	static let logger = makeDefaultLogger(label:"topaz-app")
 	
-	fileprivate static func initializeEnvironment(url:URL, flags:QuickLMDB.Environment.Flags) -> Result<QuickLMDB.Environment, Error> {
+	fileprivate static func initializeEnvironment(url:URL, flags:QuickLMDB.Environment.Flags) -> Result<QuickLMDB.Environment, Swift.Error> {
 		do {
 			if FileManager.default.fileExists(atPath:url.path) == false {
 				try FileManager.default.createDirectory(at:url, withIntermediateDirectories:true)
@@ -49,7 +72,7 @@ struct Topaz:App {
 		}
 	}
 
-	static func openLMDBEnv(named:String, flags:QuickLMDB.Environment.Flags = [.noTLS, .noSync, .noReadAhead]) -> Result<QuickLMDB.Environment, Error> {
+	static func openLMDBEnv(named:String, flags:QuickLMDB.Environment.Flags = [.noTLS, .noSync, .noReadAhead]) -> Result<QuickLMDB.Environment, Swift.Error> {
 		do {
 			let homePath = try FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true).appendingPathComponent(named, isDirectory:true)
 			return Self.initializeEnvironment(url: homePath, flags:flags)
@@ -57,6 +80,13 @@ struct Topaz:App {
 			return .failure(error)
 		}
 	}
+	
+//	static func openOrCreateUX(pubkey:String) -> Result<UX, Swift.Error> {
+//		do {
+//			let homePath = try FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true).appendingPathComponent(named, isDirectory:true)
+//			
+//		}
+//	}
 	
 	@ObservedObject var localData:ApplicationModel
 	
@@ -71,7 +101,6 @@ struct Topaz:App {
 				fatalError("false")
 			}
 		} catch let error {
-			print("\(error)")
 			fatalError("false")
 		}
 	}

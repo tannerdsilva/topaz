@@ -14,16 +14,11 @@ internal actor Holder<T>: AsyncSequence {
 	typealias Element = [T]
 	typealias AsyncIterator = HolderEventStream
 
-	// the elements that are being held
 	private var elements: [T] = []
-	// the amount of time that must pass before the elements are flushed
 	private let holdInterval: TimeInterval
-	// the last time the elements were flushed
-	private var lastFlush: Date? = nil
-	// the consumers of the AsyncSequence that are waiting for the next set of elements
+	private var lastFlush: timeval? = nil
 	private var waiters: [UnsafeContinuation<[T]?, Never>] = []
 
-	// initialize the holder with a hold interval
 	init(holdInterval: TimeInterval) {
 		self.holdInterval = holdInterval
 	}
@@ -36,7 +31,7 @@ internal actor Holder<T>: AsyncSequence {
 		let holder: Holder
 		typealias Element = [T]
 
-		func next() async throws -> [T]? {
+		func next() async -> [T]? {
 			await holder.waitForNext()
 		}
 	}
@@ -44,22 +39,26 @@ internal actor Holder<T>: AsyncSequence {
 	func append(element: T) {
 		self.elements.append(element)
 		if lastFlush == nil {
-			lastFlush = Date()
+			lastFlush = timeval()
+			gettimeofday(&lastFlush!, nil)
 		}
 		flushElementsIfNeeded()
 	}
 
 	private func hasTimeThresholdPassed() -> Bool {
 		guard let lastFlush = lastFlush else { return false }
-		return abs(lastFlush.timeIntervalSinceNow) > holdInterval
+		var currentTime = timeval()
+		gettimeofday(&currentTime, nil)
+		let elapsedTime = Double(currentTime.tv_sec - lastFlush.tv_sec) + Double(currentTime.tv_usec - lastFlush.tv_usec) / 1_000_000.0
+		return elapsedTime > holdInterval
 	}
 
 	private func flushElementsIfNeeded() {
 		if hasTimeThresholdPassed() && !waiters.isEmpty {
 			let currentElements = elements
 			elements.removeAll()
-			lastFlush = Date()
-
+			lastFlush = timeval()
+			gettimeofday(&lastFlush!, nil)
 			for waiter in waiters {
 				waiter.resume(returning: currentElements)
 			}
@@ -71,7 +70,8 @@ internal actor Holder<T>: AsyncSequence {
 		if hasTimeThresholdPassed() {
 			let currentElements = elements
 			elements.removeAll()
-			lastFlush = Date()
+			lastFlush = timeval()
+			gettimeofday(&lastFlush!, nil)
 			return currentElements
 		} else {
 			return await withUnsafeContinuation { continuation in

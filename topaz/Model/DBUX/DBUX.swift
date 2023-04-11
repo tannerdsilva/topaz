@@ -81,7 +81,7 @@ extension DBUX {
 }
 
 extension DBUX {
-	@frozen @usableFromInline internal struct UUID: MDB_convertible, MDB_comparable, LosslessStringConvertible, Hashable, Equatable, Comparable {
+	/*@frozen @usableFromInline internal struct UUID: MDB_convertible, MDB_comparable, LosslessStringConvertible, Hashable, Equatable, Comparable {
 		static public func == (lhs:Self, rhs:Self) -> Bool {
 			return lhs.asMDB_val({ lhsVal in
 				return rhs.asMDB_val({ rhsVal in
@@ -166,5 +166,5 @@ extension DBUX {
 				}
 			})
 		}
-	}
+	}*/
 }

@@ -71,6 +71,123 @@ extension nostr {
 			case bad_id
 			case bad_sig
 		}
+		
+		@frozen @usableFromInline internal struct UID: MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable, LosslessStringConvertible, Codable {
+			enum Error:Swift.Error {
+				case invalidStringLength(String)
+			}
+
+			static func nullUID() -> Self {
+				return Self()
+			}
+
+			// Lexigraphical sorting here
+			static let mdbCompareFunction:@convention(c) (UnsafePointer<MDB_val>?, UnsafePointer<MDB_val>?) -> Int32 = { a, b in
+				let aData = a!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
+				let bData = b!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
+				
+				let minLength = min(a!.pointee.mv_size, b!.pointee.mv_size)
+				let comparisonResult = memcmp(aData, bData, minLength)
+
+				if comparisonResult != 0 {
+					return Int32(comparisonResult)
+				} else {
+					// If the common prefix is the same, compare their lengths.
+					return Int32(a!.pointee.mv_size) - Int32(b!.pointee.mv_size)
+				}
+			}
+
+			static func == (lhs: nostr.Event.UID, rhs: nostr.Event.UID) -> Bool {
+				return lhs.asMDB_val({ lhsVal in
+					return rhs.asMDB_val({ rhsVal in
+						return Self.mdbCompareFunction(&lhsVal, &rhsVal) == 0
+					})
+				})
+			}
+			
+			static func < (lhs: nostr.Event.UID, rhs: nostr.Event.UID) -> Bool {
+				return lhs.asMDB_val({ lhsVal in
+					return rhs.asMDB_val({ rhsVal in
+						return Self.mdbCompareFunction(&lhsVal, &rhsVal) < 0
+					})
+				})
+			}
+			
+			static let hashLength = 32
+
+			var bytes: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+			
+			var description: String {
+				get {
+					return self.exportData().base64EncodedString()
+				}
+			}
+			
+			internal init?(_ description:String) {
+				guard let asData = Data(base64Encoded:description) else {
+					return nil
+				}
+				
+				guard asData.count == Self.hashLength else {
+					return nil
+				}
+				self = Self.init(asData)
+			}
+
+			/// Initialize from Data containing SHA256 hash
+			internal init(_ hashData: Data) {
+				hashData.withUnsafeBytes({ byteBuffer in
+					memcpy(&bytes, byteBuffer, Self.hashLength)
+				})
+			}
+
+			/// Null Initializer
+			fileprivate init() {}
+
+			// MDB_convertible
+			internal init?(_ value: MDB_val) {
+				guard value.mv_size == Self.hashLength else {
+					return nil
+				}
+				_ = memcpy(&bytes, value.mv_data, Self.hashLength)
+			}
+			public func asMDB_val<R>(_ valFunc: (inout MDB_val) throws -> R) rethrows -> R {
+				return try withUnsafePointer(to: bytes, { unsafePointer in
+					var val = MDB_val(mv_size: Self.hashLength, mv_data: UnsafeMutableRawPointer(mutating: unsafePointer))
+					return try valFunc(&val)
+				})
+			}
+			
+			// Hashable
+			public func hash(into hasher:inout Hasher) {
+				withUnsafePointer(to:bytes) { byteBuff in
+					for i in 0..<Self.hashLength {
+						hasher.combine(byteBuff.advanced(by: i))
+					}
+				}
+			}
+			
+			/// Export the hash as a Data struct
+			public func exportData() -> Data {
+				withUnsafePointer(to:bytes) { byteBuff in
+					return Data(bytes:byteBuff, count:Self.hashLength)
+				}
+			}
+			
+			/// Codable
+			init(from decoder:Decoder) throws {
+				var container = try decoder.singleValueContainer()
+				let asString = try container.decode(String.self)
+				guard let makeSelf = Self(asString) else {
+					throw Error.invalidStringLength(asString)
+				}
+				self = makeSelf
+			}
+			func encode(to encoder: Encoder) throws {
+				var container = encoder.singleValueContainer()
+				try container.encode(self.description)
+			}
+		}
 
 		///
 		enum Block {
@@ -273,7 +390,7 @@ extension nostr {
 		
 		// used to render the UI during development
 		static func createTestPost() -> Self {
-			return Self(uid:UUID().uuidString, sig:"", tags:[], boosted_by: nil, pubkey: "foo", created:Date(timeIntervalSinceNow:-300), kind:Kind.text_note, content:"oh jeez look here at all this content wowweee")
+			return Self(uid:"", sig:"", tags:[], boosted_by: nil, pubkey: "foo", created:Date(timeIntervalSinceNow:-300), kind:Kind.text_note, content:"oh jeez look here at all this content wowweee")
 		}
 		
 		fileprivate init(uid:String, sig:String, tags:[Tag], boosted_by:String?, pubkey:String, created:Date, kind:Kind, content:String) {
@@ -381,20 +498,19 @@ extension nostr.Event:Hashable {
 
 extension nostr.Event:Identifiable {
 	var id:String {
-		return self.uid
+		return self.uid.description
 	}
 }
 
 extension nostr.Event {
 	/// The result of validating an event.
-	func commitment() throws -> Data {
+	fileprivate func commitment() throws -> Data {
 		let encoder = JSONEncoder()
 		encoder.outputFormatting = .withoutEscapingSlashes
 		let tagsString = String(data:try encoder.encode(self.tags), encoding:.utf8)!
 		let buildContentString = try encoder.encode(self.content)
 		let contentString = String(data:buildContentString, encoding:.utf8)!
 		let commit = "[0,\"\(self.pubkey)\",\(Int64(self.created.timeIntervalSince1970)),\(self.kind.rawValue),\(tagsString),\(contentString)]"
-		Self.logger.info("created event commitment string", metadata:["commitment":"\(commit)"])
 		return Data(commit.utf8)
 	}
 	func validate() -> Result<ValidationResult, Swift.Error> {
@@ -421,7 +537,7 @@ extension nostr.Event {
 				return .success(.bad_sig)
 			}
 			var raw_id_bytes = raw_id.bytes
-			ok = secp256k1_schnorrsig_verify(ctx, &sig64, &raw_id_bytes, raw_id.count, &xonly_pubkey) > 0
+			ok = secp256k1_schnorrsig_verify(ctx, &sig64, &raw_id_bytes, UID.hashLength, &xonly_pubkey) > 0
 			let result:ValidationResult = ok ? .ok : .bad_sig
 			return .success(result)
 		} catch let error {
@@ -615,9 +731,7 @@ func decode_data<T: Decodable>(_ data: Data) -> T? {
 	let decoder = JSONDecoder()
 	do {
 		return try decoder.decode(T.self, from: data)
-	} catch {
-		print("decode_data failed for \(T.self): \(error)")
-	}
+	} catch {}
 
 	return nil
 }

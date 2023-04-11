@@ -54,7 +54,6 @@ struct ConnectionDetailsView: View {
 												do {
 													try await relay.connect(retryLaterIfFailed:true)
 												} catch {
-													print("Error reconnecting: \(error)")
 												}
 											}
 										}, label: {

@@ -27,7 +27,6 @@
 		AE26C08A29B4F77700B85600 /* topazTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE26C08929B4F77700B85600 /* topazTests.swift */; };
 		AE26C09429B4F77700B85600 /* topazUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE26C09329B4F77700B85600 /* topazUITests.swift */; };
 		AE26C09629B4F77700B85600 /* topazUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE26C09529B4F77700B85600 /* topazUITestsLaunchTests.swift */; };
-		AE2C0EE629BA50BD00C0B87C /* EventHolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE2C0EE529BA50BD00C0B87C /* EventHolder.swift */; };
 		AE2C0EEB29BA6E8700C0B87C /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE2C0EEA29BA6E8700C0B87C /* Profile.swift */; };
 		AE2C0EEE29BA71B100C0B87C /* ActionBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE2C0EED29BA71B100C0B87C /* ActionBarModel.swift */; };
 		AE2C0EF029BA725A00C0B87C /* Zap.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE2C0EEF29BA725A00C0B87C /* Zap.swift */; };
@@ -40,6 +39,9 @@
 		AE421C7A29BE30DE009CB737 /* Date.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7929BE30DE009CB737 /* Date.swift */; };
 		AE598F2C29E49B2100D4CB8F /* DBUX.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F2B29E49B2100D4CB8F /* DBUX.swift */; };
 		AE598F2E29E4DFD700D4CB8F /* Post.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F2D29E4DFD700D4CB8F /* Post.swift */; };
+		AE598F3029E5AB3A00D4CB8F /* URL.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F2F29E5AB3A00D4CB8F /* URL.swift */; };
+		AE598F3329E5B8C100D4CB8F /* ExperienceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F3229E5B8C100D4CB8F /* ExperienceEngine.swift */; };
+		AE598F3529E5C77600D4CB8F /* QuickLMDB.Environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F3429E5C77600D4CB8F /* QuickLMDB.Environment.swift */; };
 		AE717AC229C014F7002D6A52 /* HomeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE717AC129C014F7002D6A52 /* HomeModel.swift */; };
 		AE717AC529C0344B002D6A52 /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = AE717AC429C0344B002D6A52 /* AsyncAlgorithms */; };
 		AE771EAF29B5166A0019EDA1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE771EAE29B5166A0019EDA1 /* ContentView.swift */; };
@@ -126,7 +128,6 @@
 		AE26C08F29B4F77700B85600 /* topazUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = topazUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE26C09329B4F77700B85600 /* topazUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = topazUITests.swift; sourceTree = "<group>"; };
 		AE26C09529B4F77700B85600 /* topazUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = topazUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		AE2C0EE529BA50BD00C0B87C /* EventHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventHolder.swift; sourceTree = "<group>"; };
 		AE2C0EEA29BA6E8700C0B87C /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
 		AE2C0EED29BA71B100C0B87C /* ActionBarModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionBarModel.swift; sourceTree = "<group>"; };
 		AE2C0EEF29BA725A00C0B87C /* Zap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Zap.swift; sourceTree = "<group>"; };
@@ -137,8 +138,11 @@
 		AE421C7229BD095B009CB737 /* EventReference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventReference.swift; sourceTree = "<group>"; };
 		AE421C7629BD1FB5009CB737 /* ReplyDesc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyDesc.swift; sourceTree = "<group>"; };
 		AE421C7929BE30DE009CB737 /* Date.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Date.swift; sourceTree = "<group>"; };
-		AE598F2B29E49B2100D4CB8F /* DBUX.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = DBUX.swift; path = DBUX/DBUX.swift; sourceTree = "<group>"; };
+		AE598F2B29E49B2100D4CB8F /* DBUX.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DBUX.swift; sourceTree = "<group>"; };
 		AE598F2D29E4DFD700D4CB8F /* Post.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Post.swift; sourceTree = "<group>"; };
+		AE598F2F29E5AB3A00D4CB8F /* URL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URL.swift; sourceTree = "<group>"; };
+		AE598F3229E5B8C100D4CB8F /* ExperienceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceEngine.swift; sourceTree = "<group>"; };
+		AE598F3429E5C77600D4CB8F /* QuickLMDB.Environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLMDB.Environment.swift; sourceTree = "<group>"; };
 		AE717AC129C014F7002D6A52 /* HomeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeModel.swift; sourceTree = "<group>"; };
 		AE771EAE29B5166A0019EDA1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AE7FE83829BBB7F80060DCE3 /* Parser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Parser.swift; sourceTree = "<group>"; };
@@ -327,8 +331,19 @@
 			isa = PBXGroup;
 			children = (
 				AE421C7929BE30DE009CB737 /* Date.swift */,
+				AE598F2F29E5AB3A00D4CB8F /* URL.swift */,
+				AE598F3429E5C77600D4CB8F /* QuickLMDB.Environment.swift */,
 			);
 			path = Extensions;
+			sourceTree = "<group>";
+		};
+		AE598F3129E5B8A500D4CB8F /* DBUX */ = {
+			isa = PBXGroup;
+			children = (
+				AE598F2B29E49B2100D4CB8F /* DBUX.swift */,
+				AE598F3229E5B8C100D4CB8F /* ExperienceEngine.swift */,
+			);
+			path = DBUX;
 			sourceTree = "<group>";
 		};
 		AEB39B7129B5400000F3C92E /* nostr */ = {
@@ -369,7 +384,6 @@
 				AEB39B7429B5403900F3C92E /* npub.swift */,
 				AEB39B7A29B5417D00F3C92E /* POW.swift */,
 				AE39020A29B912D600F9D40C /* Delta.swift */,
-				AE2C0EE529BA50BD00C0B87C /* EventHolder.swift */,
 				AE2C0EEF29BA725A00C0B87C /* Zap.swift */,
 				AE2C0EF129BA7C9E00C0B87C /* Constants.swift */,
 				AED9D12E29BA9730004AE0AE /* LocalizationHelp.swift */,
@@ -413,7 +427,7 @@
 		AEB899EF29B4FE4E004361B8 /* Model */ = {
 			isa = PBXGroup;
 			children = (
-				AE598F2B29E49B2100D4CB8F /* DBUX.swift */,
+				AE598F3129E5B8A500D4CB8F /* DBUX */,
 				AE0F152D29C50819009E3297 /* UserExperience */,
 				AE2C0EEC29BA712D00C0B87C /* Other Stuff */,
 				AEB899F029B4FE4E004361B8 /* ApplicationModel.swift */,
@@ -606,6 +620,7 @@
 				AEB39B7B29B5417D00F3C92E /* POW.swift in Sources */,
 				AE1A59CE29B7C02D00D21AA0 /* ScheduledTask.swift in Sources */,
 				AEF298E529D4BE1600E50654 /* Holder.swift in Sources */,
+				AE598F3529E5C77600D4CB8F /* QuickLMDB.Environment.swift in Sources */,
 				AE7FE83929BBB7F80060DCE3 /* Parser.swift in Sources */,
 				AE2C0EEE29BA71B100C0B87C /* ActionBarModel.swift in Sources */,
 				AE1A59C229B7A20600D21AA0 /* Event.swift in Sources */,
@@ -613,8 +628,8 @@
 				AE771EAF29B5166A0019EDA1 /* ContentView.swift in Sources */,
 				AEEAF2A629C97CC7002B3C37 /* ZapsDB.swift in Sources */,
 				AEB899F129B4FE4E004361B8 /* ApplicationModel.swift in Sources */,
-				AE2C0EE629BA50BD00C0B87C /* EventHolder.swift in Sources */,
 				AE1A59C629B7B0EA00D21AA0 /* Invoice.swift in Sources */,
+				AE598F3029E5AB3A00D4CB8F /* URL.swift in Sources */,
 				AEF298E729D4BE2800E50654 /* HTTPTool.swift in Sources */,
 				AEB39B8229B5C37800F3C92E /* Relay.swift in Sources */,
 				AE421C7129BC7EED009CB737 /* RelayRegistrar.swift in Sources */,
@@ -630,6 +645,7 @@
 				AE8F05B729CD44CB00D59FEC /* Warnings.swift in Sources */,
 				AE2C0EEB29BA6E8700C0B87C /* Profile.swift in Sources */,
 				AEB39B6C29B52B1200F3C92E /* OnboardingView.swift in Sources */,
+				AE598F3329E5B8C100D4CB8F /* ExperienceEngine.swift in Sources */,
 				AEEAF2B029CA1A0B002B3C37 /* TimelineView.swift in Sources */,
 				AEB39B8829B68D6A00F3C92E /* UserExperienceView.swift in Sources */,
 				AE598F2E29E4DFD700D4CB8F /* Post.swift in Sources */,

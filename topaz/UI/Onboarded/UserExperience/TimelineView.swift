@@ -142,7 +142,7 @@ struct EventDetailView: View {
 				Text("Event ID")
 					.font(.headline)
 				Spacer()
-				Text(event.uid)
+				Text(event.uid.description)
 					.font(.subheadline)
 					.lineLimit(1)
 			}

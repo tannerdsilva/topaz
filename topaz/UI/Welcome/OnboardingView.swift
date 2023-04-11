@@ -130,7 +130,6 @@ struct OnboardingView: View {
 							do {
 								try appData.installUser(publicKey: gPub, privateKey: getPK)
 							} catch let error {
-								print(error)
 							}
 						}
 						.padding()
