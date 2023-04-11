@@ -36,7 +36,7 @@ struct UserExperienceView: View {
 					case .search:
 						SearchView()
 					case .profile:
-						PV()
+						ProfileDetailView(profile:ue.profilesDB.currentUserProfile!)
 					}
 					
 					Spacer()
@@ -202,8 +202,10 @@ struct SearchView: View {
 }
 
 struct PV: View {
+	let ue:UE
+	
 	var body: some View {
-		UnderConstructionView(unavailableViewName:"Profile and Settings")
+		ProfileDetailView(profile:ue.profilesDB.currentUserProfile!)
 	}
 }
 
@@ -268,7 +270,7 @@ struct EventViewCell: View {
 
 			TextNoteContentView(content: event.content)
 
-
+			
 			HStack {
 				Text(dateFormatter.string(from: event.created))
 					.font(.caption)
@@ -276,6 +278,25 @@ struct EventViewCell: View {
 
 				Spacer()
 
+				// Validation status indicator
+				switch event.validate() {
+				case .success(let validationResult):
+					if validationResult == .ok {
+						Image(systemName: "checkmark.circle.fill")
+							.foregroundColor(.green)
+							.font(.system(size: 18))
+					} else {
+						Image(systemName: "exclamationmark.circle.fill")
+							.foregroundColor(.red)
+							.font(.system(size: 18))
+					}
+				case .failure(_):
+					Image(systemName: "questionmark.circle.fill")
+						.foregroundColor(.yellow)
+						.font(.system(size: 18))
+				}
+				
+				Spacer()
 				if let boostedBy = event.boosted_by {
 					HStack {
 						Image(systemName: "arrow.triangle.2.circlepath.circle.fill")

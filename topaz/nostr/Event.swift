@@ -63,6 +63,7 @@ extension nostr {
 	
 	///
 	struct Event:Codable {
+		static let logger = Topaz.makeDefaultLogger(label:"nostr.Event")
 		
 		///
 		enum ValidationResult:UInt8 {
@@ -388,34 +389,44 @@ extension nostr.Event {
 	/// The result of validating an event.
 	func commitment() throws -> Data {
 		let encoder = JSONEncoder()
+		encoder.outputFormatting = .withoutEscapingSlashes
 		let tagsString = String(data:try encoder.encode(self.tags), encoding:.utf8)!
 		let buildContentString = try encoder.encode(self.content)
 		let contentString = String(data:buildContentString, encoding:.utf8)!
-		let commit = "[0,\"\(self.pubkey)\",\(self.created.timeIntervalSince1970),\(self.kind.rawValue),\(tagsString),\(contentString)]"
+		let commit = "[0,\"\(self.pubkey)\",\(Int64(self.created.timeIntervalSince1970)),\(self.kind.rawValue),\(tagsString),\(contentString)]"
+		Self.logger.info("created event commitment string", metadata:["commitment":"\(commit)"])
 		return Data(commit.utf8)
 	}
-	func validate() throws -> ValidationResult {
-		let raw_id = sha256(try self.commitment())
-		let id = hex_encode(raw_id)
-		if id != self.uid {
-			return .bad_id
+	func validate() -> Result<ValidationResult, Swift.Error> {
+		do {
+			let raw_id = sha256(try self.commitment())
+			let id = hex_encode(raw_id)
+			if id != self.uid {
+				Self.logger.error("validation failed - uid mismatch")
+				return .success(.bad_id)
+			}
+			guard var sig64 = hex_decode(self.sig) else {
+				Self.logger.error("validation failed - could not hex decode signature")
+				return .success(.bad_sig)
+			}
+			guard var ev_pubkey = hex_decode(self.pubkey) else {
+				Self.logger.error("validation failed - could not hex decode public key")
+				return .success(.bad_sig)
+			}
+			let ctx = try secp256k1.Context.create()
+			var xonly_pubkey = secp256k1_xonly_pubkey.init()
+			var ok = secp256k1_xonly_pubkey_parse(ctx, &xonly_pubkey, &ev_pubkey) != 0
+			if !ok {
+				Self.logger.error("validation failed - not ok?")
+				return .success(.bad_sig)
+			}
+			var raw_id_bytes = raw_id.bytes
+			ok = secp256k1_schnorrsig_verify(ctx, &sig64, &raw_id_bytes, raw_id.count, &xonly_pubkey) > 0
+			let result:ValidationResult = ok ? .ok : .bad_sig
+			return .success(result)
+		} catch let error {
+			return .failure(error)
 		}
-		guard var sig64 = hex_decode(self.sig) else {
-			return .bad_sig
-		}
-		guard var ev_pubkey = hex_decode(self.pubkey) else {
-			return .bad_sig
-		}
-		let ctx = try secp256k1.Context.create()
-		var xonly_pubkey = secp256k1_xonly_pubkey.init()
-		var ok = secp256k1_xonly_pubkey_parse(ctx, &xonly_pubkey, &ev_pubkey) != 0
-		if !ok {
-			return .bad_sig
-		}
-		var raw_id_bytes = raw_id.bytes
-
-		ok = secp256k1_schnorrsig_verify(ctx, &sig64, &raw_id_bytes, raw_id.count, &xonly_pubkey) > 0
-		return ok ? .ok : .bad_sig
 	}
 	func firstEventTag() -> String? {
 		for tag in tags {
@@ -461,6 +472,7 @@ extension nostr.Event {
 	func getEventReferences(privkey:String) -> [EventReference] {
 		return interpret_event_refs(blocks:self.blocks(privkey), tags:self.tags.compactMap({ $0.toArray() }))
 	}
+//	static func createFromPost(_ )
 }
 
 extension KeyPair {
@@ -565,7 +577,7 @@ func decrypt_private_zap(our_privkey: String, zapreq:nostr.Event, target:Zap.Tar
 	}
 	
 	do {
-		guard try zapreq.validate() == .ok else {
+		guard case .success(.ok) = zapreq.validate() else {
 			return nil
 		}
 	} catch {

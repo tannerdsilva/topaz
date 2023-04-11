@@ -4,12 +4,12 @@
 //
 //  Created by Tanner Silva on 3/25/23.
 //
-
-import Foundation
-
 // The Holder is a simple class that allows for the holding of elements until a certain amount of time has passed.
 // It generally helps group an aggressive stream of incoming elements into more digestible chunks for the database and UI, both of which write with a single thread.
 // This tool is deployed by the holder of a relay connection.
+
+import Foundation
+
 internal actor Holder<T>: AsyncSequence {
 	typealias Element = [T]
 	typealias AsyncIterator = HolderEventStream

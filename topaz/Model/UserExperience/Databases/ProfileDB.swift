@@ -58,7 +58,6 @@ extension UE {
 				} catch LMDBError.notFound {
 					continue
 				}
-				
 			}
 			return profiles
 		}
@@ -94,6 +93,116 @@ extension UE {
 //				}
 			}
 			try newTrans.commit()
+		}
+	}
+}
+
+
+extension UE.Profiles {
+	class PictureDB {
+		enum Databases:String {
+			case pubkey_picURLHash = "_profile_pic:pubkey-picURLHash"
+			case pubkey_picCacheMode = "_profile_pic:pubkey-picCacheMode"
+			case pubkey_picData = "_profile_pic:pubkey-picData"
+			case pubkey_picDate = "_profile_pic:pubkey-picDate"
+			case pubkey_contentType = "_profile_pic:pubkey-contentType"
+		}
+		
+		// the cache policy for a given profile picture
+		enum CacheMode:UInt8, MDB_convertible {
+			case asNeeded
+			case always
+		}
+
+		let env:QuickLMDB.Environment
+		let pubkey:String
+
+		// the URL hash is the hash of the URL of the picture. this is used to determine if the picture has changed
+		let picURLHashDB:Database		// [String:String]
+
+		// the storage policy for the picture.
+		let picCacheModeDB:Database		// [String:CacheMode]
+
+		// the picture data is the actual picture data
+		let picDataDB:Database			// [String:Data]
+
+		// the picture date is the date the picture was last updated
+		let picDateDB:Database			// [String:Date]
+
+		// the content type is the content type of the picture
+		let picContentTypeDB:Database	// [String:String]
+
+		private let holder:Holder<(pubkey:String, imageData:Data)>
+
+		// creates a new picture database
+		init(myPubkey:String, env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
+			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
+			self.env = env
+			self.pubkey = myPubkey
+			self.picURLHashDB = try env.openDatabase(named:Databases.pubkey_picURLHash.rawValue, flags:[.create], tx:subTrans)
+			self.picCacheModeDB = try env.openDatabase(named:Databases.pubkey_picCacheMode.rawValue, flags:[.create], tx:subTrans)
+			self.picDataDB = try env.openDatabase(named:Databases.pubkey_picData.rawValue, flags:[.create], tx:subTrans)
+			self.picDateDB = try env.openDatabase(named:Databases.pubkey_picDate.rawValue, flags:[.create], tx:subTrans)
+			self.picContentTypeDB = try env.openDatabase(named:Databases.pubkey_contentType.rawValue, flags:[.create], tx:subTrans)
+			self.holder = Holder<(pubkey:String, imageData:Data)>(holdInterval:0.5)
+			try subTrans.commit()
+		}
+
+		// assigns a picture to a user. if the user already has a picture, it will be deleted and the new URL will be assigned
+		func setImageURLs(_ pk_url:[String:String], tx someTrans:QuickLMDB.Transaction) throws {
+			let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
+			let urlHashCursor = try self.picURLHashDB.cursor(tx:newTrans)
+			for (pubkey, url) in pk_url {
+				try url.asMDB_val({ newURLVal in
+					do {
+						// check if there is already a URL for this pubkey
+						let oldURL = try urlHashCursor.getEntry(.set, key:url).value
+						if oldURL != newURLVal {
+							// the URL is different, so we need to delete the old picture for this pubkey.
+							// the data may not exist, and that is ok
+							do {
+								// try to delete the picture data
+								try self.picDataDB.deleteEntry(key:pubkey, tx:newTrans)
+							} catch LMDBError.notFound {}
+							do {
+								// try to delete the picture date
+								try self.picDateDB.deleteEntry(key:pubkey, tx:newTrans)
+							} catch LMDBError.notFound {}
+							do {
+								// try to delete the picture content type
+								try self.picContentTypeDB.deleteEntry(key:pubkey, tx:newTrans)
+							} catch LMDBError.notFound {}
+
+							// no need to replace or otherwise modify the cache policy entry, so that is left alone
+
+							try urlHashCursor.setEntry(value:newURLVal, forKey:pubkey)
+						}
+					} catch LMDBError.notFound {
+						// new entries get a default cache mode
+						try urlHashCursor.setEntry(value:newURLVal, forKey:pubkey)
+						try urlHashCursor.setEntry(value:CacheMode.asNeeded, forKey:pubkey)
+					}
+				})
+			}
+			try newTrans.commit()
+		}
+
+		func getImageOrFetchIfNecessary(_ publicKeys:Set<String>, tx someTrans:QuickLMDB.Transaction) throws -> [String:ImageModel] {
+			let imageDataCursor = try self.picDataDB.cursor(tx:someTrans)
+			let contentTypeCursor = try self.picContentTypeDB.cursor(tx:someTrans)
+			var hasData = [String:(Data, String?)]()
+			var needsLoading = Set<String>()
+			for curID in publicKeys {
+				do {
+					let getImage = Data(try imageDataCursor.getEntry(.set, key:curID).value)!
+					let getContentType = String(try contentTypeCursor.getEntry(.set, key:curID).value)
+					hasData[curID] = (getImage, getContentType)
+				} catch LMDBError.notFound {
+					// launch an async task to get the image
+					let newModel = ImageModel("", state:.noData)
+				}
+			}
+			return [String:ImageModel]()
 		}
 	}
 }

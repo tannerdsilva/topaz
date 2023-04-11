@@ -158,7 +158,7 @@ func hexchar(_ val: UInt8) -> UInt8 {
 }
 
 
-func hex_encode(_ data: Data) -> String {
+func hex_encode(_ data:Data) -> String {
 	var str = ""
 	for c in data {
 		let c1 = hexchar(c >> 4)

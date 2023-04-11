@@ -18,8 +18,11 @@ struct HTTP {
 
 	static let logger = Topaz.makeDefaultLogger(label: "http-client")
 
-	static func get(url: URL) async throws -> (Data, String?) {
-		let httpClient = HTTPClient(eventLoopGroupProvider: .shared(Topaz.defaultPool), configuration: HTTPClient.Configuration(timeout: HTTPClient.Configuration.Timeout(connect: .seconds(15), read: .seconds(60))))
+	/// Invokes an HTTP GET request to the specified URL.
+	/// - Returns a tuple containing the body content of the response, and the content type of the response, if available.
+	/// - Throws an error if the request could not be completed
+	static func getContent(url: URL) async throws -> (Data, String?) {
+		let httpClient = HTTPClient(eventLoopGroupProvider: .shared(Topaz.defaultPool), configuration: HTTPClient.Configuration(timeout: HTTPClient.Configuration.Timeout(connect: .seconds(15), read: .seconds(30))))
 		defer { try? httpClient.syncShutdown() }
 
 		logger.trace("Requesting image.", metadata: ["url": "\(url)"])

@@ -66,7 +66,7 @@ struct Zap:Codable {
 		}
 		
 		do {
-			guard try zap_req.validate() == .ok else {
+			guard case .success(.ok) = zap_req.validate() else {
 				return nil
 			}
 		} catch {
@@ -285,7 +285,7 @@ func decode_zap_request(_ desc: String) -> Zap.Request? {
 			}
 			
 			/// Ensure the signature on the zap request is correct
-			guard case .ok = try? zap_req.validate() else {
+			guard case .success(.ok) = zap_req.validate() else {
 				return nil
 			}
 			

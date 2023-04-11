@@ -3,7 +3,7 @@ import SwiftUI
 struct TextNoteContentView: View {
 	let content: String
 	
-	private func renderRichText()  -> Result<AttributedString, Swift.Error> {
+	private func renderRichText() -> Result<AttributedString, Swift.Error> {
 		do {
 			var attributedString = AttributedString(content)
 			let urlRegex = try Regex("((https|http)://)((\\w|-)+)(([.]|[/])((\\w|-)+))+")

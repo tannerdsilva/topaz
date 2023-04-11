@@ -43,19 +43,19 @@ struct EventDetailView: View {
 
 	private var profileBanner: some View {
 		ZStack {
-			if let bannerURL = profile?.banner, let url = URL(string: bannerURL) {
-				AsyncImage(url: url, scale: 1.0) { image in
-					image
-						.resizable()
-						.scaledToFill()
-				} placeholder: {
-					RoundedRectangle(cornerRadius: 10)
-						.fill(Color.gray)
-				}
-			} else {
+//			if let bannerURL = profile?.banner, let url = URL(string: bannerURL) {
+//				AsyncImage(url: url, scale: 1.0) { image in
+//					image
+//						.resizable()
+//						.scaledToFill()
+//				} placeholder: {
+//					RoundedRectangle(cornerRadius: 10)
+//						.fill(Color.gray)
+//				}
+//			} else {
 				RoundedRectangle(cornerRadius: 10)
 					.fill(Color.gray)
-			}
+//			}
 		}
 		.frame(height: 200)
 		.cornerRadius(10)
