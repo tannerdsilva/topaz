@@ -36,12 +36,13 @@
 		AE421C7129BC7EED009CB737 /* RelayRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7029BC7EED009CB737 /* RelayRegistrar.swift */; };
 		AE421C7329BD095B009CB737 /* EventReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7229BD095B009CB737 /* EventReference.swift */; };
 		AE421C7729BD1FB5009CB737 /* ReplyDesc.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7629BD1FB5009CB737 /* ReplyDesc.swift */; };
-		AE421C7A29BE30DE009CB737 /* Date.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7929BE30DE009CB737 /* Date.swift */; };
+		AE421C7A29BE30DE009CB737 /* Foundation.Date.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7929BE30DE009CB737 /* Foundation.Date.swift */; };
 		AE598F2C29E49B2100D4CB8F /* DBUX.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F2B29E49B2100D4CB8F /* DBUX.swift */; };
 		AE598F2E29E4DFD700D4CB8F /* Post.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F2D29E4DFD700D4CB8F /* Post.swift */; };
 		AE598F3029E5AB3A00D4CB8F /* URL.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F2F29E5AB3A00D4CB8F /* URL.swift */; };
 		AE598F3329E5B8C100D4CB8F /* ExperienceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F3229E5B8C100D4CB8F /* ExperienceEngine.swift */; };
 		AE598F3529E5C77600D4CB8F /* QuickLMDB.Environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F3429E5C77600D4CB8F /* QuickLMDB.Environment.swift */; };
+		AE598F3729E5F48100D4CB8F /* DBUX.Date.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE598F3629E5F48100D4CB8F /* DBUX.Date.swift */; };
 		AE717AC229C014F7002D6A52 /* HomeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE717AC129C014F7002D6A52 /* HomeModel.swift */; };
 		AE717AC529C0344B002D6A52 /* AsyncAlgorithms in Frameworks */ = {isa = PBXBuildFile; productRef = AE717AC429C0344B002D6A52 /* AsyncAlgorithms */; };
 		AE771EAF29B5166A0019EDA1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE771EAE29B5166A0019EDA1 /* ContentView.swift */; };
@@ -137,12 +138,13 @@
 		AE421C7029BC7EED009CB737 /* RelayRegistrar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayRegistrar.swift; sourceTree = "<group>"; };
 		AE421C7229BD095B009CB737 /* EventReference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventReference.swift; sourceTree = "<group>"; };
 		AE421C7629BD1FB5009CB737 /* ReplyDesc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyDesc.swift; sourceTree = "<group>"; };
-		AE421C7929BE30DE009CB737 /* Date.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Date.swift; sourceTree = "<group>"; };
+		AE421C7929BE30DE009CB737 /* Foundation.Date.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Foundation.Date.swift; sourceTree = "<group>"; };
 		AE598F2B29E49B2100D4CB8F /* DBUX.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DBUX.swift; sourceTree = "<group>"; };
 		AE598F2D29E4DFD700D4CB8F /* Post.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Post.swift; sourceTree = "<group>"; };
 		AE598F2F29E5AB3A00D4CB8F /* URL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URL.swift; sourceTree = "<group>"; };
 		AE598F3229E5B8C100D4CB8F /* ExperienceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceEngine.swift; sourceTree = "<group>"; };
 		AE598F3429E5C77600D4CB8F /* QuickLMDB.Environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLMDB.Environment.swift; sourceTree = "<group>"; };
+		AE598F3629E5F48100D4CB8F /* DBUX.Date.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DBUX.Date.swift; sourceTree = "<group>"; };
 		AE717AC129C014F7002D6A52 /* HomeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeModel.swift; sourceTree = "<group>"; };
 		AE771EAE29B5166A0019EDA1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AE7FE83829BBB7F80060DCE3 /* Parser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Parser.swift; sourceTree = "<group>"; };
@@ -330,9 +332,10 @@
 		AE421C7829BE3050009CB737 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
-				AE421C7929BE30DE009CB737 /* Date.swift */,
+				AE421C7929BE30DE009CB737 /* Foundation.Date.swift */,
 				AE598F2F29E5AB3A00D4CB8F /* URL.swift */,
 				AE598F3429E5C77600D4CB8F /* QuickLMDB.Environment.swift */,
+				AE598F3629E5F48100D4CB8F /* DBUX.Date.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -603,6 +606,7 @@
 				AE7FE83B29BBBCBE0060DCE3 /* LNURLPayRequest.swift in Sources */,
 				AE1A59CA29B7B26200D21AA0 /* ReferenceID.swift in Sources */,
 				AE0F152F29C5083B009E3297 /* ProfileDB.swift in Sources */,
+				AE598F3729E5F48100D4CB8F /* DBUX.Date.swift in Sources */,
 				AEEAF2AE29CA19D2002B3C37 /* TextEvent.swift in Sources */,
 				AEB39B8029B5C2E700F3C92E /* UserEnvironment.swift in Sources */,
 				AEB39B8429B5C3F300F3C92E /* RelayConnection.swift in Sources */,
@@ -637,7 +641,7 @@
 				AE421C7329BD095B009CB737 /* EventReference.swift in Sources */,
 				AE2C0EF229BA7C9E00C0B87C /* Constants.swift in Sources */,
 				AEB39B6E29B52D5900F3C92E /* Topaz.swift in Sources */,
-				AE421C7A29BE30DE009CB737 /* Date.swift in Sources */,
+				AE421C7A29BE30DE009CB737 /* Foundation.Date.swift in Sources */,
 				AED9D12F29BA9730004AE0AE /* LocalizationHelp.swift in Sources */,
 				AE421C6D29BC433B009CB737 /* PostBlock.swift in Sources */,
 				AE0F153629C555EB009E3297 /* RelaysDB.swift in Sources */,
@@ -832,7 +836,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.0.3;
+				MARKETING_VERSION = 0.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -871,7 +875,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.0.3;
+				MARKETING_VERSION = 0.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1089,7 +1093,7 @@
 			repositoryURL = "https://github.com/tannerdsilva/hummingbird-websocket.git";
 			requirement = {
 				kind = revision;
-				revision = 577ae5630192f8de6b2e54c6b507603559f6c3d3;
+				revision = 1def5fb12fb3d8c1223815478662ca5ae7656caf;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

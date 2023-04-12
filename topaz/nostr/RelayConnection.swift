@@ -132,7 +132,7 @@ final actor RelayConnection:ObservableObject {
             self.state = .connecting
 			await self.stateChannel.send((self, .connecting))
             let newURL = HBURL(self.url)
-			let newWS = try await HBWebSocketClient.connect(url:newURL, configuration: HBWebSocketClient.Configuration(), on:loopGroup.next())
+			let newWS = try await HBWebSocketClient.connect(url:newURL, configuration: HBWebSocketClient.Configuration(redirectCount: 5), on:loopGroup.next())
             // cancel the connection if the state was changed during the connection attempt
 			let shouldExit:Bool
 			switch self.state {

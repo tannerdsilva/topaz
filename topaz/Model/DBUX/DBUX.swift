@@ -1,5 +1,4 @@
 import QuickLMDB
-import struct Foundation.Date
 import struct Foundation.TimeInterval
 import struct Foundation.UUID
 import struct Foundation.Data
@@ -13,19 +12,19 @@ extension DBUX {
 	// the primary primitive for the Date type is a TimeInterval, which is the number of seconds since the Swift date "Reference Date" (Jan 1, 2001, 00:00:00 GMT)
 	@frozen @usableFromInline internal struct Date:MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable {
 		/// the primitive value of this instance
-		@usableFromInline internal let rawVal:TimeInterval
+		let rawVal:TimeInterval
 
 		/// basic initializer based on the primitive
-		@usableFromInline internal init(referenceInterval:TimeInterval) {
+		init(referenceInterval:TimeInterval) {
 			self.rawVal = referenceInterval
 		}
 
 		/// initialize from database
-		@usableFromInline internal init?(_ value:MDB_val) {
+		@usableFromInline init?(_ value:MDB_val) {
 			guard MemoryLayout<Self>.size == value.mv_size else {
 				return nil
 			}
-			self = value.mv_data.bindMemory(to:Date.self, capacity:1).pointee
+			self = value.mv_data.bindMemory(to:Self.self, capacity:1).pointee
 		}
 
 		/// encode into database
@@ -37,13 +36,13 @@ extension DBUX {
 		}
 
 		/// returns the difference in time between the called instance and passed date
-		@usableFromInline internal func timeIntervalSince(_ other:Date) -> TimeInterval {
+		@usableFromInline internal func timeIntervalSince(_ other:Self) -> TimeInterval {
 			return self.rawVal - other.rawVal
 		}
 
 		/// returns a new value that is the sum of the current value and the passed interval
 		@usableFromInline internal func addingTimeInterval(_ interval:TimeInterval) -> Self {
-			return Date(referenceInterval:self.rawVal + interval)
+			return Self(referenceInterval:self.rawVal + interval)
 		}
 
 		/// custom LMDB comparison function for the encoding scheme of this type

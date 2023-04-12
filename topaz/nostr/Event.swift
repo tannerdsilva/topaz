@@ -72,7 +72,7 @@ extension nostr {
 			case bad_sig
 		}
 		
-		@frozen @usableFromInline internal struct UID: MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable, LosslessStringConvertible, Codable {
+		@frozen @usableFromInline internal struct UID:MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable, LosslessStringConvertible, Codable {
 			enum Error:Swift.Error {
 				case invalidStringLength(String)
 			}
@@ -119,19 +119,19 @@ extension nostr {
 			
 			var description: String {
 				get {
-					return self.exportData().base64EncodedString()
+					hex_encode(self.exportData())
 				}
 			}
 			
 			internal init?(_ description:String) {
-				guard let asData = Data(base64Encoded:description) else {
+				guard let asBytes = hex_decode(description) else {
 					return nil
 				}
 				
-				guard asData.count == Self.hashLength else {
+				guard asBytes.count == Self.hashLength else {
 					return nil
 				}
-				self = Self.init(asData)
+				self = Self.init(Data(asBytes))
 			}
 
 			/// Initialize from Data containing SHA256 hash
@@ -378,7 +378,7 @@ extension nostr {
 		private static let df = ISO8601DateFormatter()
 		let keySignature:Data
 
-		let uid:String
+		let uid:UID
 		let sig:String
 		let tags:[Tag]
 		let boosted_by:String?
@@ -390,10 +390,10 @@ extension nostr {
 		
 		// used to render the UI during development
 		static func createTestPost() -> Self {
-			return Self(uid:"", sig:"", tags:[], boosted_by: nil, pubkey: "foo", created:Date(timeIntervalSinceNow:-300), kind:Kind.text_note, content:"oh jeez look here at all this content wowweee")
+			return Self(uid:UID.nullUID(), sig:"", tags:[], boosted_by: nil, pubkey: "foo", created:Date(timeIntervalSinceNow:-300), kind:Kind.text_note, content:"oh jeez look here at all this content wowweee")
 		}
 		
-		fileprivate init(uid:String, sig:String, tags:[Tag], boosted_by:String?, pubkey:String, created:Date, kind:Kind, content:String) {
+		fileprivate init(uid:UID, sig:String, tags:[Tag], boosted_by:String?, pubkey:String, created:Date, kind:Kind, content:String) {
 			let formattedDate = Data(Self.df.string(from: created).utf8)
 			var eventUIDHash = try! Blake2bHasher(outputLength:48)
 			try! eventUIDHash.update(Data(sig.utf8))
@@ -411,7 +411,7 @@ extension nostr {
 
 		init(from decoder:Decoder) throws {
 			let container = try decoder.container(keyedBy: CodingKeys.self)
-			self.uid = try container.decode(String.self, forKey: .uid)
+			self.uid = try container.decode(UID.self, forKey: .uid)
 			let getSig = try container.decode(String.self, forKey: .sig)
 			self.sig = getSig
 			self.tags = try container.decode([Tag].self, forKey: .tags)
@@ -515,9 +515,8 @@ extension nostr.Event {
 	}
 	func validate() -> Result<ValidationResult, Swift.Error> {
 		do {
-			let raw_id = sha256(try self.commitment())
-			let id = hex_encode(raw_id)
-			if id != self.uid {
+			let raw_id = UID(sha256(try self.commitment()))
+			if raw_id != self.uid {
 				Self.logger.error("validation failed - uid mismatch")
 				return .success(.bad_id)
 			}

@@ -139,7 +139,7 @@ struct EventDetailView: View {
 			}
 
 			HStack {
-				Text("Event ID")
+				Text("Event ID (\(event.uid.description.count))")
 					.font(.headline)
 				Spacer()
 				Text(event.uid.description)
@@ -186,7 +186,7 @@ struct TimelineView: View {
 	@State private var timeline = [TimelineModel]()
 	@State private var isLoading: Bool = false
 	@State private var lastEventDate: Date? = nil
-	@State private var lastEventUID: String? = nil
+	@State private var lastEventUID:nostr.Event.UID? = nil
 
 	var body: some View {
 		NavigationStack {
