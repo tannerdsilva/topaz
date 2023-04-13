@@ -9,10 +9,14 @@ import Foundation
 import SwiftUI
 
 struct ProfileDetailView: View {
+	let pubkey:String
 	@State var profile: nostr.Profile // Load the user profile data here
 
 	var body: some View {
 		VStack {
+//			Spacer()
+//			Text("\(self.pubkey)")
+//			Spacer()
 			UpperProfileView(profile: $profile)
 			//TimelineView() // Uncomment and implement this later
 		}

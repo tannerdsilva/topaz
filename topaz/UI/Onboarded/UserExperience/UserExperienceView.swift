@@ -36,7 +36,7 @@ struct UserExperienceView: View {
 					case .search:
 						SearchView()
 					case .profile:
-						ProfileDetailView(profile:ue.profilesDB.currentUserProfile!)
+						ProfileDetailView(pubkey:ue.keypair.pubkey, profile:ue.profilesDB.currentUserProfile!)
 					}
 					
 					Spacer()
@@ -205,7 +205,7 @@ struct PV: View {
 	let ue:UE
 	
 	var body: some View {
-		ProfileDetailView(profile:ue.profilesDB.currentUserProfile!)
+		ProfileDetailView(pubkey:ue.keypair.pubkey, profile:ue.profilesDB.currentUserProfile!)
 	}
 }
 

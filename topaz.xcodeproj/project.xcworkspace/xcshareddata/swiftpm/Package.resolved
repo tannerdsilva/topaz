@@ -58,7 +58,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tannerdsilva/hummingbird-websocket.git",
       "state" : {
-        "revision" : "0970f677b072dfc127853a9e91cb617de48b83f7"
+        "revision" : "80cf06a1462fd9bb59b3ac289bcf782deb5fe984"
       }
     },
     {
@@ -173,8 +173,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "45167b8006448c79dda4b7bd604e07a034c15c49",
-        "version" : "2.48.0"
+        "revision" : "e0cc6dd6ffa8e6a6f565938acd858b24e47902d0",
+        "version" : "2.50.0"
       }
     },
     {
