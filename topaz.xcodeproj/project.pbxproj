@@ -822,6 +822,8 @@
 				DEVELOPMENT_TEAM = 32J6BB6VUS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = topaz;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -836,7 +838,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.0.4;
+				MARKETING_VERSION = 0.0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -861,6 +863,8 @@
 				DEVELOPMENT_TEAM = 32J6BB6VUS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = topaz;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -875,7 +879,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.0.4;
+				MARKETING_VERSION = 0.0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1093,7 +1097,7 @@
 			repositoryURL = "https://github.com/tannerdsilva/hummingbird-websocket.git";
 			requirement = {
 				kind = revision;
-				revision = 1def5fb12fb3d8c1223815478662ca5ae7656caf;
+				revision = 80cf06a1462fd9bb59b3ac289bcf782deb5fe984;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

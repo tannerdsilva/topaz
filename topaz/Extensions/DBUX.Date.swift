@@ -5,7 +5,7 @@
 //  Created by Tanner Silva on 4/11/23.
 //
 
-import Foundation
+import struct Foundation.Date
 
 extension DBUX.Date {
 	init() {

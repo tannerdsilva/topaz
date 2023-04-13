@@ -67,7 +67,7 @@ extension DBUX {
 		static public func < (lhs:Self, rhs:Self) -> Bool {
 			return lhs.asMDB_val({ lhsVal in
 				rhs.asMDB_val({ rhsVal in
-					lhsVal.lexicographicallyPrecedes(rhsVal)
+					Self.mdbCompareFunction(&lhsVal, &rhsVal) < 0
 				})
 			})
 		}

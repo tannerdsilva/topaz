@@ -144,6 +144,7 @@ class UE:ObservableObject {
 					}
 					let newTrans = try Transaction(self.env, readOnly:false)
 					var buildProfiles = [String:nostr.Profile]()
+					var profileUpdateDates = [String:DBUX.Date]()
 					for curEv in curEvs {
 						switch curEv.kind {
 						case .metadata:
@@ -152,6 +153,7 @@ class UE:ObservableObject {
 								let decoded = try decoder.decode(nostr.Profile.self, from:asData)
 								self.logger.info("successfully decoded profile", metadata:["pubkey":"\(curEv.pubkey)"])
 								buildProfiles[curEv.pubkey] = decoded
+								profileUpdateDates[curEv.pubkey] = DBUX.Date(curEv.created)
 							} catch {
 								self.logger.error("failed to decode profile.")
 							}
@@ -165,10 +167,12 @@ class UE:ObservableObject {
 										following.update(with:getPubKey)
 									}
 								}
-								try self.relaysDB.setRelays(relays, pubkey:curEv.pubkey)
+								try self.relaysDB.setRelays(relays, pubkey:curEv.pubkey, asOf:DBUX.Date(curEv.created))
 								try self.contactsDB.followDB.set(pubkey:curEv.pubkey, follows:following, tx:newTrans)
 								self.logger.info("updated contact information for ")
-							} catch {}
+							} catch let error {
+								
+							}
 						default:
 							self.logger.debug("got event.", metadata:["kind":"\(curEv.kind)"])
 						}

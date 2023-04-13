@@ -23,6 +23,7 @@ extension UE {
 		
 		enum Databases:String {
 			// related to profiles and their listed relays
+			case pubkey_relays_asof = "pubkey-relays-asof"
 			case pubkey_relayHash = "pubkey-relayHash"
 			case relayHash_pubKey = "relayHash-pubKey"
 			case relayHash_relayString = "relayHash-relayString"
@@ -41,6 +42,7 @@ extension UE {
 		let myPubkey:String
 
 		// related to profiles and their listed relays
+		private let pubkey_relays_asof:Database		// stores the last time the user updated their profile							[String:DBUX.Date]
 		private let pubkey_relayHash:Database		// stores the list of relay hashes that the user has listed in their profile	[String:String] * DUP *
 		private let relayHash_relayString:Database	// stores the full relay URL for a given relay hash								[String:String]
 		private let relayHash_pubKey:Database		// stores the public key for a given relay hash									[String:String] * DUP *
@@ -78,6 +80,7 @@ extension UE {
 			newLogger.logLevel = .debug
 			
 			let subTrans = try Transaction(env, readOnly:false)
+			let pubkeyRelaysAsofDB = try env.openDatabase(named:Databases.pubkey_relays_asof.rawValue, flags:[.create], tx:subTrans)
 			let pubRelaysDB = try env.openDatabase(named:Databases.pubkey_relayHash.rawValue, flags:[.create, .dupSort], tx:subTrans)
 			let relayStringDB = try env.openDatabase(named:Databases.relayHash_relayString.rawValue, flags:[.create], tx:subTrans)
 			let relayConnectionDB = try env.openDatabase(named:Databases.relayHash_relayConnection.rawValue, flags:[.create], tx:subTrans)
@@ -96,6 +99,8 @@ extension UE {
 			let stateC = AsyncChannel<RelayConnection.StateChangeEvent>()
 			self.eventChannel = eventC
 			self.stateChannel = stateC
+			self.logger = newLogger
+			self.pubkey_relays_asof = pubkeyRelaysAsofDB
 			self.pubkey_relayHash = pubRelaysDB
 			self.relayHash_relayString = relayStringDB
 			self.relayHash_relayConnection = relayConnectionDB
@@ -149,7 +154,6 @@ extension UE {
 			}
 			_userRelayConnections = Published(wrappedValue:buildConnections)
 			_userRelayConnectionStates = Published(initialValue:buildStates)
-			self.logger = newLogger
 			try subTrans.commit()
 			
 			// launch the digest task
@@ -172,7 +176,7 @@ extension UE {
 								}
 							}
 							self.relayConnectionStatusUpdated(relay:curChanger.url, state:newState)
-							logThing.info("successfully updated relay connection state \(newState)", metadata:["url":"\(curChanger.url)"])
+							logThing.trace("successfully updated relay connection state \(newState)", metadata:["url":"\(curChanger.url)"])
 							try newTrans.commit()
 						}
 					}
@@ -183,11 +187,11 @@ extension UE {
 						for await curEvent in ec {
 							switch curEvent.1 {
 							case let .event(subID, myEvent):
-								logThing.debug("got event.", metadata:["kind":"\(myEvent.kind.rawValue)", "pubkey":"\(myEvent.pubkey)"])
+								logThing.trace("got event.", metadata:["kind":"\(myEvent.kind.rawValue)", "pubkey":"\(myEvent.pubkey)"])
 								await self.holder.append(element: myEvent)
 								break;
 							case .endOfStoredEvents(let subID):
-								logThing.notice("end of events", metadata:["sub_id":"\(subID)"])
+								logThing.trace("end of events", metadata:["sub_id":"\(subID)"])
 								break;
 							default:
 								break;
@@ -222,9 +226,31 @@ extension UE {
 		}
 
 		// sets the relays for a given pubkey
-		//  - if the relay information is already in the database, it will be updated silently and any keys that existed previously will be dropped
-		func setRelays(_ relays:Set<String>, pubkey:String) throws {
+		//  - if the relay information is already in the database, LDMBError.keyExists will be thrown
+		func setRelays(_ relays:Set<String>, pubkey:String, asOf writeDate:DBUX.Date) throws {
+			#if DEBUG
+			self.logger.critical("attempting to assign \(relays.count) relays for pubkey \(pubkey) as of \(writeDate.exportDate())")
+			#endif
 			let newTrans = try Transaction(self.env, readOnly:false)
+			do {
+				let checkDate = try self.pubkey_relays_asof.getEntry(type:DBUX.Date.self, forKey:pubkey, tx:newTrans)!
+				guard checkDate < writeDate else {
+					#if DEBUG
+					self.logger.critical("attempted to write relay information for pubkey \(pubkey) that was older than the existing information", metadata:["existing":"\(checkDate.exportDate())", "new":"\(writeDate.exportDate())"])
+					#endif
+					newTrans.abort()
+					if (checkDate != writeDate) {
+						throw LMDBError.keyExists
+					} else {
+						return
+					}
+				}
+			} catch LMDBError.notFound {
+				#if DEBUG
+				self.logger.critical("assigning new relay list based on event date \(writeDate.exportDate()) for pubkey \(pubkey)")
+				#endif
+			}
+			try self.pubkey_relays_asof.setEntry(value:writeDate, forKey:pubkey, tx:newTrans)
 			var didModify = false
 			
 			// hash-pubkey associations
@@ -237,14 +263,19 @@ extension UE {
 			let relaySubsCursor = try self.relayHash_currentSubscriptions.cursor(tx:newTrans)
 			let relayEventsCursor = try self.relayHash_pendingEvents.cursor(tx:newTrans)
 			
+			var removeConnections = Set<String>()
+
 			var assignRelays = relays
 			do {
 				// iterate through all existing entries and determine if they need to be removed from the database
 				for (_ , curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
 					// check if the relay is still in the list of relays that we are setting
-					let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
-					if !assignRelays.contains(String(relayString)!) {
+					let relayStringVal = try relayStringCursor.getEntry(.set, key:curRelayHash).value
+					let relayString = String(relayStringVal)!
+					self.logger.critical("evaluating relay that already exists in db", metadata:["name":"\(relayString)"])
+					if !assignRelays.contains(relayString) {
 						didModify = true
+						self.logger.critical("relay should NOT be retained", metadata:["name":"\(relayString)"])
 						// check if there are any other public keys that are using this relay
 						do {
 							try relayHashPubKeyCursor.getEntry(.getBoth, key:curRelayHash, value:pubkey)
@@ -269,12 +300,15 @@ extension UE {
 								// - remove any pending events
 								try relayEventsCursor.getEntry(.set, key:curRelayHash)
 								try relayEventsCursor.deleteEntry()
+								removeConnections.update(with: relayString)
 							} else {
 								// there are other public keys that are using this relay, so we can just remove the public key from the list of public keys that are using this relay
 								try relayHashPubKeyCursor.deleteEntry()
 								try relayHashCursor.deleteEntry()
+								removeConnections.update(with: relayString)
 							}
 						} catch LMDBError.notFound {
+							self.logger.critical("notfound thrown")
 							// this should never happen, but if it does, we can just remove the relay from the database
 							// - remove the relay connection object
 							do {
@@ -294,10 +328,12 @@ extension UE {
 							// - remove any pending events
 							try relayEventsCursor.getEntry(.set, key:curRelayHash)
 							try relayEventsCursor.deleteEntry()
+							removeConnections.update(with: relayString)
 						}
 					} else {
 						// remove the relay from the list of relays that we are setting
-						assignRelays.remove(String(relayString)!)
+						assignRelays.remove(relayString)
+						self.logger.critical("relay should be retained", metadata:["name":"\(relayString)"])
 					}
 				}
 			} catch LMDBError.notFound {}
@@ -327,15 +363,32 @@ extension UE {
 			// if these are the relays that belong to the current user, manage the current connections so that they can become an updated list of connections
 			if pubkey == myPubkey {
 				if didModify == true {
-					Task.detached { @MainActor [weak self, buildConns = buildConnections, buildStates = buildStates] in
+					Task.detached { @MainActor [weak self, buildConns = buildConnections, buildStates = buildStates, removes = removeConnections] in
 						guard let self = self else {
 							return
 						}
-						self.userRelayConnections = buildConns
-						self.userRelayConnectionStates = buildStates
+						var editConns = self.userRelayConnections
+						var editStates = self.userRelayConnectionStates
+						for curRM in removes {
+							if let getconn = editConns.removeValue(forKey:curRM) {
+								Task.detached { [conn = getconn] in
+									try await conn.forceClosure()
+								}
+							}
+							editStates.removeValue(forKey:curRM)
+						}
+						for curAdd in buildConns {
+							editConns[curAdd.key] = curAdd.value
+						}
+						for curAddState in buildStates {
+							editStates[curAddState.key] = curAddState.value
+						}
+						self.userRelayConnections = editConns
+						self.userRelayConnectionStates = editStates
 					}
 				}
 			}
+			self.logger.critical("successfully set relays for public key.", metadata:["relay_count":"\(assignRelays.count)", "did_modify":"\(didModify)", "pubkey":"\(pubkey)"])
 			try newTrans.commit()
 		}
 
