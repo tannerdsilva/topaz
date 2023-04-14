@@ -14,11 +14,7 @@ struct ProfileDetailView: View {
 
 	var body: some View {
 		VStack {
-//			Spacer()
-//			Text("\(self.pubkey)")
-//			Spacer()
 			UpperProfileView(profile: $profile)
-			//TimelineView() // Uncomment and implement this later
 		}
 	}
 }

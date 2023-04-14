@@ -7,6 +7,7 @@
 
 import Foundation
 import QuickLMDB
+import struct CLMDB.MDB_dbi
 import Logging
 import SwiftBlake2
 import AsyncAlgorithms
@@ -38,7 +39,7 @@ extension UE {
 		}
 		
 		fileprivate let logger:Logger
-		fileprivate let env:QuickLMDB.Environment
+		let env:QuickLMDB.Environment
 		let myPubkey:String
 
 		// related to profiles and their listed relays

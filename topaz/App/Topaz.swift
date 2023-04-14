@@ -47,6 +47,13 @@ struct Topaz:App {
 		return Data(bytes:readBuffer, count:length)
 	}
 	
+	static func launchExperienceEngine<T>(_ type:T.Type, from base:URL, for publicKey:nostr.Key) throws -> T where T:ExperienceEngine {
+		let path = base.appendingPathComponent(type.name, isDirectory:type.env_flags.contains(.noSubDir) ? false : true)
+		let increaseSize = size_t(path.getFileSize()) + size_t(type.deltaSize)
+		let makeEnv = try QuickLMDB.Environment(path: path.path, flags: type.env_flags, mapSize: increaseSize, maxDBs: type.maxDBs)
+		return try type.init(base:path, env: makeEnv, publicKey:publicKey)
+	}
+	
 	public static func makeDefaultLogger(label:String) -> Logger {
 		var logger = Logger(label:label)
 		#if DEBUG

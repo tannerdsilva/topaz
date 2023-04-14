@@ -62,7 +62,7 @@ extension nostr {
 	}
 	
 	///
-	struct Event:Codable {
+	@usableFromInline struct Event:Codable {
 		static let logger = Topaz.makeDefaultLogger(label:"nostr.Event")
 		
 		///
@@ -72,7 +72,7 @@ extension nostr {
 			case bad_sig
 		}
 		
-		@frozen @usableFromInline internal struct UID:MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable, LosslessStringConvertible, Codable {
+		@frozen @usableFromInline struct UID:MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable, LosslessStringConvertible, Codable {
 			enum Error:Swift.Error {
 				case invalidStringLength(String)
 			}
@@ -82,7 +82,7 @@ extension nostr {
 			}
 
 			// Lexigraphical sorting here
-			static let mdbCompareFunction:@convention(c) (UnsafePointer<MDB_val>?, UnsafePointer<MDB_val>?) -> Int32 = { a, b in
+			@usableFromInline static let mdbCompareFunction:@convention(c) (UnsafePointer<MDB_val>?, UnsafePointer<MDB_val>?) -> Int32 = { a, b in
 				let aData = a!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
 				let bData = b!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
 				
@@ -97,7 +97,7 @@ extension nostr {
 				}
 			}
 
-			static func == (lhs: nostr.Event.UID, rhs: nostr.Event.UID) -> Bool {
+			@usableFromInline static func == (lhs: nostr.Event.UID, rhs: nostr.Event.UID) -> Bool {
 				return lhs.asMDB_val({ lhsVal in
 					return rhs.asMDB_val({ rhsVal in
 						return Self.mdbCompareFunction(&lhsVal, &rhsVal) == 0
@@ -105,7 +105,7 @@ extension nostr {
 				})
 			}
 			
-			static func < (lhs: nostr.Event.UID, rhs: nostr.Event.UID) -> Bool {
+			@usableFromInline static func < (lhs: nostr.Event.UID, rhs: nostr.Event.UID) -> Bool {
 				return lhs.asMDB_val({ lhsVal in
 					return rhs.asMDB_val({ rhsVal in
 						return Self.mdbCompareFunction(&lhsVal, &rhsVal) < 0
@@ -117,13 +117,13 @@ extension nostr {
 
 			var bytes: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 			
-			var description: String {
+			@usableFromInline var description: String {
 				get {
 					hex_encode(self.exportData())
 				}
 			}
 			
-			internal init?(_ description:String) {
+			@usableFromInline internal init?(_ description:String) {
 				guard let asBytes = hex_decode(description) else {
 					return nil
 				}
@@ -145,7 +145,7 @@ extension nostr {
 			fileprivate init() {}
 
 			// MDB_convertible
-			internal init?(_ value: MDB_val) {
+			@usableFromInline internal init?(_ value: MDB_val) {
 				guard value.mv_size == Self.hashLength else {
 					return nil
 				}
@@ -175,15 +175,15 @@ extension nostr {
 			}
 			
 			/// Codable
-			init(from decoder:Decoder) throws {
-				var container = try decoder.singleValueContainer()
+			@usableFromInline init(from decoder:Decoder) throws {
+				let container = try decoder.singleValueContainer()
 				let asString = try container.decode(String.self)
 				guard let makeSelf = Self(asString) else {
 					throw Error.invalidStringLength(asString)
 				}
 				self = makeSelf
 			}
-			func encode(to encoder: Encoder) throws {
+			@usableFromInline  func encode(to encoder: Encoder) throws {
 				var container = encoder.singleValueContainer()
 				try container.encode(self.description)
 			}
@@ -409,7 +409,7 @@ extension nostr {
 			self.content = content
 		}
 
-		init(from decoder:Decoder) throws {
+		@usableFromInline init(from decoder:Decoder) throws {
 			let container = try decoder.container(keyedBy: CodingKeys.self)
 			self.uid = try container.decode(UID.self, forKey: .uid)
 			let getSig = try container.decode(String.self, forKey: .sig)
@@ -429,7 +429,7 @@ extension nostr {
 			self.keySignature = formattedDate + finalUID
 		}
 
-		func encode(to encoder:Encoder) throws {
+		@usableFromInline func encode(to encoder:Encoder) throws {
 			var container = encoder.container(keyedBy: CodingKeys.self)
 			try container.encode(uid, forKey: .uid)
 			try container.encode(sig, forKey: .sig)
@@ -485,19 +485,19 @@ extension nostr {
 }
 
 extension nostr.Event:Equatable {
-	static func == (lhs:nostr.Event, rhs:nostr.Event) -> Bool {
+	@usableFromInline static func == (lhs:nostr.Event, rhs:nostr.Event) -> Bool {
 		return lhs.uid == rhs.uid
 	}
 }
 
 extension nostr.Event:Hashable {
-	func hash(into hasher:inout Hasher) {
+	@usableFromInline func hash(into hasher:inout Hasher) {
 		hasher.combine(uid)
 	}
 }
 
 extension nostr.Event:Identifiable {
-	var id:String {
+	@usableFromInline var id:String {
 		return self.uid.description
 	}
 }

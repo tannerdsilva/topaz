@@ -36,7 +36,7 @@ struct UserExperienceView: View {
 					case .search:
 						SearchView()
 					case .profile:
-						ProfileDetailView(pubkey:ue.keypair.pubkey, profile:ue.profilesDB.currentUserProfile!)
+						ProfileDetailView(pubkey:ue.keypair.pubkey, profile:ue.profilesDB.currentUserProfile ?? nostr.Profile())
 					}
 					
 					Spacer()

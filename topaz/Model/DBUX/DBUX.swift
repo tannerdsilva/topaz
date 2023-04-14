@@ -3,9 +3,30 @@ import struct Foundation.TimeInterval
 import struct Foundation.UUID
 import struct Foundation.Data
 import Darwin
+import Logging
+import class Foundation.FileManager
+import struct Foundation.URL
+import SwiftBlake2
 
 // encompasses the user experience 
-public struct DBUX {}
+public struct DBUX:Based {
+	let logger:Logger
+	let base:URL
+	
+//	let relaysEngine:DBUX.RelaysEngine
+	
+	init(base:URL, keypair:KeyPair) throws {
+		let makeLogger = Topaz.makeDefaultLogger(label:"dbux")
+		self.logger = makeLogger
+		let makeBase = base.appendingPathComponent("uid-\(keypair)", isDirectory:true)
+		if FileManager.default.fileExists(atPath: makeBase.path) == false {
+			try FileManager.default.createDirectory(atPath:makeBase.path, withIntermediateDirectories:false)
+		}
+		self.base = makeBase
+//		let makeRelays:DBUX.RelaysEngine = try Topaz.launchExperienceEngine(DBUX.RelaysEngine.self, from:makeBase, for:nostr.Key(keypair.pubkey)!)
+//		self.relaysEngine = makeRelays
+	}
+}
 
 extension DBUX {
 	// since QuickLMDB implements a default encoding scheme for Foundation.Date that does not work for our needs here, we implement our own type and encoding scheme for Date.
@@ -80,71 +101,161 @@ extension DBUX {
 }
 
 extension DBUX {
-	/*@frozen @usableFromInline internal struct UUID: MDB_convertible, MDB_comparable, LosslessStringConvertible, Hashable, Equatable, Comparable {
-		static public func == (lhs:Self, rhs:Self) -> Bool {
-			return lhs.asMDB_val({ lhsVal in
-				return rhs.asMDB_val({ rhsVal in
-					return Self.mdbCompareFunction(&lhsVal, &rhsVal) == 0
-				})
-			})
-		}
-		
-		static public func < (lhs:Self, rhs:Self) -> Bool {
-			return lhs.asMDB_val({ lhsVal in
-				return rhs.asMDB_val({ rhsVal in
-					return Self.mdbCompareFunction(&lhsVal, &rhsVal) < 0
-				})
-			})
-		}
-		
-		fileprivate static let hashLength = 16
+	@frozen @usableFromInline internal struct DatedNostrEventUID:MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable {
+		let date:Date
+		@usableFromInline let obj:nostr.Event.UID
 
-		var bytes: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-
-		// Initialize from UUID
-		@usableFromInline internal init(_ uuid: Foundation.UUID) {
-			self.bytes = uuid.uuid
-		}
-
-		public var description: String {
-			let uuid = withUnsafePointer(to: bytes) { ptr -> uuid_t in
-				return ptr.withMemoryRebound(to: UInt8.self, capacity: Self.hashLength) { bytePtr in
-					return bytePtr.withMemoryRebound(to: uuid_t.self, capacity: 1) { uuidPtr in
-						return uuidPtr.pointee
-					}
-				}
-			}
-			return Foundation.UUID(uuid: uuid).uuidString
-		}
-
-		public init?(_ description: String) {
-			guard let uuid = Foundation.UUID(uuidString: description) else {
+		internal static func dateFromMDBVal(value: MDB_val) -> Date? {
+			if value.mv_data == nil || value.mv_size < MemoryLayout<Date>.size {
 				return nil
 			}
-			self.init(uuid)
+			let timeIntervalVal = MDB_val(mv_size: MemoryLayout<Date>.size, mv_data: UnsafeMutableRawPointer(value.mv_data!))
+			return Date(timeIntervalVal)
 		}
 
+		internal static func uidFromMDBVal(value: MDB_val) -> nostr.Event.UID? {
+			if value.mv_data == nil || value.mv_size < MemoryLayout<Date>.size {
+				return nil
+			}
+			let bytes = value.mv_data!.advanced(by: MemoryLayout<Date>.size).assumingMemoryBound(to: UInt8.self)
+			let objSize = value.mv_size - MemoryLayout<Date>.size
+			let objDataVal = MDB_val(mv_size: objSize, mv_data: bytes)
+			return nostr.Event.UID(objDataVal)
+		}
 
-		// Initialize from database
+		internal init(date: Date, obj:nostr.Event.UID) {
+			self.date = date
+			self.obj = obj
+		}
+
 		@usableFromInline internal init?(_ value: MDB_val) {
-			guard value.mv_size == Self.hashLength else {
+			let totalSize = value.mv_size
+			guard totalSize > MemoryLayout<TimeInterval>.size else {
 				return nil
 			}
-			_ = memcpy(&bytes, value.mv_data, Self.hashLength)
+			guard let date = Self.dateFromMDBVal(value: value) else {
+				return nil
+			}
+			guard let obj = Self.uidFromMDBVal(value: value) else {
+				return nil
+			}
+			self.date = date
+			self.obj = obj
 		}
 
-		// Encode into database
 		public func asMDB_val<R>(_ valFunc: (inout MDB_val) throws -> R) rethrows -> R {
-			return try withUnsafePointer(to: bytes, { unsafePointer in
-				var val = MDB_val(mv_size: Self.hashLength, mv_data: UnsafeMutableRawPointer(mutating: unsafePointer))
+			try withUnsafePointer(to:self, { unsafePointer in
+				var val = MDB_val(mv_size:MemoryLayout<Self>.size, mv_data:UnsafeMutableRawPointer(mutating:unsafePointer))
 				return try valFunc(&val)
 			})
 		}
 
-		// Lexigraphical sorting here
+		public static let mdbCompareFunction: MDB_comparable.MDB_compare_function = { a, b in
+			let dateComparisonResult = Date.mdbCompareFunction(a, b)
+			if dateComparisonResult != 0 {
+				return dateComparisonResult
+			} else {
+				return Self.uidFromMDBVal(value: a!.pointee)!.asMDB_val({ aObjVal in
+					return Self.uidFromMDBVal(value: b!.pointee)!.asMDB_val({ bObjVal in
+						return nostr.Event.UID.mdbCompareFunction(&aObjVal, &bObjVal)
+					})
+				})
+			}
+		}
+
+		@usableFromInline static func < (lhs: Self, rhs: Self) -> Bool {
+			return lhs.asMDB_val({ lhsVal in
+				rhs.asMDB_val({ rhsVal in
+					Self.mdbCompareFunction(&lhsVal, &rhsVal) < 0
+				})
+			})
+		}
+
+		@usableFromInline static func == (lhs: Self, rhs: Self) -> Bool {
+			return lhs.asMDB_val({ lhsVal in
+				rhs.asMDB_val({ rhsVal in
+					Self.mdbCompareFunction(&lhsVal, &rhsVal) == 0
+				})
+			})
+		}
+
+		public func hash(into hasher:inout Hasher) {
+			date.asMDB_val({ dateVal in
+				hasher.combine(bytes: UnsafeRawBufferPointer(start: dateVal.mv_data, count: dateVal.mv_size))
+			})
+			obj.asMDB_val({ objVal in
+				hasher.combine(bytes: UnsafeRawBufferPointer(start: objVal.mv_data, count: objVal.mv_size))
+			})
+		}
+	}
+}
+
+extension DBUX {
+	struct RelayHash:MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable {
+		static func produceHash(from url:String) throws -> Data {
+			var hasher = try Blake2bHasher(outputLength: 6)
+			try Data(url.utf8).withUnsafeBytes { relayBytes in
+				try hasher.update(relayBytes)
+			}
+			return try hasher.export()
+		}
+		
+		// 6 byte tuple
+		var bytes:(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0)
+		
+		@usableFromInline init(rawHashData:Data) {
+			guard rawHashData.count == MemoryLayout<Self>.size else {
+				return
+			}
+			rawHashData.withUnsafeBytes({ byteBuffer in
+				memcpy(&bytes, byteBuffer, MemoryLayout<Self>.size)
+			})
+		}
+		@usableFromInline init(_ string:String) throws {
+			self = .init(rawHashData:try Self.produceHash(from: string))
+		}
+		@usableFromInline init() {}
+		@usableFromInline init(_ value: MDB_val) {
+			let totalSize = value.mv_size
+			guard totalSize == MemoryLayout<Self>.size else {
+				return
+			}
+			let bytes = value.mv_data!.assumingMemoryBound(to: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+			self.bytes = bytes.pointee
+		}
+		@usableFromInline func asMDB_val<R>(_ valFunc: (inout MDB_val) throws -> R) rethrows -> R {
+			try withUnsafePointer(to:self, { unsafePointer in
+				var val = MDB_val(mv_size:MemoryLayout<Self>.size, mv_data:UnsafeMutableRawPointer(mutating:unsafePointer))
+				return try valFunc(&val)
+			})
+		}
+
+		@usableFromInline static func < (lhs: Self, rhs: Self) -> Bool {
+			return lhs.asMDB_val({ lhsVal in
+				rhs.asMDB_val({ rhsVal in
+					Self.mdbCompareFunction(&lhsVal, &rhsVal) < 0
+				})
+			})
+		}
+
+		@usableFromInline static func == (lhs: Self, rhs: Self) -> Bool {
+			return lhs.asMDB_val({ lhsVal in
+				rhs.asMDB_val({ rhsVal in
+					Self.mdbCompareFunction(&lhsVal, &rhsVal) == 0
+				})
+			})
+		}
+
+		public func hash(into hasher:inout Hasher) {
+			self.asMDB_val({ selfVal in
+				hasher.combine(bytes: UnsafeRawBufferPointer(start: &selfVal, count:MemoryLayout<Self>.size))
+			})
+			
+		}
+
 		@usableFromInline static let mdbCompareFunction:@convention(c) (UnsafePointer<MDB_val>?, UnsafePointer<MDB_val>?) -> Int32 = { a, b in
-			let aData = a!.pointee.mv_data!.assumingMemoryBound(to: UInt8.self)
-			let bData = b!.pointee.mv_data!.assumingMemoryBound(to: UInt8.self)
+			let aData = a!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
+			let bData = b!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
 			
 			let minLength = min(a!.pointee.mv_size, b!.pointee.mv_size)
 			let comparisonResult = memcmp(aData, bData, minLength)
@@ -156,14 +267,5 @@ extension DBUX {
 				return Int32(a!.pointee.mv_size) - Int32(b!.pointee.mv_size)
 			}
 		}
-
-		// Hashable conformance
-		public func hash(into hasher: inout Hasher) {
-			withUnsafePointer(to:bytes, { unsafePointer in
-				for i in 0..<Self.hashLength {
-					hasher.combine(unsafePointer.advanced(by:i))
-				}
-			})
-		}
-	}*/
+	}
 }

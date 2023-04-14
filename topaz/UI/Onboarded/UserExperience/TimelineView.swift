@@ -186,7 +186,10 @@ struct TimelineView: View {
 	@State private var timeline = [TimelineModel]()
 	@State private var isLoading: Bool = false
 	@State private var lastEventDate: Date? = nil
-	@State private var lastEventUID:nostr.Event.UID? = nil
+	@State private var lastEventUID: nostr.Event.UID? = nil
+	
+	// The maximum number of timeline items to keep in memory
+	let maxItemsInMemory = 20
 
 	var body: some View {
 		NavigationStack {
@@ -210,6 +213,9 @@ struct TimelineView: View {
 			.onAppear {
 				loadMoreData()
 			}
+			.onDisappear {
+				trimTimeline()
+			}
 		}
 	}
 	func loadMoreData() {
@@ -230,6 +236,12 @@ struct TimelineView: View {
 		if let lastEvent = newEventsAndProfiles.0.last {
 			lastEventDate = lastEvent.created
 			lastEventUID = lastEvent.uid
+		}
+	}
+	
+	func trimTimeline() {
+		if timeline.count > maxItemsInMemory {
+			timeline = Array(timeline.suffix(maxItemsInMemory))
 		}
 	}
 }
