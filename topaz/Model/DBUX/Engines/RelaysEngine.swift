@@ -14,11 +14,10 @@ import AsyncAlgorithms
 
 extension DBUX {
 	class RelayEngine:ObservableObject, ExperienceEngine {
-		
 		static let name = "relay-engine.mdb"
 		static let deltaSize = size_t(1.9e10)
 		static let maxDBs:MDB_dbi = 6
-		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir]
+		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let base:URL
 		let env:QuickLMDB.Environment
 		let pubkey:nostr.Key
@@ -62,10 +61,10 @@ extension DBUX {
 			self.logger = newLogger
 			self.pubkey = publicKey
 			let subTrans = try Transaction(env, readOnly:false)
-			self.pubkey_relays_asof = try env.openDatabase(named:Databases.pubkey_relays_asof.rawValue, flags:[], tx:subTrans)
-			self.pubkey_relayHash = try env.openDatabase(named:Databases.pubkey_relayHash.rawValue, flags:[.dupSort], tx:subTrans)
-			self.relayHash_pubKey = try env.openDatabase(named:Databases.relayHash_pubKey.rawValue, flags:[.dupSort], tx:subTrans)
-			self.relayHash_relayString = try env.openDatabase(named:Databases.relayHash_relayString.rawValue, flags:[], tx:subTrans)
+			self.pubkey_relays_asof = try env.openDatabase(named:Databases.pubkey_relays_asof.rawValue, flags:[.create], tx:subTrans)
+			self.pubkey_relayHash = try env.openDatabase(named:Databases.pubkey_relayHash.rawValue, flags:[.create, .dupSort], tx:subTrans)
+			self.relayHash_pubKey = try env.openDatabase(named:Databases.relayHash_pubKey.rawValue, flags:[.create, .dupSort], tx:subTrans)
+			self.relayHash_relayString = try env.openDatabase(named:Databases.relayHash_relayString.rawValue, flags:[.create], tx:subTrans)
 
 			self.relayHash_pendingEvents = try env.openDatabase(named:Databases.relayHash_pendingEvents.rawValue, flags:[.create], tx:subTrans)
 			self.relayHash_currentSubscriptions = try env.openDatabase(named:Databases.relayHash_currentSubscriptions.rawValue, flags:[.create], tx:subTrans)
@@ -73,7 +72,7 @@ extension DBUX {
 			let stateC = AsyncChannel<RelayConnection.StateChangeEvent>()
 			self.eventChannel = eventC
 			self.stateChannel = stateC
-
+			try self.relayHash_currentSubscriptions.deleteAllEntries(tx:subTrans)
 			let getRelays:Set<String>
 			do {
 				let pubRelaysCursor = try self.pubkey_relayHash.cursor(tx:subTrans)
@@ -109,7 +108,7 @@ extension DBUX {
 			_userRelayConnections = Published(initialValue:buildConnections)
 			_userRelayConnectionStates = Published(initialValue:buildStates)
 			try subTrans.commit()
-
+			try env.sync()
 			self.digestTask = Task.detached { [weak self, sc = stateC, newEnv = env, logThing = newLogger, eventC = eventC] in
 				await withThrowingTaskGroup(of:Void.self, body: { [weak self, sc = sc, newEnv = newEnv, ec = eventC] tg in
 					// status
@@ -341,6 +340,9 @@ extension DBUX {
 			}
 			self.logger.critical("successfully set relays for public key.", metadata:["relay_count":"\(assignRelays.count)", "did_modify":"\(didModify)", "pubkey":"\(pubkey)"])
 			try newTrans.commit()
+			if (didModify == true) {
+				try env.sync()
+			}
 		}
 
 		func add(subscriptions:[nostr.Subscribe], to relayURL:String) throws {
@@ -368,6 +370,8 @@ extension DBUX {
 					}
 				}
 			}
+			try newTransaction.commit()
+			try env.sync()
 		}
 	}
 }

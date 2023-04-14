@@ -102,7 +102,7 @@ extension DBUX {
 
 extension DBUX {
 	@frozen @usableFromInline internal struct DatedNostrEventUID:MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable {
-		let date:Date
+		let date:DBUX.Date
 		@usableFromInline let obj:nostr.Event.UID
 
 		internal static func dateFromMDBVal(value: MDB_val) -> Date? {
@@ -121,6 +121,11 @@ extension DBUX {
 			let objSize = value.mv_size - MemoryLayout<Date>.size
 			let objDataVal = MDB_val(mv_size: objSize, mv_data: bytes)
 			return nostr.Event.UID(objDataVal)
+		}
+
+		internal init(event:nostr.Event) {
+			self.date = DBUX.Date(event.created)
+			self.obj = event.uid
 		}
 
 		internal init(date: Date, obj:nostr.Event.UID) {

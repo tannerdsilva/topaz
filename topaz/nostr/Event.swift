@@ -61,7 +61,6 @@ extension nostr {
 		}
 	}
 	
-	///
 	@usableFromInline struct Event:Codable {
 		static let logger = Topaz.makeDefaultLogger(label:"nostr.Event")
 		
