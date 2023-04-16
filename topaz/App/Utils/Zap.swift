@@ -27,13 +27,13 @@ struct Zap:Codable {
 	
 	public let event:nostr.Event
 	public let invoice:LightningInvoice<Int64>
-	public let zapper:String /// zap authorizer
+	public let zapper:nostr.Key /// zap authorizer
 	public let target:Target
 	public let request:Request
 	public let is_anon:Bool
 	public let private_request:nostr.Event?
 	
-	public static func from_zap_event(zap_ev:nostr.Event, zapper:String, our_privkey:String?) -> Zap? {
+	public static func from_zap_event(zap_ev:nostr.Event, zapper:nostr.Key, our_privkey:String?) -> Zap? {
 		/// Make sure that we only create a zap event if it is authorized by the profile or event
 		guard zapper == zap_ev.pubkey else {
 			return nil

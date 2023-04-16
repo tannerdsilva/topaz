@@ -28,29 +28,29 @@ struct EventView: View {
 	}
 	let event:nostr.Event
 	let options:nostr.Event.ViewOptions
-	let ue:UE
-	let pubkey: String
+	let dbux:DBUX
+	let pubkey:nostr.Key
 
 	@EnvironmentObject var action_bar: ActionBarModel
 
-	init(ue:UE, event:nostr.Event, options:nostr.Event.ViewOptions) {
+	init(dbux:DBUX, event:nostr.Event, options:nostr.Event.ViewOptions) {
 		self.event = event
 		self.options = options
-		self.ue = ue
+		self.dbux = dbux
 		self.pubkey = event.pubkey
 	}
 
-	init(ue:UE, event:nostr.Event) {
+	init(dbux:DBUX, event:nostr.Event) {
 		self.event = event
 		self.options = []
-		self.ue = ue
+		self.dbux = dbux
 		self.pubkey = event.pubkey
 	}
 
-	init(ue:UE, event:nostr.Event, pubkey:String) {
+	init(dbux:DBUX, event:nostr.Event, pubkey:nostr.Key) {
 		self.event = event
 		self.options = [.no_action_bar]
-		self.ue = ue
+		self.dbux = dbux
 		self.pubkey = pubkey
 	}
 
@@ -64,20 +64,16 @@ struct EventView: View {
 }
 
 // blame the porn bots for this code
-func should_show_images(ue:UE, ev:nostr.Event, our_pubkey: String, booster_pubkey: String? = nil) -> Bool {
+func should_show_images(dbux:DBUX, ev:nostr.Event, our_pubkey:nostr.Key, booster_pubkey: String? = nil) -> Bool {
 	if ev.pubkey == our_pubkey {
 		return true
 	}
 	do {
-		let openTrans = try ue.transact(readOnly:true)
-		defer {
-			try? openTrans.commit()
-		}
-		if try ue.contactsDB.isInFriendosphere(pubkey:ev.pubkey, tx: openTrans) {
+		if try dbux.contactsEngine.isInFriendosphere(pubkey:ev.pubkey) {
 			return true
 		}
 		if booster_pubkey != nil {
-			if try ue.contactsDB.isInFriendosphere(pubkey:booster_pubkey!, tx:openTrans) {
+			if try dbux.contactsEngine.isInFriendosphere(pubkey:nostr.Key(booster_pubkey!)!) {
 				return true
 			}
 		}
@@ -127,7 +123,7 @@ func format_date(_ created_at: Int64) -> String {
 	return dateFormatter.string(from: date)
 }
 
-func make_actionbar_model(ev:String, ue:UE) -> ActionBarModel {
+func make_actionbar_model(ev:String, ue:DBUX) -> ActionBarModel {
 	let our_like:nostr.Event? = nil
 	let our_boost:nostr.Event? = nil
 	let our_zap:Zap? = nil
@@ -143,13 +139,13 @@ func make_actionbar_model(ev:String, ue:UE) -> ActionBarModel {
 }
 
 
-struct EventView_Previews: PreviewProvider {
-	static var previews: some View {
-		VStack {
-			EventView(ue:try! UE(keypair:Topaz.tester_account), event: test_event )
-		}
-		.padding()
-	}
-}
+//struct EventView_Previews: PreviewProvider {
+//	static var previews: some View {
+//		VStack {
+//			EventView(ue:try! UE(keypair:Topaz.tester_account), event: test_event )
+//		}
+//		.padding()
+//	}
+//}
 
 let test_event = nostr.Event.createTestPost()

@@ -70,123 +70,6 @@ extension nostr {
 			case bad_id
 			case bad_sig
 		}
-		
-		@frozen @usableFromInline struct UID:MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable, LosslessStringConvertible, Codable {
-			enum Error:Swift.Error {
-				case invalidStringLength(String)
-			}
-
-			static func nullUID() -> Self {
-				return Self()
-			}
-
-			// Lexigraphical sorting here
-			@usableFromInline static let mdbCompareFunction:@convention(c) (UnsafePointer<MDB_val>?, UnsafePointer<MDB_val>?) -> Int32 = { a, b in
-				let aData = a!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
-				let bData = b!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
-				
-				let minLength = min(a!.pointee.mv_size, b!.pointee.mv_size)
-				let comparisonResult = memcmp(aData, bData, minLength)
-
-				if comparisonResult != 0 {
-					return Int32(comparisonResult)
-				} else {
-					// If the common prefix is the same, compare their lengths.
-					return Int32(a!.pointee.mv_size) - Int32(b!.pointee.mv_size)
-				}
-			}
-
-			@usableFromInline static func == (lhs: nostr.Event.UID, rhs: nostr.Event.UID) -> Bool {
-				return lhs.asMDB_val({ lhsVal in
-					return rhs.asMDB_val({ rhsVal in
-						return Self.mdbCompareFunction(&lhsVal, &rhsVal) == 0
-					})
-				})
-			}
-			
-			@usableFromInline static func < (lhs: nostr.Event.UID, rhs: nostr.Event.UID) -> Bool {
-				return lhs.asMDB_val({ lhsVal in
-					return rhs.asMDB_val({ rhsVal in
-						return Self.mdbCompareFunction(&lhsVal, &rhsVal) < 0
-					})
-				})
-			}
-			
-			static let hashLength = 32
-
-			var bytes: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-			
-			@usableFromInline var description: String {
-				get {
-					hex_encode(self.exportData())
-				}
-			}
-			
-			@usableFromInline internal init?(_ description:String) {
-				guard let asBytes = hex_decode(description) else {
-					return nil
-				}
-				
-				guard asBytes.count == Self.hashLength else {
-					return nil
-				}
-				self = Self.init(Data(asBytes))
-			}
-
-			/// Initialize from Data containing SHA256 hash
-			internal init(_ hashData: Data) {
-				hashData.withUnsafeBytes({ byteBuffer in
-					memcpy(&bytes, byteBuffer, Self.hashLength)
-				})
-			}
-
-			/// Null Initializer
-			fileprivate init() {}
-
-			// MDB_convertible
-			@usableFromInline internal init?(_ value: MDB_val) {
-				guard value.mv_size == Self.hashLength else {
-					return nil
-				}
-				_ = memcpy(&bytes, value.mv_data, Self.hashLength)
-			}
-			public func asMDB_val<R>(_ valFunc: (inout MDB_val) throws -> R) rethrows -> R {
-				return try withUnsafePointer(to: bytes, { unsafePointer in
-					var val = MDB_val(mv_size: Self.hashLength, mv_data: UnsafeMutableRawPointer(mutating: unsafePointer))
-					return try valFunc(&val)
-				})
-			}
-			
-			// Hashable
-			public func hash(into hasher:inout Hasher) {
-				withUnsafePointer(to:bytes) { byteBuff in
-					for i in 0..<Self.hashLength {
-						hasher.combine(byteBuff.advanced(by: i))
-					}
-				}
-			}
-			
-			/// Export the hash as a Data struct
-			public func exportData() -> Data {
-				withUnsafePointer(to:bytes) { byteBuff in
-					return Data(bytes:byteBuff, count:Self.hashLength)
-				}
-			}
-			
-			/// Codable
-			@usableFromInline init(from decoder:Decoder) throws {
-				let container = try decoder.singleValueContainer()
-				let asString = try container.decode(String.self)
-				guard let makeSelf = Self(asString) else {
-					throw Error.invalidStringLength(asString)
-				}
-				self = makeSelf
-			}
-			@usableFromInline  func encode(to encoder: Encoder) throws {
-				var container = encoder.singleValueContainer()
-				try container.encode(self.description)
-			}
-		}
 
 		///
 		enum Block {
@@ -198,7 +81,7 @@ extension nostr {
 		}
 		
 		///
-		enum Kind:Int, Equatable, MDB_convertible, Codable {
+		@frozen @usableFromInline enum Kind:Int, Equatable, MDB_convertible, Codable {
 			case metadata = 0
 			case text_note = 1
 			case recommended_relay = 2
@@ -218,6 +101,22 @@ extension nostr {
 			case list_pin = 10001
 			case list_categorized = 30000
 			case list_categorized_bookmarks = 30001
+
+			@usableFromInline init?(_ value:MDB_val) {
+				guard MemoryLayout<Int>.size == value.mv_size else {
+					return nil
+				}
+				guard let asSelf = Self(rawValue:value.mv_data.bindMemory(to:Int.self, capacity:1).pointee) else {
+					return nil
+				}
+				self = asSelf
+			}
+			@usableFromInline func asMDB_val<R>(_ valFunc:(inout MDB_val) throws -> R) rethrows -> R {
+				return try withUnsafePointer(to:self.rawValue) { rawVal in
+					var val = MDB_val(mv_size:MemoryLayout<Int>.size, mv_data:UnsafeMutableRawPointer(mutating: rawVal))
+					return try valFunc(&val)
+				}
+			}
 		}
 
 		struct Tag:Codable {
@@ -375,29 +274,23 @@ extension nostr {
 		}
 		
 		private static let df = ISO8601DateFormatter()
-		let keySignature:Data
 
 		let uid:UID
 		let sig:String
 		let tags:[Tag]
 		let boosted_by:String?
 
-		let pubkey:String
-		let created:Date
+		let pubkey:Key
+		let created:DBUX.Date
 		let kind:Kind
 		let content:String
 		
 		// used to render the UI during development
 		static func createTestPost() -> Self {
-			return Self(uid:UID.nullUID(), sig:"", tags:[], boosted_by: nil, pubkey: "foo", created:Date(timeIntervalSinceNow:-300), kind:Kind.text_note, content:"oh jeez look here at all this content wowweee")
+			return Self(uid:UID.nullUID(), sig:"", tags:[], boosted_by: nil, pubkey:nostr.Key.nullKey(), created:DBUX.Date(Date(timeIntervalSinceNow:-300)), kind:Kind.text_note, content:"oh jeez look here at all this content wowweee")
 		}
 		
-		fileprivate init(uid:UID, sig:String, tags:[Tag], boosted_by:String?, pubkey:String, created:Date, kind:Kind, content:String) {
-			let formattedDate = Data(Self.df.string(from: created).utf8)
-			var eventUIDHash = try! Blake2bHasher(outputLength:48)
-			try! eventUIDHash.update(Data(sig.utf8))
-			let finalUID = try! eventUIDHash.export()
-			self.keySignature = formattedDate + finalUID
+		fileprivate init(uid:UID, sig:String, tags:[Tag], boosted_by:String?, pubkey:Key, created:DBUX.Date, kind:Kind, content:String) {
 			self.uid = uid
 			self.sig = sig
 			self.tags = tags
@@ -415,17 +308,12 @@ extension nostr {
 			self.sig = getSig
 			self.tags = try container.decode([Tag].self, forKey: .tags)
 			self.boosted_by = try container.decodeIfPresent(String.self, forKey: .boosted_by)
-			self.pubkey = try container.decode(String.self, forKey: .pubkey)
+			self.pubkey = try container.decode(Key.self, forKey: .pubkey)
 			let getTI = try container.decode(TimeInterval.self, forKey: .created)
 			let getCreateDate = Date(timeIntervalSince1970:getTI)
-			self.created = getCreateDate
+			self.created = DBUX.Date(getCreateDate)
 			self.kind = Kind(rawValue:try container.decode(Int.self, forKey: .kind))!
 			self.content = try container.decode(String.self, forKey: .content)
-			let formattedDate = Data(Self.df.string(from: self.created).utf8)
-			var eventUIDHash = try Blake2bHasher(outputLength:48)
-			try eventUIDHash.update(Data(self.sig.utf8))
-			let finalUID = try eventUIDHash.export()
-			self.keySignature = formattedDate + finalUID
 		}
 
 		@usableFromInline func encode(to encoder:Encoder) throws {
@@ -435,7 +323,7 @@ extension nostr {
 			try container.encode(tags, forKey: .tags)
 			try container.encode(boosted_by, forKey: .boosted_by)
 			try container.encode(pubkey, forKey: .pubkey)
-			try container.encode(created.timeIntervalSince1970, forKey: .created)
+			try container.encode(created.exportDate().timeIntervalSince1970, forKey: .created)
 			try container.encode(kind.rawValue, forKey: .kind)
 			try container.encode(content, forKey: .content)
 		}
@@ -466,7 +354,7 @@ extension nostr {
 				return nil
 			}
 			
-			var pubkey = self.pubkey
+			var pubkey = self.pubkey.description
 			// This is our DM, we need to use the pubkey of the person we're talking to instead
 			if our_pubkey == pubkey {
 				guard let refkey = self.getReferencedIDs("e").first else {
@@ -502,6 +390,125 @@ extension nostr.Event:Identifiable {
 }
 
 extension nostr.Event {
+	@frozen @usableFromInline struct UID:MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable, LosslessStringConvertible, Codable {
+		enum Error:Swift.Error {
+			case invalidStringLength(String)
+		}
+
+		static func nullUID() -> Self {
+			return Self()
+		}
+
+		// Lexigraphical sorting here
+		@usableFromInline static let mdbCompareFunction:@convention(c) (UnsafePointer<MDB_val>?, UnsafePointer<MDB_val>?) -> Int32 = { a, b in
+			let aData = a!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
+			let bData = b!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
+			
+			let minLength = min(a!.pointee.mv_size, b!.pointee.mv_size)
+			let comparisonResult = memcmp(aData, bData, minLength)
+
+			if comparisonResult != 0 {
+				return Int32(comparisonResult)
+			} else {
+				// If the common prefix is the same, compare their lengths.
+				return Int32(a!.pointee.mv_size) - Int32(b!.pointee.mv_size)
+			}
+		}
+
+		@usableFromInline static func == (lhs: nostr.Event.UID, rhs: nostr.Event.UID) -> Bool {
+			return lhs.asMDB_val({ lhsVal in
+				return rhs.asMDB_val({ rhsVal in
+					return Self.mdbCompareFunction(&lhsVal, &rhsVal) == 0
+				})
+			})
+		}
+		
+		@usableFromInline static func < (lhs: nostr.Event.UID, rhs: nostr.Event.UID) -> Bool {
+			return lhs.asMDB_val({ lhsVal in
+				return rhs.asMDB_val({ rhsVal in
+					return Self.mdbCompareFunction(&lhsVal, &rhsVal) < 0
+				})
+			})
+		}
+		
+		static let hashLength = 32
+
+		var bytes: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+		
+		@usableFromInline var description: String {
+			get {
+				hex_encode(self.exportData())
+			}
+		}
+		
+		@usableFromInline internal init?(_ description:String) {
+			guard let asBytes = hex_decode(description) else {
+				return nil
+			}
+			
+			guard asBytes.count == Self.hashLength else {
+				return nil
+			}
+			self = Self.init(Data(asBytes))
+		}
+
+		/// Initialize from Data containing SHA256 hash
+		internal init(_ hashData: Data) {
+			hashData.withUnsafeBytes({ byteBuffer in
+				memcpy(&bytes, byteBuffer, Self.hashLength)
+			})
+		}
+
+		/// Null Initializer
+		fileprivate init() {}
+
+		// MDB_convertible
+		@usableFromInline internal init?(_ value: MDB_val) {
+			guard value.mv_size == Self.hashLength else {
+				return nil
+			}
+			_ = memcpy(&bytes, value.mv_data, Self.hashLength)
+		}
+		public func asMDB_val<R>(_ valFunc: (inout MDB_val) throws -> R) rethrows -> R {
+			return try withUnsafePointer(to: bytes, { unsafePointer in
+				var val = MDB_val(mv_size: Self.hashLength, mv_data: UnsafeMutableRawPointer(mutating: unsafePointer))
+				return try valFunc(&val)
+			})
+		}
+		
+		// Hashable
+		public func hash(into hasher:inout Hasher) {
+			withUnsafePointer(to:bytes) { byteBuff in
+				for i in 0..<Self.hashLength {
+					hasher.combine(byteBuff.advanced(by: i))
+				}
+			}
+		}
+		
+		/// Export the hash as a Data struct
+		public func exportData() -> Data {
+			withUnsafePointer(to:bytes) { byteBuff in
+				return Data(bytes:byteBuff, count:Self.hashLength)
+			}
+		}
+		
+		/// Codable
+		@usableFromInline init(from decoder:Decoder) throws {
+			let container = try decoder.singleValueContainer()
+			let asString = try container.decode(String.self)
+			guard let makeSelf = Self(asString) else {
+				throw Error.invalidStringLength(asString)
+			}
+			self = makeSelf
+		}
+		@usableFromInline  func encode(to encoder: Encoder) throws {
+			var container = encoder.singleValueContainer()
+			try container.encode(self.description)
+		}
+	}
+}
+
+extension nostr.Event {
 	/// The result of validating an event.
 	fileprivate func commitment() throws -> Data {
 		let encoder = JSONEncoder()
@@ -509,7 +516,7 @@ extension nostr.Event {
 		let tagsString = String(data:try encoder.encode(self.tags), encoding:.utf8)!
 		let buildContentString = try encoder.encode(self.content)
 		let contentString = String(data:buildContentString, encoding:.utf8)!
-		let commit = "[0,\"\(self.pubkey)\",\(Int64(self.created.timeIntervalSince1970)),\(self.kind.rawValue),\(tagsString),\(contentString)]"
+		let commit = "[0,\"\(self.pubkey)\",\(Int64(self.created.exportDate().timeIntervalSince1970)),\(self.kind.rawValue),\(tagsString),\(contentString)]"
 		return Data(commit.utf8)
 	}
 	func validate() -> Result<ValidationResult, Swift.Error> {
@@ -523,7 +530,7 @@ extension nostr.Event {
 				Self.logger.error("validation failed - could not hex decode signature")
 				return .success(.bad_sig)
 			}
-			guard var ev_pubkey = hex_decode(self.pubkey) else {
+			guard var ev_pubkey = hex_decode(self.pubkey.description) else {
 				Self.logger.error("validation failed - could not hex decode public key")
 				return .success(.bad_sig)
 			}
@@ -657,11 +664,11 @@ func decrypt_private_zap(our_privkey: String, zapreq:nostr.Event, target:Zap.Tar
 	
 	let enc_note = anon_tag[1]
 	
-	var note = decrypt_note(our_privkey: our_privkey, their_pubkey: zapreq.pubkey, enc_note: enc_note, encoding: .bech32)
+	var note = decrypt_note(our_privkey: our_privkey, their_pubkey: zapreq.pubkey.description, enc_note: enc_note, encoding: .bech32)
 	
 	// check to see if the private note was from us
 	if note == nil {
-		guard let our_private_keypair = generate_private_keypair(our_privkey: our_privkey, id: target.id, created_at: Int64(zapreq.created.timeIntervalSince1970)) else{
+		guard let our_private_keypair = generate_private_keypair(our_privkey: our_privkey, id: target.id, created_at: Int64(zapreq.created.exportDate().timeIntervalSince1970)) else{
 			return nil
 		}
 		// use our private keypair and their pubkey to get the shared secret

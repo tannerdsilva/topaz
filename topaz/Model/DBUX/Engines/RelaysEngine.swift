@@ -13,7 +13,7 @@ import Logging
 import AsyncAlgorithms
 
 extension DBUX {
-	class RelayEngine:ObservableObject, ExperienceEngine {
+	class RelaysEngine:ObservableObject, ExperienceEngine {
 		static let name = "relay-engine.mdb"
 		static let deltaSize = size_t(1.9e10)
 		static let maxDBs:MDB_dbi = 6

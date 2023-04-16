@@ -128,11 +128,9 @@ struct OnboardingView: View {
 					if let getPub = privkey_to_pubkey(privkey: pk) {
 						Button("Login") { [getPK = pk, gPub = getPub] in
 							do {
-								try appData.installUser(publicKey: gPub, privateKey: getPK)
-							} catch let error {
-							}
-						}
-						.padding()
+								try appData.installUser(publicKey: nostr.Key(gPub)!, privateKey:nostr.Key(getPK)!)
+							} catch {}
+						}.padding()
 						.background(Color.blue)
 						.foregroundColor(Color.white)
 						.cornerRadius(8)

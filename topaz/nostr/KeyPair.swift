@@ -10,7 +10,10 @@ import QuickLMDB
 import secp256k1
 
 extension nostr {
-	struct Key:MDB_convertible, MDB_comparable, LosslessStringConvertible, Hashable, Equatable, Comparable {
+	struct Key:MDB_convertible, MDB_comparable, LosslessStringConvertible, Codable, Hashable, Equatable, Comparable {
+		enum Error:Swift.Error {
+			case encodedStringInvalid
+		}
 		static func nullKey() -> Self {
 			return Self()
 		}
@@ -30,6 +33,20 @@ extension nostr {
 				// If the common prefix is the same, compare their lengths.
 				return Int32(a!.pointee.mv_size) - Int32(b!.pointee.mv_size)
 			}
+		}
+		
+		init(from decoder:Decoder) throws {
+			let container = try decoder.singleValueContainer()
+			let asString = try container.decode(String.self)
+			guard let asKey = Self(asString) else {
+				throw Error.encodedStringInvalid
+			}
+			self = asKey
+		}
+
+		func encode(to encoder:Encoder) throws {
+			var container = encoder.singleValueContainer()
+			try container.encode(self.description)
 		}
 
 		// LosslessStringConvertible (hex encoding)
@@ -133,6 +150,11 @@ extension nostr {
 
 		let pubkey:Key
 		let privkey:Key
+		
+		init(_ keypair:topaz.KeyPair) {
+			self.pubkey = Key(keypair.pubkey)!
+			self.privkey = Key(keypair.privkey)!
+		}
 		
 		init(pubkey:Key, privkey:Key) {
 			self.pubkey = pubkey

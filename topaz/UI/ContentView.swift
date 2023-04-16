@@ -12,7 +12,7 @@ struct ContentView: View {
 	
     var body: some View {
 		if (appData.state == .onboarded) {
-			UserExperienceView(ue: appData.currentUE!).background(.yellow)
+			UserExperienceView(dbux: appData.currentUX!).background(.yellow)
 		} else {
 			OnboardingView(appData:appData)
 		}

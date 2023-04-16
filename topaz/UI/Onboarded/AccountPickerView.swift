@@ -8,12 +8,12 @@
 import SwiftUI
 
 struct AccountPickerView: View {
-	@ObservedObject var ue:UE
+	let dbux:DBUX
 	
     var body: some View {
 		VStack {
 			// Title Bar
-			CustomTitleBar(ue:ue)
+			CustomTitleBar(dbux:dbux)
 			
 			Spacer()
 			
@@ -25,8 +25,8 @@ struct AccountPickerView: View {
     }
 }
 
-struct AccountPickerView_Previews: PreviewProvider {
-  static var previews: some View {
-	  AccountPickerView(ue:try! UE(keypair: Topaz.tester_account))
-  }
-}
+//struct AccountPickerView_Previews: PreviewProvider {
+//  static var previews: some View {
+//	  AccountPickerView(ue:try! UE(keypair: Topaz.tester_account))
+//  }
+//}

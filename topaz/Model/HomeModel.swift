@@ -8,11 +8,10 @@
 import Foundation
 
 class HomeModel: ObservableObject {
-	let ue:UE
+	let dbux:DBUX
 
-//	var
 
-	init(_ ue:UE) {
-		self.ue = ue
+	init(_ dbux:DBUX) {
+		self.dbux = dbux
 	}
 }

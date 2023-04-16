@@ -9,19 +9,17 @@ import Foundation
 import SwiftUI
 
 struct TimelineModel:Identifiable {
-	var id:String {
+	var id:nostr.Event.UID {
 		get {
-			return event.keySignature.base64EncodedString()
+			return event.uid
 		}
 	}
-	let keysig:String
 	var event:nostr.Event
 	var profile:nostr.Profile?
 	
 	init(event:nostr.Event, profile:nostr.Profile?) {
 		self.event = event
 		self.profile = profile
-		self.keysig = event.keySignature.base64EncodedString()
 	}
 }
 
@@ -134,7 +132,7 @@ struct EventDetailView: View {
 				Text("Created on")
 					.font(.headline)
 				Spacer()
-				Text("\(event.created, formatter: dateFormatter)")
+				Text("\(event.created.exportDate(), formatter: dateFormatter)")
 					.font(.subheadline)
 			}
 
@@ -182,7 +180,7 @@ struct EventDetailView: View {
 }
 
 struct TimelineView: View {
-	let ue: UE
+	let dbux: DBUX
 	@State private var timeline = [TimelineModel]()
 	@State private var isLoading: Bool = false
 	@State private var lastEventDate: Date? = nil
@@ -220,23 +218,25 @@ struct TimelineView: View {
 	}
 	func loadMoreData() {
 		isLoading = true
-
-		let newEventsAndProfiles = ue.getHomeTimelineState()
 		
-		var newTimelineItems = [TimelineModel]()
-		for newEvent in newEventsAndProfiles.0 {
-			let getProf = newEventsAndProfiles.1[newEvent.pubkey]
-			newTimelineItems.append(TimelineModel(event:newEvent, profile:getProf))
-		}
-		
-		timeline.append(contentsOf: newTimelineItems)
-		isLoading = false
-		
-		// Update the last event's date and UID for the next pagination request
-		if let lastEvent = newEventsAndProfiles.0.last {
-			lastEventDate = lastEvent.created
-			lastEventUID = lastEvent.uid
-		}
+		do {
+			let newEventsAndProfiles = try dbux.getHomeTimelineState()
+			
+			var newTimelineItems = [TimelineModel]()
+			for newEvent in newEventsAndProfiles.0 {
+				let getProf = newEventsAndProfiles.1[newEvent.pubkey]
+				newTimelineItems.append(TimelineModel(event:newEvent, profile:getProf))
+			}
+			
+			timeline.append(contentsOf: newTimelineItems)
+			isLoading = false
+			
+			// Update the last event's date and UID for the next pagination request
+			if let lastEvent = newEventsAndProfiles.0.last {
+				lastEventDate = lastEvent.created.exportDate()
+				lastEventUID = lastEvent.uid
+			}
+		} catch {}
 	}
 	
 	func trimTimeline() {

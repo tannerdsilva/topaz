@@ -13,18 +13,94 @@ public struct DBUX:Based {
 	let logger:Logger
 	let base:URL
 	
-//	let relaysEngine:DBUX.RelaysEngine
+	let keypair:nostr.KeyPair
 	
-	init(base:URL, keypair:KeyPair) throws {
+	let contactsEngine:ContactsEngine
+
+	let profilesEngine:ProfilesEngine
+
+	let contextEngine:ContextEngine
+
+	let eventsEngine:EventsEngine
+
+	let relaysEngine:RelaysEngine
+
+	init(base:URL, keypair:nostr.KeyPair) throws {
 		let makeLogger = Topaz.makeDefaultLogger(label:"dbux")
+		self.keypair = keypair
 		self.logger = makeLogger
 		let makeBase = base.appendingPathComponent("uid-\(keypair)", isDirectory:true)
 		if FileManager.default.fileExists(atPath: makeBase.path) == false {
 			try FileManager.default.createDirectory(atPath:makeBase.path, withIntermediateDirectories:false)
 		}
+		
+		self.contactsEngine = try Topaz.launchExperienceEngine(ContactsEngine.self, from:makeBase, for:keypair.pubkey)
+		self.profilesEngine = try Topaz.launchExperienceEngine(ProfilesEngine.self, from:makeBase, for:keypair.pubkey)
+		self.contextEngine = try Topaz.launchExperienceEngine(ContextEngine.self, from:makeBase, for:keypair.pubkey)
+		self.eventsEngine = try EventsEngine(base:makeBase, pubkey:keypair.pubkey)
+		self.relaysEngine = try Topaz.launchExperienceEngine(RelaysEngine.self, from:makeBase, for:keypair.pubkey)
 		self.base = makeBase
-//		let makeRelays:DBUX.RelaysEngine = try Topaz.launchExperienceEngine(DBUX.RelaysEngine.self, from:makeBase, for:nostr.Key(keypair.pubkey)!)
-//		self.relaysEngine = makeRelays
+	}
+//	
+	func getHomeTimelineState() throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {
+		let contextOpen = try contextEngine.getTimelineAnchor()
+		let tltx = try eventsEngine.timelineEngine.transact(readOnly:true)
+		let events = try eventsEngine.timelineEngine.readEvents(from:contextOpen, tx:tltx, filter: { nostrID in
+			return true
+		})
+		try tltx.commit()
+		let profilesTx = try profilesEngine.transact(readOnly:true)
+		let profiles = try self.profilesEngine.getPublicKeys(publicKeys:Set(events.compactMap({ $0.pubkey })), tx: profilesTx)
+		try profilesTx.commit()
+		return (events.sorted(by: { $0.created < $1.created }), profiles)
+	}
+
+	func buildMainUserFilters() throws -> [nostr.Filter] {
+		let newTransaction = try self.contactsEngine.followsEngine.transact(readOnly:true)
+		// get the friends list
+		let myFriends = try self.contactsEngine.followsEngine.getFollows(pubkey:self.keypair.pubkey, tx:newTransaction)
+		try newTransaction.commit()
+		
+		let friendString = myFriends.compactMap({ $0.description })
+		
+		// build the contacts filter
+		var contactsFilter = nostr.Filter()
+		contactsFilter.authors = Array(friendString)
+		contactsFilter.kinds = [.metadata]
+
+		// build the "our contacts" filter
+		var ourContactsFilter = nostr.Filter()
+		ourContactsFilter.kinds = [.metadata, .contacts]
+		ourContactsFilter.authors = [self.keypair.pubkey.description]
+		
+		// build "blocklist" filter
+		var blocklistFilter = nostr.Filter()
+		blocklistFilter.kinds = [.list_categorized]
+		blocklistFilter.parameter = ["mute"]
+		blocklistFilter.authors = [self.keypair.pubkey.description]
+
+		// build "dms" filter
+		var dmsFilter = nostr.Filter()
+		dmsFilter.kinds = [.dm]
+		dmsFilter.authors = [self.keypair.pubkey.description]
+
+		// build "our" dms filter
+		var ourDMsFilter = nostr.Filter()
+		ourDMsFilter.kinds = [.dm]
+		ourDMsFilter.authors = [self.keypair.pubkey.description]
+
+		// create home filter
+		var homeFilter = nostr.Filter()
+		homeFilter.kinds = [.text_note, .like, .boost]
+		homeFilter.authors = Array(friendString)
+
+		// // create "notifications" filter
+		// var notificationsFilter = nostr.Filter()
+		// notificationsFilter.kinds = [.like, .boost, .text_note, .zap]
+		// notificationsFilter.limit = 500
+
+		// return [contactsFilter]
+		return [contactsFilter, ourContactsFilter, blocklistFilter, dmsFilter, ourDMsFilter, homeFilter]
 	}
 }
 
@@ -103,7 +179,7 @@ extension DBUX {
 extension DBUX {
 	@frozen @usableFromInline internal struct DatedNostrEventUID:MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable {
 		let date:DBUX.Date
-		@usableFromInline let obj:nostr.Event.UID
+		@usableFromInline let uid:nostr.Event.UID
 
 		internal static func dateFromMDBVal(value: MDB_val) -> Date? {
 			if value.mv_data == nil || value.mv_size < MemoryLayout<Date>.size {
@@ -124,18 +200,18 @@ extension DBUX {
 		}
 
 		internal init(event:nostr.Event) {
-			self.date = DBUX.Date(event.created)
-			self.obj = event.uid
+			self.date = event.created
+			self.uid = event.uid
 		}
 
 		internal init(date: Date, obj:nostr.Event.UID) {
 			self.date = date
-			self.obj = obj
+			self.uid = obj
 		}
 
 		@usableFromInline internal init?(_ value: MDB_val) {
 			let totalSize = value.mv_size
-			guard totalSize > MemoryLayout<TimeInterval>.size else {
+			guard totalSize > MemoryLayout<Date>.size else {
 				return nil
 			}
 			guard let date = Self.dateFromMDBVal(value: value) else {
@@ -145,7 +221,7 @@ extension DBUX {
 				return nil
 			}
 			self.date = date
-			self.obj = obj
+			self.uid = obj
 		}
 
 		public func asMDB_val<R>(_ valFunc: (inout MDB_val) throws -> R) rethrows -> R {
@@ -168,6 +244,27 @@ extension DBUX {
 			}
 		}
 
+		public static let invertedDateMDBCompareFunction:MDB_compare_function = { a, b in
+			let dateComparisonResult = Date.mdbCompareFunction(a, b)
+			if dateComparisonResult != 0 {
+				return -dateComparisonResult
+			} else {
+				return Self.uidFromMDBVal(value: a!.pointee)!.asMDB_val({ aObjVal in
+					return Self.uidFromMDBVal(value: b!.pointee)!.asMDB_val({ bObjVal in
+						return nostr.Event.UID.mdbCompareFunction(&aObjVal, &bObjVal)
+					})
+				})
+			}
+		}
+
+		@usableFromInline static func invertedDateCompare(_ lhs: Self, _ rhs: Self) -> Bool {
+			return lhs.asMDB_val({ lhsVal in
+				rhs.asMDB_val({ rhsVal in
+					return Self.invertedDateMDBCompareFunction(&lhsVal, &rhsVal) < 0
+				})
+			})
+		}
+
 		@usableFromInline static func < (lhs: Self, rhs: Self) -> Bool {
 			return lhs.asMDB_val({ lhsVal in
 				rhs.asMDB_val({ rhsVal in
@@ -188,7 +285,7 @@ extension DBUX {
 			date.asMDB_val({ dateVal in
 				hasher.combine(bytes: UnsafeRawBufferPointer(start: dateVal.mv_data, count: dateVal.mv_size))
 			})
-			obj.asMDB_val({ objVal in
+			uid.asMDB_val({ objVal in
 				hasher.combine(bytes: UnsafeRawBufferPointer(start: objVal.mv_data, count: objVal.mv_size))
 			})
 		}

@@ -22,10 +22,9 @@ extension UE {
 		let env:QuickLMDB.Environment
 		fileprivate let decoder:JSONDecoder
 		
-		let profilesDB:Database  // [String:Profile] where the key is the pubkey
+		let profilesDB:Database  // [nostr.Key:Profile] where the key is the pubkey
 		
 		@MainActor @Published var currentUserProfile:nostr.Profile?
-		@MainActor @Published var currentUserProfilePicture:nostr.Profile?
 		
 		init(pubkey:String, _ env:QuickLMDB.Environment, tx someTrans:QuickLMDB.Transaction) throws {
 			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)

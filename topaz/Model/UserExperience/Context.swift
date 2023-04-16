@@ -8,7 +8,7 @@
 import Foundation
 import QuickLMDB
 
-extension UE {
+/*extension UE {
 	// user context
 	// - stores information about the current state of the user environment. this includes things such as notification badges, sync times with relays, etc
 	// - the stuff that is stored in here is not metadata that a user should ever be concerned with managing directly. this is mostly a place for the topaz app to store relevant information about the user's current state
@@ -20,7 +20,7 @@ extension UE {
 		}
 
 		// tab bar related items
-		@Published var badgeStatus:ViewBadgeStatus {
+		@Published var badgeStatus:DBUX.ViewBadgeStatus {
 			willSet {
 				let encoder = JSONEncoder()
 				let encoded = try! encoder.encode(newValue)
@@ -29,7 +29,7 @@ extension UE {
 			}
 		}
 
-		@Published var viewMode:ViewMode {
+		@Published var viewMode:DBUX.ViewMode {
 			willSet {
 				let encoder = JSONEncoder()
 				let encoded = try! encoder.encode(newValue)
@@ -54,20 +54,20 @@ extension UE {
 
 			// get the badge status
 			do {
-				let decoded = try decoder.decode(ViewBadgeStatus.self, from:try context.getEntry(type:Data.self, forKey:Contexts.badgeStatus, tx:subTrans)!)
+				let decoded = try decoder.decode(DBUX.ViewBadgeStatus.self, from:try context.getEntry(type:Data.self, forKey:Contexts.badgeStatus, tx:subTrans)!)
 				_badgeStatus = Published(wrappedValue:decoded)
 			} catch LMDBError.notFound {
-				let newBadgeStatus = ViewBadgeStatus.defaultViewBadgeStatus()
+				let newBadgeStatus = DBUX.ViewBadgeStatus.defaultViewBadgeStatus()
 				_badgeStatus = Published(wrappedValue:newBadgeStatus)
 				try context.setEntry(value:try encoder.encode(newBadgeStatus), forKey:Contexts.badgeStatus, tx:subTrans)
 			}
 
 			// get the view mode
 			do {
-				let decoded = try decoder.decode(ViewMode.self, from:try context.getEntry(type:Data.self, forKey:Contexts.viewMode, tx:subTrans)!)
+				let decoded = try decoder.decode(DBUX.ViewMode.self, from:try context.getEntry(type:Data.self, forKey:Contexts.viewMode, tx:subTrans)!)
 				_viewMode = Published(initialValue:decoded)
 			} catch LMDBError.notFound {
-				let newViewMode:ViewMode = .home
+				let newViewMode:DBUX.ViewMode = .home
 				_viewMode = Published(initialValue:newViewMode)
 				try context.setEntry(value:encoder.encode(newViewMode), forKey:Contexts.viewMode, tx:subTrans)
 			}
@@ -76,3 +76,4 @@ extension UE {
 	}
 	
 }
+*/

@@ -12,37 +12,8 @@ import Logging
 import SwiftBlake2
 import AsyncAlgorithms
 
-class UE:ObservableObject {
-	/// stores the primary root view that the user is currently viewing
-	enum ViewMode:Int, MDB_convertible, Codable {
-		case home = 0
-		case notifications = 1
-		case dms = 2
-		case search = 3
-		case profile = 4
-	}
+/*fileprivate class UE:ObservableObject {
 	
-	// stores the primary tab viwe badge status for the user
-	struct ViewBadgeStatus:Codable {
-		var homeBadge:Bool
-		var notificationsBadge:Bool
-		var dmsBadge:Bool
-		var searchBadge:Bool
-		var profileBadge:Bool
-		
-		fileprivate init(homeBadge:Bool, notificationsBadge:Bool, dmsBadge:Bool, searchBadge:Bool, profileBadge:Bool) {
-			self.homeBadge = homeBadge
-			self.notificationsBadge = notificationsBadge
-			self.dmsBadge = dmsBadge
-			self.searchBadge = searchBadge
-			self.profileBadge = profileBadge
-		}
-		
-		static func defaultViewBadgeStatus() -> ViewBadgeStatus {
-			return Self(homeBadge:false, notificationsBadge: false, dmsBadge: false, searchBadge: false, profileBadge: false)
-		}
-	}
-
 	// the databases 
 	enum Databases:String {
 		case userContext = "-usercontext"
@@ -71,21 +42,21 @@ class UE:ObservableObject {
 	let userSettings:Database
 
 	// event info
-	let eventsDB:UE.EventsDB
+	let eventsDB:DBUX.EventsDB
 
 	// contacts db
 	let contactsDB:UE.Contacts
 
 	// profiles db
-	let profilesDB:Profiles
+	let profilesDB:DBUX.ProfilesEngine
 	
 	// context
 	var contextDB:UE.Context
 
 	// relays
-	let relaysDB:UE.RelaysDB
+	let relaysDB:DBUX.RelayEngine
 
-	init(keypair:KeyPair, uuid:String = UUID().uuidString) throws {
+	fileprivate init(keypair:KeyPair, uuid:String = UUID().uuidString) throws {
 		let makeLogger = Topaz.makeDefaultLogger(label:"user-environment")
 		self.logger = makeLogger
 		let makeEnv = Topaz.openLMDBEnv(named:"topaz-u-\(keypair.pubkey.prefix(8))")
@@ -450,3 +421,4 @@ extension UE {
 		
 	}
 }
+*/

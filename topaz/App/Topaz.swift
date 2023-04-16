@@ -12,7 +12,7 @@ import SystemPackage
 import NIO
 
 @main
-struct Topaz:App {
+struct Topaz:App, Based {
 	enum Error:Swift.Error {
 		case systemReadError
 		case memoryAllocationError
@@ -45,6 +45,10 @@ struct Topaz:App {
 			throw Error.systemReadError
 		}
 		return Data(bytes:readBuffer, count:length)
+	}
+	
+	static func findApplicationBase() throws -> URL {
+		try FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true)
 	}
 	
 	static func launchExperienceEngine<T>(_ type:T.Type, from base:URL, for publicKey:nostr.Key) throws -> T where T:ExperienceEngine {
@@ -95,6 +99,8 @@ struct Topaz:App {
 //		}
 //	}
 	
+	let base = try! Self.findApplicationBase()
+	
 	@ObservedObject var localData:ApplicationModel
 	
 	init() {
@@ -102,7 +108,7 @@ struct Topaz:App {
 			let localData = Topaz.openLMDBEnv(named:"topaz-app")
 			switch (localData) {
 			case (.success(let localData)):
-				let appModel = try ApplicationModel(localData, tx:nil)
+				let appModel = try Topaz.launchExperienceEngine(ApplicationModel.self, from:self.base, for:nostr.Key.nullKey())
 				_localData = ObservedObject(wrappedValue: appModel)
 			default:
 				fatalError("false")

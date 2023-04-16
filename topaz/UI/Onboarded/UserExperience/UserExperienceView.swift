@@ -10,33 +10,33 @@ import SwiftUI
 struct UserExperienceView: View {
 	@Environment(\.scenePhase) private var scenePhase
 	
-	@ObservedObject var ue:UE
-	@ObservedObject var context:UE.Context
+	let dbux:DBUX
+	@ObservedObject var context:DBUX.ContextEngine
 	
-	init(ue:UE) {
-		self.ue = ue
-		self.context = ue.contextDB
+	init(dbux:DBUX) {
+		self.dbux = dbux
+		self.context = dbux.contextEngine
 	}
     var body: some View {
 		VStack {
 //			NavigationStack {
 				VStack {
 					// Title Bar
-					CustomTitleBar(ue:ue)
+					CustomTitleBar(dbux:dbux)
 					
 					Spacer()
 					
 					switch context.viewMode {
 					case .home:
-						HomeView(ue:ue)
+						HomeView(dbux:dbux)
 					case .notifications:
 						MentionsView()
 					case .dms:
-						MessagesView(isUnread:$ue.contextDB.badgeStatus.dmsBadge)
+						MessagesView(isUnread:$context.badgeStatus.dmsBadge)
 					case .search:
 						SearchView()
 					case .profile:
-						ProfileDetailView(pubkey:ue.keypair.pubkey, profile:ue.profilesDB.currentUserProfile ?? nostr.Profile())
+						ProfileDetailView(pubkey:dbux.keypair.pubkey.description, profile:dbux.profilesEngine.currentUserProfile)
 					}
 					
 					Spacer()
@@ -45,14 +45,14 @@ struct UserExperienceView: View {
 //			}
 			// Navigation Bar
 			HStack {
-				CustomTabBar(ue:ue, viewMode:$context.viewMode, badgeStatus:$context.badgeStatus)
+				CustomTabBar(dbux:dbux, viewMode:$context.viewMode, badgeStatus:$context.badgeStatus)
 			}
 		}.background(Color(.systemBackground)).onChange(of:scenePhase) { newValue in
 				switch newValue {
 				case .active:
-					let getDisconnected = ue.relaysDB.userRelayConnectionStates.values.filter({ $0 == .disconnected })
+					let getDisconnected = dbux.relaysEngine.userRelayConnectionStates.values.filter({ $0 == .disconnected })
 					if getDisconnected.count > 0 {
-						Task.detached { [relays = ue.relaysDB.userRelayConnections] in
+						Task.detached { [relays = dbux.relaysEngine.userRelayConnections] in
 							await withTaskGroup(of:Void.self) { tg in
 								for curRelay in relays {
 									tg.addTask { [cr = curRelay] in
@@ -75,10 +75,10 @@ struct UserExperienceView: View {
 }
 
 struct TabButton: View {
-	let myView: UE.ViewMode
+	let myView: DBUX.ViewMode
 	let icon: String
 	let index: Int
-	@Binding var selectedTab: UE.ViewMode
+	@Binding var selectedTab: DBUX.ViewMode
 	let accentColor: Color
 	@Binding var showBadge: Bool
 	@State var profileIndicate: nostr.Profile?
@@ -141,9 +141,9 @@ struct TabButton: View {
 }
 
 struct CustomTabBar: View {
-	let ue:UE
-	@Binding var viewMode: UE.ViewMode
-	@Binding var badgeStatus: UE.ViewBadgeStatus
+	let dbux:DBUX
+	@Binding var viewMode: DBUX.ViewMode
+	@Binding var badgeStatus: DBUX.ViewBadgeStatus
 	@State private var showAccountPicker = false
 	
 	var body: some View {
@@ -160,7 +160,7 @@ struct CustomTabBar: View {
 			TabButton(myView: .search, icon: "magnifyingglass", index: 3, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.searchBadge, profileIndicate: nil)
 				.frame(maxWidth: .infinity)
 
-			TabButton(myView: .profile, icon: "person.fill", index: 4, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.profileBadge, profileIndicate:ue.profilesDB.currentUserProfile) // Pass the profile image here
+			TabButton(myView: .profile, icon: "person.fill", index: 4, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.profileBadge, profileIndicate:dbux.profilesEngine.currentUserProfile) // Pass the profile image here
 				.frame(maxWidth: .infinity)
 				.onLongPressGesture {
 				showAccountPicker.toggle()
@@ -174,9 +174,9 @@ struct CustomTabBar: View {
 
 
 struct HomeView: View {
-	let ue:UE
+	let dbux:DBUX
 	var body: some View {
-		TimelineView(ue:ue)
+		TimelineView(dbux:dbux)
 	}
 }
 
@@ -202,10 +202,10 @@ struct SearchView: View {
 }
 
 struct PV: View {
-	let ue:UE
+	let ue:DBUX
 	
 	var body: some View {
-		ProfileDetailView(pubkey:ue.keypair.pubkey, profile:ue.profilesDB.currentUserProfile!)
+		ProfileDetailView(pubkey:ue.keypair.pubkey.description, profile:ue.profilesEngine.currentUserProfile)
 	}
 }
 
@@ -272,7 +272,7 @@ struct EventViewCell: View {
 
 			
 			HStack {
-				Text(dateFormatter.string(from: event.created))
+				Text(dateFormatter.string(from: event.created.exportDate()))
 					.font(.caption)
 					.foregroundColor(.gray)
 
@@ -316,7 +316,7 @@ struct EventViewCell: View {
 }
 
 struct ConnectionStatusIndicator: View {
-	@ObservedObject var relays: UE.RelaysDB
+	@ObservedObject var relays:DBUX.RelaysEngine
 	@State private var isTextVisible = false
 	@State var showModal = false
 
@@ -470,11 +470,11 @@ struct AnyShape: Shape {
 }
 
 struct CustomTitleBar: View {
-	let ue:UE
+	let dbux:DBUX
 	var body: some View {
 		HStack {
 			Spacer()
-			ConnectionStatusIndicator(relays: ue.relaysDB)
+			ConnectionStatusIndicator(relays: dbux.relaysEngine)
 		}
 		.padding(.vertical, 8) // Adjust the vertical padding for less height
 		.frame(height: 44) // Set the height of the title bar

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ConnectionDetailsView: View {
-	@ObservedObject var relayDB: UE.RelaysDB
+	@ObservedObject var relayDB: DBUX.RelaysEngine
 
 	var sortedConnections: [(String, RelayConnection.State)] {
 		relayDB.userRelayConnectionStates.sorted { lhs, rhs in
