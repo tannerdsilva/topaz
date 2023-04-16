@@ -19,40 +19,29 @@ struct UserExperienceView: View {
 	}
     var body: some View {
 		VStack {
-//			NavigationStack {
-				VStack {
-					// Title Bar
-					CustomTitleBar(dbux:dbux)
-					
-					Spacer()
-					
-					switch context.viewMode {
-					case .home:
-						HomeView(dbux:dbux)
-					case .notifications:
-						MentionsView()
-					case .dms:
-						MessagesView(isUnread:$context.badgeStatus.dmsBadge)
-					case .search:
-						SearchView()
-					case .profile:
-						ProfileDetailView(pubkey:dbux.keypair.pubkey.description, profile:dbux.profilesEngine.currentUserProfile)
-					}
-					
-					Spacer()
-					
-				}.frame(maxWidth:.infinity)
-//			}
-			// Navigation Bar
-			HStack {
-				CustomTabBar(dbux:dbux, viewMode:$context.viewMode, badgeStatus:$context.badgeStatus)
+			switch context.viewMode {
+			case .home:
+				HomeView(dbux:dbux)
+			case .notifications:
+				MentionsView()
+			case .dms:
+				MessagesView(isUnread:$context.badgeStatus.dmsBadge)
+			case .search:
+				SearchView()
+			case .profile:
+				ProfileDetailView(pubkey:dbux.keypair.pubkey.description, profile:dbux.profilesEngine.currentUserProfile)
 			}
-		}.background(Color(.systemBackground)).onChange(of:scenePhase) { newValue in
-				switch newValue {
-				case .active:
-					let getDisconnected = dbux.relaysEngine.userRelayConnectionStates.values.filter({ $0 == .disconnected })
+			Spacer()
+			UI.NavBar(dbux:dbux, viewMode:$context.viewMode, badgeStatus:$context.badgeStatus)
+				.frame(maxWidth: .infinity, maxHeight: 70)
+		}.background(Color(.systemBackground)).border(.cyan).onChange(of:scenePhase) { newValue in
+			switch newValue {
+			case .active:
+				Task.detached { [dbux = dbux] in
+					let getItAll = await dbux.relaysEngine.getConnectionsAndStates()
+					let getDisconnected = getItAll.1.values.filter({ $0 == .disconnected })
 					if getDisconnected.count > 0 {
-						Task.detached { [relays = dbux.relaysEngine.userRelayConnections] in
+						Task.detached { [relays = getItAll.0] in
 							await withTaskGroup(of:Void.self) { tg in
 								for curRelay in relays {
 									tg.addTask { [cr = curRelay] in
@@ -62,112 +51,15 @@ struct UserExperienceView: View {
 							}
 						}
 					}
-					
-				case .inactive:
-					break;
-				case .background:
-					break;
-				@unknown default:
-					break;
 				}
+			case .inactive:
+				break;
+			case .background:
+				break;
+			@unknown default:
+				break;
 			}
 		}
-}
-
-struct TabButton: View {
-	let myView: DBUX.ViewMode
-	let icon: String
-	let index: Int
-	@Binding var selectedTab: DBUX.ViewMode
-	let accentColor: Color
-	@Binding var showBadge: Bool
-	@State var profileIndicate: nostr.Profile?
-	@Environment(\.sizeCategory) var sizeCategory
-
-	var imageSize: CGFloat {
-		switch sizeCategory {
-		case .accessibilityExtraExtraExtraLarge:
-			return 45
-		case .accessibilityExtraExtraLarge, .accessibilityExtraLarge, .accessibilityLarge, .accessibilityMedium:
-			return 32
-		default:
-			return 22
-		}
-	}
-	
-	var badgeSize: CGFloat {
-		return imageSize * 0.420
-	}
-	
-	var body: some View {
-			Button(action: {
-				selectedTab = myView
-				showBadge = false
-			}) {
-				ZStack {
-					if let profileImgUrl = profileIndicate?.picture {
-						AsyncImage(url: URL(string:profileImgUrl), content: { image in
-							image
-								.resizable()
-								.aspectRatio(contentMode: .fill)
-								.frame(width: imageSize, height: imageSize)
-								.clipShape(Circle())
-						}, placeholder: {
-							ProgressView()
-								.frame(width: imageSize, height: imageSize)
-						})
-					} else {
-						Image(systemName: icon)
-							.resizable()
-							.scaledToFit()
-							.foregroundColor(selectedTab == myView ? accentColor : .gray)
-							.frame(width: imageSize, height: imageSize)
-					}
-					
-					if showBadge {
-						GeometryReader { geometry in
-							ZStack {
-								Circle()
-									.fill(Color.red)
-									.frame(width: badgeSize, height: badgeSize)
-							}
-							.position(x: geometry.size.width, y: geometry.size.height * 0.11)
-						}
-					}
-				}
-				.frame(width: imageSize, height: imageSize)
-			}
-		}
-}
-
-struct CustomTabBar: View {
-	let dbux:DBUX
-	@Binding var viewMode: DBUX.ViewMode
-	@Binding var badgeStatus: DBUX.ViewBadgeStatus
-	@State private var showAccountPicker = false
-	
-	var body: some View {
-		HStack {
-			TabButton(myView: .home, icon: "house.fill", index: 0, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.homeBadge, profileIndicate: nil)
-				.frame(maxWidth: .infinity)
-
-			TabButton(myView: .notifications, icon: "bell.fill", index: 1, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.notificationsBadge, profileIndicate: nil)
-				.frame(maxWidth: .infinity)
-
-			TabButton(myView: .dms, icon: "envelope.fill", index: 2, selectedTab: $viewMode, accentColor: .pink, showBadge: $badgeStatus.dmsBadge, profileIndicate: nil)
-				.frame(maxWidth: .infinity)
-
-			TabButton(myView: .search, icon: "magnifyingglass", index: 3, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.searchBadge, profileIndicate: nil)
-				.frame(maxWidth: .infinity)
-
-			TabButton(myView: .profile, icon: "person.fill", index: 4, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.profileBadge, profileIndicate:dbux.profilesEngine.currentUserProfile) // Pass the profile image here
-				.frame(maxWidth: .infinity)
-				.onLongPressGesture {
-				showAccountPicker.toggle()
-			}
-		}
-		.padding(.top)
-		.frame(maxWidth: .infinity).background(Color(.systemBackground))
 	}
 }
 
@@ -176,7 +68,12 @@ struct CustomTabBar: View {
 struct HomeView: View {
 	let dbux:DBUX
 	var body: some View {
-		TimelineView(dbux:dbux)
+		NavigationStack {
+			CustomTitleBar(dbux:dbux)
+			Spacer()
+			TimelineView(dbux:dbux)
+		}
+		
 	}
 }
 
@@ -315,166 +212,12 @@ struct EventViewCell: View {
 	}
 }
 
-struct ConnectionStatusIndicator: View {
-	@ObservedObject var relays:DBUX.RelaysEngine
-	@State private var isTextVisible = false
-	@State var showModal = false
-
-	var body: some View {
-		GeometryReader { geometry in
-			let circleSize: CGFloat = 6
-			let spacing: CGFloat = 4
-			let succ = relays.userRelayConnectionStates.sorted(by: { $0.key < $1.key }).compactMap({ $0.value })
-			let connCount = succ.filter { $0 == .connected }
-
-			VStack {
-				if succ.count <= ConnectionDotView.maxShapesInFrame(maxWidth:geometry.size.width, maxHeight:geometry.size.height, shapeSize:circleSize, spacing:spacing) {
-					ConnectionDotView(spacing:spacing, shapeSize:circleSize, status:succ)
-				} else {
-					ProgressRing(progress: Double(connCount.count) / Double(succ.count))
-						.stroke(Color.green, lineWidth: 4)
-						.frame(width: 22, height: 22)
-				}
-
-				if isTextVisible {
-					Text("\(connCount.count)/\(succ.count)")
-						.font(.system(size: 12))
-						.foregroundColor(.white)
-						.transition(.opacity)
-				}
-			}
-			.frame(width: geometry.size.width, height: geometry.size.height).sheet(isPresented: $showModal) {
-				ConnectionDetailsView(relayDB: relays)
-			}
-		}
-		.frame(width: 45, height: 30)
-		.onTapGesture {
-			showModal.toggle()
-			if isTextVisible {
-				Task.detached {
-					try await Task.sleep(nanoseconds:5_000_000_000)
-					await MainActor.run { () -> Void in
-						withAnimation(.easeInOut(duration:0.25)) {
-							isTextVisible = true
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-struct ProgressRing: Shape {
-	let progress: Double
-	
-	func path(in rect: CGRect) -> Path {
-		var path = Path()
-		path.addArc(center: CGPoint(x: rect.midX, y: rect.midY),
-					radius: rect.width / 2,
-					startAngle: .degrees(-90),
-					endAngle: .degrees(-90 + 360 * progress),
-					clockwise: false)
-		return path
-	}
-}
-
-struct ConnectionDotView: View {
-	let spacing: CGFloat
-	let shapeSize: CGFloat
-	let status: [RelayConnection.State]
-
-	var body: some View {
-		GeometryReader { geometry in
-			let numberOfColumns = Int((geometry.size.width - spacing) / (shapeSize + spacing))
-			let numberOfRows = Int((geometry.size.height - spacing) / (shapeSize + spacing))
-			let columns = Array(repeating: GridItem(.fixed(shapeSize), spacing: spacing), count: numberOfColumns)
-
-			let horizontalPadding = (geometry.size.width - CGFloat(min(numberOfColumns, status.count)) * (shapeSize + spacing) + spacing) / 2
-			let usedRows = max(1, Int(ceil(Double(status.count) / Double(numberOfColumns))))
-			let verticalPadding = (geometry.size.height - CGFloat(usedRows) * (shapeSize + spacing) + spacing) / 2
-
-			LazyVGrid(columns: columns, spacing: spacing) {
-				ForEach(status.indices, id: \.self) { index in
-					DotConnectionView(state: status[index])
-						.frame(width: shapeSize, height: shapeSize)
-				}
-			}
-			.padding(.horizontal, horizontalPadding)
-			.padding(.vertical, verticalPadding)
-		}
-	}
-	
-	static func maxShapesInFrame(maxWidth: CGFloat, maxHeight: CGFloat, shapeSize: CGFloat, spacing: CGFloat) -> Int {
-		let numberOfColumns = Int((maxWidth - spacing) / (shapeSize + spacing))
-		let numberOfRows = Int((maxHeight - spacing) / (shapeSize + spacing))
-		return numberOfColumns * numberOfRows
-	}
-}
-
-struct DotConnectionView: View {
-	let state: RelayConnection.State
-
-	var body: some View {
-		connectionShape(state: state)
-			.foregroundColor(colorForConnectionState(state))
-	}
-
-	func connectionShape(state: RelayConnection.State) -> some Shape {
-		switch state {
-		case .disconnected:
-			return AnyShape(Triangle())
-		case .connecting:
-			return AnyShape(Rectangle())
-		case .connected:
-			return AnyShape(Circle())
-		}
-	}
-
-	func colorForConnectionState(_ state: RelayConnection.State) -> Color {
-		switch state {
-		case .disconnected:
-			return Color.red
-		case .connecting:
-			return Color.yellow
-		case .connected:
-			return Color.green
-		}
-	}
-}
-
-struct Triangle: Shape {
-	func path(in rect: CGRect) -> Path {
-		var path = Path()
-
-		path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
-		path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-		path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
-		path.closeSubpath()
-
-		return path
-	}
-}
-
-struct AnyShape: Shape {
-	private let pathBuilder: (CGRect) -> Path
-
-	init<S: Shape>(_ wrapped: S) {
-		pathBuilder = { rect in
-			return wrapped.path(in: rect)
-		}
-	}
-
-	func path(in rect: CGRect) -> Path {
-		return pathBuilder(rect)
-	}
-}
-
 struct CustomTitleBar: View {
 	let dbux:DBUX
 	var body: some View {
 		HStack {
 			Spacer()
-			ConnectionStatusIndicator(relays: dbux.relaysEngine)
+			UI.Relays.ConnectionStatusWidget(relays: dbux.relaysEngine).border(.orange)
 		}
 		.padding(.vertical, 8) // Adjust the vertical padding for less height
 		.frame(height: 44) // Set the height of the title bar

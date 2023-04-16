@@ -18,9 +18,23 @@ internal actor Holder<T>: AsyncSequence {
 	private let holdInterval: TimeInterval
 	private var lastFlush: timeval? = nil
 	private var waiters: [UnsafeContinuation<[T]?, Never>] = []
+	private var periodicFlushTask: Task<Void, Never>? = nil
 
 	init(holdInterval: TimeInterval) {
 		self.holdInterval = holdInterval
+		self.periodicFlushTask = Task { [weak self] in
+			do {
+				while true {
+					try await Task.sleep(nanoseconds:UInt64(holdInterval * 1_000_000_000))
+					guard let self = self else { return }
+					await self.flushElementsIfNeeded()
+				}
+			} catch {}
+		}
+	}
+
+	deinit {
+		periodicFlushTask?.cancel()
 	}
 
 	nonisolated func makeAsyncIterator() -> HolderEventStream {

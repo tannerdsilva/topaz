@@ -18,7 +18,7 @@ extension DBUX.ContactsEngine {
 	/// this database stores the list of users that the user is following
 	class FollowsEngine:ExperienceEngine {
 		static let name = "follows-engine.mdb"
-		static let deltaSize = size_t(35e10)
+		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let base:URL
@@ -125,7 +125,7 @@ extension DBUX.ContactsEngine {
 extension DBUX {
 	struct ContactsEngine:ExperienceEngine {
 		static let name = "contacts-engine.mdb"
-		static let deltaSize = size_t(35e10)
+		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 1
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let base:URL
@@ -140,7 +140,7 @@ extension DBUX {
 			self.env = env
 			self.pubkey = pubkey
 			self.logger = Logger(label: "contacts-engine.mdb")
-			self.followsEngine = try Topaz.launchExperienceEngine(FollowsEngine.self, from:base, for:pubkey)
+			self.followsEngine = try Topaz.launchExperienceEngine(FollowsEngine.self, from:base.deletingLastPathComponent(), for:pubkey)
 		}
 
 		// returns a boolean indicating whether or not the given pubkey is a friend of the current user
@@ -185,7 +185,7 @@ extension DBUX.ContactsEngine {
 	// mute related - allows a local user to mute a given event or user
 	struct ModerationDB {
 		static let name = "moderation-engine.mdb"
-		static let deltaSize = size_t(35e10)
+		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let base:URL

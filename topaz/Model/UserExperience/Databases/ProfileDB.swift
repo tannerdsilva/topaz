@@ -34,9 +34,9 @@ extension UE {
 			do {
 				let myProfile = try pdb.getEntry(type:Data.self, forKey:pubkey, tx:subTrans)!
 				let decoded = try decoder.decode(nostr.Profile.self, from:myProfile)
-				_currentUserProfile = Published(wrappedValue:decoded)
+				_currentUserProfile = Published(decoded)
 			} catch LMDBError.notFound {
-				_currentUserProfile = Published(wrappedValue:nil)
+				_currentUserProfile = Published(nil)
 			}
 			
 			self.profilesDB = pdb

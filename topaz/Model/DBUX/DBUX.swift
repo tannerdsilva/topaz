@@ -1,4 +1,5 @@
 import QuickLMDB
+import class Foundation.JSONDecoder
 import struct Foundation.TimeInterval
 import struct Foundation.UUID
 import struct Foundation.Data
@@ -9,7 +10,7 @@ import struct Foundation.URL
 import SwiftBlake2
 
 // encompasses the user experience 
-public struct DBUX:Based {
+public class DBUX:Based {
 	let logger:Logger
 	let base:URL
 	
@@ -31,15 +32,80 @@ public struct DBUX:Based {
 		self.logger = makeLogger
 		let makeBase = base.appendingPathComponent("uid-\(keypair)", isDirectory:true)
 		if FileManager.default.fileExists(atPath: makeBase.path) == false {
-			try FileManager.default.createDirectory(atPath:makeBase.path, withIntermediateDirectories:false)
+			try FileManager.default.createDirectory(atPath:makeBase.path, withIntermediateDirectories:true)
 		}
 		
-		self.contactsEngine = try Topaz.launchExperienceEngine(ContactsEngine.self, from:makeBase, for:keypair.pubkey)
-		self.profilesEngine = try Topaz.launchExperienceEngine(ProfilesEngine.self, from:makeBase, for:keypair.pubkey)
-		self.contextEngine = try Topaz.launchExperienceEngine(ContextEngine.self, from:makeBase, for:keypair.pubkey)
-		self.eventsEngine = try EventsEngine(base:makeBase, pubkey:keypair.pubkey)
-		self.relaysEngine = try Topaz.launchExperienceEngine(RelaysEngine.self, from:makeBase, for:keypair.pubkey)
+		self.contactsEngine = try! Topaz.launchExperienceEngine(ContactsEngine.self, from:makeBase, for:keypair.pubkey)
+		self.profilesEngine = try! Topaz.launchExperienceEngine(ProfilesEngine.self, from:makeBase, for:keypair.pubkey)
+		self.contextEngine = try! Topaz.launchExperienceEngine(ContextEngine.self, from:makeBase, for:keypair.pubkey)
+		self.eventsEngine = try! EventsEngine(base:makeBase, pubkey:keypair.pubkey)
+		self.relaysEngine = try! Topaz.launchExperienceEngine(RelaysEngine.self, from:makeBase, for:keypair.pubkey)
 		self.base = makeBase
+		
+		let myRelays:Set<String>
+		do {
+			myRelays = try self.relaysEngine.getRelays(pubkey:keypair.pubkey.description)
+		} catch LMDBError.notFound {
+			myRelays = Set(Topaz.defaultRelays.compactMap { $0.url })
+		}
+		let homeSubs = try! self.buildMainUserFilters()
+		for curRelay in myRelays {
+			try relaysEngine.add(subscriptions:[nostr.Subscribe(sub_id:UUID().uuidString, filters:homeSubs)], to:curRelay)
+		}
+//		
+		Task.detached { [weak self, hol = self.relaysEngine.holder] in
+			guard let self = self else {
+				return
+			}
+			let decoder = JSONDecoder()
+			for try await curEvs in hol {
+				var buildProfiles = [nostr.Key:nostr.Profile]()
+				var profileUpdateDates = [nostr.Key:DBUX.Date]()
+				for curEv in curEvs {
+					switch curEv.kind {
+					case .metadata:
+						do {
+							let asData = Data(curEv.content.utf8)
+							let decoded = try decoder.decode(nostr.Profile.self, from:asData)
+							self.logger.info("successfully decoded profile", metadata:["pubkey":"\(curEv.pubkey)"])
+							buildProfiles[curEv.pubkey] = decoded
+							profileUpdateDates[curEv.pubkey] = curEv.created
+						} catch {
+							self.logger.error("failed to decode profile.")
+						}
+					case .contacts:
+						do {
+							let asData = Data(curEv.content.utf8)
+							let relays = Set(try decoder.decode([String:[String:Bool]].self, from:asData).keys)
+							var following = Set<nostr.Key>()
+							for curTag in curEv.tags {
+								if case curTag.kind = nostr.Event.Tag.Kind.pubkey, let getPubKey = curTag.info.first, let asKey = nostr.Key(getPubKey) {
+									following.update(with:asKey)
+								}
+							}
+							try self.relaysEngine.setRelays(relays, pubkey:curEv.pubkey, asOf:curEv.created)
+							let followsTx = try self.contactsEngine.followsEngine.transact(readOnly:false)
+							try self.contactsEngine.followsEngine.set(pubkey:curEv.pubkey, follows:following, tx:followsTx)
+							try followsTx.commit()
+							self.logger.info("updated contact information for ")
+						} catch let error {
+							
+						}
+						
+					default:
+						self.logger.debug("got event.", metadata:["kind":"\(curEv.kind)"])
+					}
+				}
+				let newEvsSet = Set(curEvs)
+				let tltx = try self.eventsEngine.timelineEngine.transact(readOnly:false)
+				try self.eventsEngine.timelineEngine.writeEvents(newEvsSet, tx:tltx)
+				try tltx.commit()
+				
+				let pftx = try self.profilesEngine.transact(readOnly:false)
+				try self.profilesEngine.setPublicKeys(buildProfiles, tx:pftx)
+				try pftx.commit()
+			}
+		}
 	}
 //	
 	func getHomeTimelineState() throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {
@@ -68,10 +134,6 @@ public struct DBUX:Based {
 		contactsFilter.authors = Array(friendString)
 		contactsFilter.kinds = [.metadata]
 
-		// build the "our contacts" filter
-		var ourContactsFilter = nostr.Filter()
-		ourContactsFilter.kinds = [.metadata, .contacts]
-		ourContactsFilter.authors = [self.keypair.pubkey.description]
 		
 		// build "blocklist" filter
 		var blocklistFilter = nostr.Filter()
@@ -100,7 +162,7 @@ public struct DBUX:Based {
 		// notificationsFilter.limit = 500
 
 		// return [contactsFilter]
-		return [contactsFilter, ourContactsFilter, blocklistFilter, dmsFilter, ourDMsFilter, homeFilter]
+		return [contactsFilter, blocklistFilter, dmsFilter, ourDMsFilter, homeFilter]
 	}
 }
 

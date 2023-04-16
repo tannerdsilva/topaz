@@ -15,7 +15,7 @@ import AsyncAlgorithms
 extension DBUX {
 	class ProfilesEngine:ObservableObject, ExperienceEngine {
 		static let name = "profile-engine.mdb"
-		static let deltaSize = size_t(1e10)
+		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let base:URL
@@ -47,9 +47,9 @@ extension DBUX {
 			do {
 				let myProfile = try self.profilesDB.getEntry(type:Data.self, forKey:pubkey, tx:newTrans)!
 				let decoded = try decoder.decode(nostr.Profile.self, from:myProfile)
-				_currentUserProfile = Published(initialValue:decoded)
+				_currentUserProfile = Published(wrappedValue:decoded)
 			} catch LMDBError.notFound {
-				_currentUserProfile = Published(initialValue:nostr.Profile())
+				_currentUserProfile = Published(wrappedValue:nostr.Profile())
 			}
 			try newTrans.commit()
 		}

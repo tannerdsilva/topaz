@@ -38,7 +38,7 @@ extension DBUX.EventsEngine.KindsEngine {
 extension DBUX.EventsEngine {
 	struct KindsEngine:ExperienceEngine {
 		static let name = "event-engine-kind-id.mdb"
-		static let deltaSize = size_t(1.5E+10)
+		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let base:URL
@@ -122,7 +122,7 @@ extension DBUX.EventsEngine {
 extension DBUX {
 	struct DatesEngine:ExperienceEngine {
 		static let name = "event-engine-date-id.mdb"
-		static let deltaSize = size_t(35e10)
+		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let base:URL
@@ -166,7 +166,7 @@ extension DBUX {
 extension DBUX {
 	struct PublishersEngine: ExperienceEngine {
 		static let name = "event-engine-key-uid.mdb"
-		static let deltaSize = size_t(35e10)
+		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs: MDB_dbi = 2
 		static let env_flags: QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let base: URL
@@ -239,7 +239,7 @@ extension DBUX {
 extension DBUX.EventsEngine {
 	class TimelineEngine:ExperienceEngine {
 		static let name = "timeline-engine.mdb"
-		static let deltaSize = size_t(35e10)
+		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs: MDB_dbi = 1
 		static let env_flags: QuickLMDB.Environment.Flags = [.noSubDir, .noReadAhead]
 		let base: URL

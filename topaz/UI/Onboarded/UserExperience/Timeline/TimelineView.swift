@@ -41,19 +41,8 @@ struct EventDetailView: View {
 
 	private var profileBanner: some View {
 		ZStack {
-//			if let bannerURL = profile?.banner, let url = URL(string: bannerURL) {
-//				AsyncImage(url: url, scale: 1.0) { image in
-//					image
-//						.resizable()
-//						.scaledToFill()
-//				} placeholder: {
-//					RoundedRectangle(cornerRadius: 10)
-//						.fill(Color.gray)
-//				}
-//			} else {
-				RoundedRectangle(cornerRadius: 10)
-					.fill(Color.gray)
-//			}
+			RoundedRectangle(cornerRadius: 10)
+				.fill(Color.gray)
 		}
 		.frame(height: 200)
 		.cornerRadius(10)
@@ -190,30 +179,28 @@ struct TimelineView: View {
 	let maxItemsInMemory = 20
 
 	var body: some View {
-		NavigationStack {
-			ScrollView {
-				LazyVStack {
-					ForEach(timeline) { item in
-						NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
-							EventViewCell(event: item.event, profile: item.profile)
-						}
+		ScrollView {
+			LazyVStack {
+				ForEach(timeline) { item in
+					NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
+						EventViewCell(event: item.event, profile: item.profile)
+					}
 
-						if timeline.last?.id == item.id && !isLoading {
-							Divider()
-							ProgressView() // Loading indicator
-								.onAppear {
-									loadMoreData()
-								}
-						}
+					if timeline.last?.id == item.id && !isLoading {
+						Divider()
+						ProgressView() // Loading indicator
+							.onAppear {
+								loadMoreData()
+							}
 					}
 				}
 			}
-			.onAppear {
-				loadMoreData()
-			}
-			.onDisappear {
-				trimTimeline()
-			}
+		}
+		.onAppear {
+			loadMoreData()
+		}
+		.onDisappear {
+			trimTimeline()
 		}
 	}
 	func loadMoreData() {

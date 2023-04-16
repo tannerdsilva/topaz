@@ -96,8 +96,12 @@ struct UpperProfileView: View {
 				}
 
 				if let website = profile.website {
-					Link("Website: \(website)", destination: URL(string: website)!)
-						.padding(.horizontal, 16)
+					if let asActionableURL = URL(string:website) {
+						Link("Website: \(website)", destination:asActionableURL)
+							.padding(.horizontal, 16)
+					} else {
+						Text("Website: \(website)")
+					}
 				}
 			}
 			.padding(.bottom, 16)

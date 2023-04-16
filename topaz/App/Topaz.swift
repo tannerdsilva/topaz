@@ -51,12 +51,23 @@ struct Topaz:App, Based {
 		try FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true)
 	}
 	
-	static func launchExperienceEngine<T>(_ type:T.Type, from base:URL, for publicKey:nostr.Key) throws -> T where T:ExperienceEngine {
-		let path = base.appendingPathComponent(type.name, isDirectory:type.env_flags.contains(.noSubDir) ? false : true)
-		let increaseSize = size_t(path.getFileSize()) + size_t(type.deltaSize)
-		let makeEnv = try QuickLMDB.Environment(path: path.path, flags: type.env_flags, mapSize: increaseSize, maxDBs: type.maxDBs)
-		return try type.init(base:path, env: makeEnv, publicKey:publicKey)
+	static func launchExperienceEngine<T>(_ type: T.Type, from base: URL, for publicKey: nostr.Key) throws -> T where T: ExperienceEngine {
+		let isDirectory = type.env_flags.contains(.noSubDir) ? false : true
+		let path = base.appendingPathComponent(type.name, isDirectory: isDirectory)
+
+		if isDirectory {
+			try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true, attributes: nil)
+			let dataMdbPath = path.appendingPathComponent("data.mdb")
+			let increaseSize = size_t(dataMdbPath.getFileSize()) + size_t(type.deltaSize)
+			let makeEnv = try QuickLMDB.Environment(path: path.path, flags: type.env_flags, mapSize: increaseSize, maxDBs: type.maxDBs)
+			return try type.init(base: path, env: makeEnv, publicKey: publicKey)
+		} else {
+			let increaseSize = size_t(path.getFileSize()) + size_t(type.deltaSize)
+			let makeEnv = try QuickLMDB.Environment(path: path.path, flags: type.env_flags, mapSize: increaseSize, maxDBs: type.maxDBs)
+			return try type.init(base: path, env: makeEnv, publicKey: publicKey)
+		}
 	}
+
 	
 	public static func makeDefaultLogger(label:String) -> Logger {
 		var logger = Logger(label:label)
@@ -92,27 +103,14 @@ struct Topaz:App, Based {
 		}
 	}
 	
-//	static func openOrCreateUX(pubkey:String) -> Result<UX, Swift.Error> {
-//		do {
-//			let homePath = try FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true).appendingPathComponent(named, isDirectory:true)
-//			
-//		}
-//	}
-	
 	let base = try! Self.findApplicationBase()
 	
 	@ObservedObject var localData:ApplicationModel
 	
 	init() {
 		do {
-			let localData = Topaz.openLMDBEnv(named:"topaz-app")
-			switch (localData) {
-			case (.success(let localData)):
-				let appModel = try Topaz.launchExperienceEngine(ApplicationModel.self, from:self.base, for:nostr.Key.nullKey())
-				_localData = ObservedObject(wrappedValue: appModel)
-			default:
-				fatalError("false")
-			}
+			let appModel = try! Topaz.launchExperienceEngine(ApplicationModel.self, from:self.base, for:nostr.Key.nullKey())
+			_localData = ObservedObject(wrappedValue: appModel)
 		} catch let error {
 			fatalError("false")
 		}

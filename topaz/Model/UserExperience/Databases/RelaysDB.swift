@@ -153,7 +153,7 @@ extension UE {
 				try relayStatusCursor.setEntry(value:RelayConnection.State.disconnected, forKey:relayHash)
 				try relaySubscriptionsDB.setEntry(value:[] as [nostr.Subscribe], forKey: pubkey, tx:subTrans)
 			}
-			_userRelayConnections = Published(wrappedValue:buildConnections)
+			_userRelayConnections = Published(buildConnections)
 			_userRelayConnectionStates = Published(initialValue:buildStates)
 			try subTrans.commit()
 			

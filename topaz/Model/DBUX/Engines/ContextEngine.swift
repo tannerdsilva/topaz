@@ -15,7 +15,7 @@ import AsyncAlgorithms
 extension DBUX {
 	class ContextEngine:ObservableObject, ExperienceEngine {
 		static let name = "context-engine.mdb"
-		static let deltaSize = size_t(35e10)
+		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 1
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let base:URL
@@ -47,29 +47,29 @@ extension DBUX {
 			// get the badge status
 			do {
 				let decoded = try decoder.decode(DBUX.ViewBadgeStatus.self, from:try context.getEntry(type:Data.self, forKey:Contexts.badgeStatus, tx:newTrans)!)
-				_badgeStatus = Published(initialValue:decoded)
+				_badgeStatus = Published(wrappedValue:decoded)
 			} catch LMDBError.notFound {
 				let newBadgeStatus = DBUX.ViewBadgeStatus.defaultViewBadgeStatus()
-				_badgeStatus = Published(initialValue:newBadgeStatus)
+				_badgeStatus = Published(wrappedValue:newBadgeStatus)
 				try context.setEntry(value:try encoder.encode(newBadgeStatus), forKey:Contexts.badgeStatus, tx:newTrans)
 			}
 
 			// get the view mode
 			do {
 				let decoded = try decoder.decode(DBUX.ViewMode.self, from:try context.getEntry(type:Data.self, forKey:Contexts.viewMode, tx:newTrans)!)
-				_viewMode = Published(initialValue:decoded)
+				_viewMode = Published(wrappedValue:decoded)
 			} catch LMDBError.notFound {
 				let newViewMode:DBUX.ViewMode = .home
-				_viewMode = Published(initialValue:newViewMode)
+				_viewMode = Published(wrappedValue:newViewMode)
 				try context.setEntry(value:encoder.encode(newViewMode), forKey:Contexts.viewMode, tx:newTrans)
 			}
 
 			// get the timeline anchor
 			do {
 				let decoded = try context.getEntry(type:DBUX.DatedNostrEventUID.self, forKey:Contexts.timelineAnchor, tx:newTrans)
-				_timelineAnchor = Published(initialValue:decoded)
+				_timelineAnchor = Published(wrappedValue:decoded)
 			} catch LMDBError.notFound {
-				_timelineAnchor = Published(initialValue:nil)
+				_timelineAnchor = Published(wrappedValue:nil)
 			}
 			try newTrans.commit()
 		}

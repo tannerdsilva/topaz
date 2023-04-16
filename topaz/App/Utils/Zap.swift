@@ -87,6 +87,20 @@ struct Zap:Codable {
 	}
 }
 
+fileprivate func event_has_tag(ev:nostr.Event, tag: String) -> Bool {
+	for t in ev.tags {
+		if t.count >= 1 && t[0] == tag {
+			return true
+		}
+	}
+
+	return false
+}
+
+fileprivate func event_is_anonymous(ev:nostr.Event) -> Bool {
+	return ev.kind == .zap_request && event_has_tag(ev: ev, tag: "anon")
+}
+
 extension Zap {
 	public enum Target:Equatable, Codable, Hashable {
 		enum Error:Swift.Error {

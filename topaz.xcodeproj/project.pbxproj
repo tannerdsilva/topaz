@@ -7,9 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AE010B5429C674A600ADECCA /* ConnectionDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE010B5329C674A600ADECCA /* ConnectionDetailsView.swift */; };
+		AE010B5429C674A600ADECCA /* AllConnectionsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE010B5329C674A600ADECCA /* AllConnectionsScreen.swift */; };
+		AE0C436929EC49FA000EC738 /* CustomToggleSwitch.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0C436829EC49FA000EC738 /* CustomToggleSwitch.swift */; };
+		AE0C436C29EC6BC2000EC738 /* ConnectionStatusWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0C436B29EC6BC2000EC738 /* ConnectionStatusWidget.swift */; };
+		AE0C436E29EC705A000EC738 /* UI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0C436D29EC705A000EC738 /* UI.swift */; };
+		AE0C437029EC7583000EC738 /* UIRelays.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0C436F29EC7583000EC738 /* UIRelays.swift */; };
+		AE0C437329EC7B88000EC738 /* UIEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0C437229EC7B88000EC738 /* UIEvents.swift */; };
+		AE0C437529EC7BDF000EC738 /* NavBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0C437429EC7BDF000EC738 /* NavBar.swift */; };
 		AE0F152C29C4E176009E3297 /* Stream.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0F152B29C4E176009E3297 /* Stream.swift */; };
-		AE0F153229C509B4009E3297 /* Context.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0F153129C509B4009E3297 /* Context.swift */; };
 		AE1A59C229B7A20600D21AA0 /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A59C129B7A20600D21AA0 /* Event.swift */; };
 		AE1A59C429B7A3E400D21AA0 /* nostr.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A59C329B7A3E400D21AA0 /* nostr.swift */; };
 		AE1A59C629B7B0EA00D21AA0 /* Invoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A59C529B7B0EA00D21AA0 /* Invoice.swift */; };
@@ -79,7 +84,6 @@
 		AEBA325A29CCC28F00FC2CD2 /* TextNoteContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBA325929CCC28F00FC2CD2 /* TextNoteContentView.swift */; };
 		AED9D12F29BA9730004AE0AE /* LocalizationHelp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED9D12E29BA9730004AE0AE /* LocalizationHelp.swift */; };
 		AED9D13429BA9828004AE0AE /* NIP05.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED9D13329BA9828004AE0AE /* NIP05.swift */; };
-		AEEAF2AC29CA1932002B3C37 /* EventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEEAF2AA29CA1932002B3C37 /* EventView.swift */; };
 		AEEAF2AE29CA19D2002B3C37 /* TextEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEEAF2AD29CA19D2002B3C37 /* TextEvent.swift */; };
 		AEEAF2B029CA1A0B002B3C37 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEEAF2AF29CA1A0B002B3C37 /* TimelineView.swift */; };
 		AEF298E529D4BE1600E50654 /* Holder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF298E429D4BE1600E50654 /* Holder.swift */; };
@@ -109,9 +113,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		AE010B5329C674A600ADECCA /* ConnectionDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionDetailsView.swift; sourceTree = "<group>"; };
+		AE010B5329C674A600ADECCA /* AllConnectionsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllConnectionsScreen.swift; sourceTree = "<group>"; };
+		AE0C436829EC49FA000EC738 /* CustomToggleSwitch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomToggleSwitch.swift; sourceTree = "<group>"; };
+		AE0C436B29EC6BC2000EC738 /* ConnectionStatusWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusWidget.swift; sourceTree = "<group>"; };
+		AE0C436D29EC705A000EC738 /* UI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI.swift; sourceTree = "<group>"; };
+		AE0C436F29EC7583000EC738 /* UIRelays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIRelays.swift; sourceTree = "<group>"; };
+		AE0C437229EC7B88000EC738 /* UIEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIEvents.swift; sourceTree = "<group>"; };
+		AE0C437429EC7BDF000EC738 /* NavBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavBar.swift; sourceTree = "<group>"; };
 		AE0F152B29C4E176009E3297 /* Stream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stream.swift; sourceTree = "<group>"; };
-		AE0F153129C509B4009E3297 /* Context.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Context.swift; sourceTree = "<group>"; };
 		AE1A59C129B7A20600D21AA0 /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
 		AE1A59C329B7A3E400D21AA0 /* nostr.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = nostr.swift; sourceTree = "<group>"; };
 		AE1A59C529B7B0EA00D21AA0 /* Invoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Invoice.swift; sourceTree = "<group>"; };
@@ -176,7 +185,6 @@
 		AEBA325929CCC28F00FC2CD2 /* TextNoteContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextNoteContentView.swift; sourceTree = "<group>"; };
 		AED9D12E29BA9730004AE0AE /* LocalizationHelp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationHelp.swift; sourceTree = "<group>"; };
 		AED9D13329BA9828004AE0AE /* NIP05.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NIP05.swift; sourceTree = "<group>"; };
-		AEEAF2AA29CA1932002B3C37 /* EventView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EventView.swift; sourceTree = "<group>"; };
 		AEEAF2AD29CA19D2002B3C37 /* TextEvent.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TextEvent.swift; sourceTree = "<group>"; };
 		AEEAF2AF29CA1A0B002B3C37 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		AEF298E429D4BE1600E50654 /* Holder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Holder.swift; sourceTree = "<group>"; };
@@ -222,24 +230,44 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		AE0F152D29C50819009E3297 /* UserExperience */ = {
+		AE0C436529EC496F000EC738 /* Timeline */ = {
 			isa = PBXGroup;
 			children = (
-				AE0F153129C509B4009E3297 /* Context.swift */,
+				AEEAF2AF29CA1A0B002B3C37 /* TimelineView.swift */,
 			);
-			path = UserExperience;
+			path = Timeline;
+			sourceTree = "<group>";
+		};
+		AE0C436A29EC6730000EC738 /* Relay Connections */ = {
+			isa = PBXGroup;
+			children = (
+				AE010B5329C674A600ADECCA /* AllConnectionsScreen.swift */,
+				AE0C436B29EC6BC2000EC738 /* ConnectionStatusWidget.swift */,
+				AE0C436F29EC7583000EC738 /* UIRelays.swift */,
+			);
+			path = "Relay Connections";
+			sourceTree = "<group>";
+		};
+		AE0C437129EC7B2A000EC738 /* Events */ = {
+			isa = PBXGroup;
+			children = (
+				AE0C437229EC7B88000EC738 /* UIEvents.swift */,
+			);
+			path = Events;
 			sourceTree = "<group>";
 		};
 		AE1A59BE29B70F7900D21AA0 /* UserExperience */ = {
 			isa = PBXGroup;
 			children = (
-				AEEAF2AA29CA1932002B3C37 /* EventView.swift */,
+				AE0C437129EC7B2A000EC738 /* Events */,
+				AE0C436A29EC6730000EC738 /* Relay Connections */,
+				AE0C436529EC496F000EC738 /* Timeline */,
 				AEEAF2AD29CA19D2002B3C37 /* TextEvent.swift */,
 				AEB39B8729B68D6A00F3C92E /* UserExperienceView.swift */,
-				AE010B5329C674A600ADECCA /* ConnectionDetailsView.swift */,
-				AEEAF2AF29CA1A0B002B3C37 /* TimelineView.swift */,
 				AEBA325929CCC28F00FC2CD2 /* TextNoteContentView.swift */,
 				AEF298EC29D4CDF900E50654 /* ProfileDetailView.swift */,
+				AE0C436829EC49FA000EC738 /* CustomToggleSwitch.swift */,
+				AE0C437429EC7BDF000EC738 /* NavBar.swift */,
 			);
 			path = UserExperience;
 			sourceTree = "<group>";
@@ -427,6 +455,7 @@
 				AEB899E429B4FE44004361B8 /* Welcome */,
 				AE771EAE29B5166A0019EDA1 /* ContentView.swift */,
 				AE8F05B629CD44CB00D59FEC /* Warnings.swift */,
+				AE0C436D29EC705A000EC738 /* UI.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -443,7 +472,6 @@
 			isa = PBXGroup;
 			children = (
 				AE598F3129E5B8A500D4CB8F /* DBUX */,
-				AE0F152D29C50819009E3297 /* UserExperience */,
 				AE2C0EEC29BA712D00C0B87C /* Other Stuff */,
 				AEB899F029B4FE4E004361B8 /* ApplicationModel.swift */,
 				AEB39B7F29B5C2E700F3C92E /* UserEnvironment.swift */,
@@ -618,6 +646,7 @@
 				AE598F8929E9E65000D4CB8F /* Notifications.swift in Sources */,
 				AE598F2C29E49B2100D4CB8F /* DBUX.swift in Sources */,
 				AE7FE83B29BBBCBE0060DCE3 /* LNURLPayRequest.swift in Sources */,
+				AE0C437529EC7BDF000EC738 /* NavBar.swift in Sources */,
 				AE1A59CA29B7B26200D21AA0 /* ReferenceID.swift in Sources */,
 				AE598F3729E5F48100D4CB8F /* DBUX.Date.swift in Sources */,
 				AEEAF2AE29CA19D2002B3C37 /* TextEvent.swift in Sources */,
@@ -633,7 +662,6 @@
 				AE598F7529E8A74E00D4CB8F /* MDB_comparable.swift in Sources */,
 				AE421C7729BD1FB5009CB737 /* ReplyDesc.swift in Sources */,
 				AEB39B7E29B59C5B00F3C92E /* AccountPickerView.swift in Sources */,
-				AE0F153229C509B4009E3297 /* Context.swift in Sources */,
 				AE1A59C829B7B1EA00D21AA0 /* Mention.swift in Sources */,
 				AEBA325A29CCC28F00FC2CD2 /* TextNoteContentView.swift in Sources */,
 				AEB39B7B29B5417D00F3C92E /* POW.swift in Sources */,
@@ -642,10 +670,12 @@
 				AE598F3529E5C77600D4CB8F /* QuickLMDB.Environment.swift in Sources */,
 				AE598F7929E8CEE800D4CB8F /* KeyPair.swift in Sources */,
 				AE7FE83929BBB7F80060DCE3 /* Parser.swift in Sources */,
+				AE0C437029EC7583000EC738 /* UIRelays.swift in Sources */,
+				AE0C436E29EC705A000EC738 /* UI.swift in Sources */,
 				AE2C0EEE29BA71B100C0B87C /* ActionBarModel.swift in Sources */,
 				AE598F8129E92C4500D4CB8F /* ContextEngine.swift in Sources */,
 				AE1A59C229B7A20600D21AA0 /* Event.swift in Sources */,
-				AE010B5429C674A600ADECCA /* ConnectionDetailsView.swift in Sources */,
+				AE010B5429C674A600ADECCA /* AllConnectionsScreen.swift in Sources */,
 				AE771EAF29B5166A0019EDA1 /* ContentView.swift in Sources */,
 				AEB899F129B4FE4E004361B8 /* ApplicationModel.swift in Sources */,
 				AE1A59C629B7B0EA00D21AA0 /* Invoice.swift in Sources */,
@@ -656,16 +686,18 @@
 				AED9D13429BA9828004AE0AE /* NIP05.swift in Sources */,
 				AE421C7329BD095B009CB737 /* EventReference.swift in Sources */,
 				AE2C0EF229BA7C9E00C0B87C /* Constants.swift in Sources */,
+				AE0C436C29EC6BC2000EC738 /* ConnectionStatusWidget.swift in Sources */,
 				AEB39B6E29B52D5900F3C92E /* Topaz.swift in Sources */,
 				AE421C7A29BE30DE009CB737 /* Foundation.Date.swift in Sources */,
 				AED9D12F29BA9730004AE0AE /* LocalizationHelp.swift in Sources */,
 				AE421C6D29BC433B009CB737 /* PostBlock.swift in Sources */,
-				AEEAF2AC29CA1932002B3C37 /* EventView.swift in Sources */,
 				AE598F8729E9E4D400D4CB8F /* Dispatcher.swift in Sources */,
 				AE8F05B729CD44CB00D59FEC /* Warnings.swift in Sources */,
 				AE2C0EEB29BA6E8700C0B87C /* Profile.swift in Sources */,
 				AEB39B6C29B52B1200F3C92E /* OnboardingView.swift in Sources */,
+				AE0C437329EC7B88000EC738 /* UIEvents.swift in Sources */,
 				AE598F7B29E9098900D4CB8F /* EventsEngine.swift in Sources */,
+				AE0C436929EC49FA000EC738 /* CustomToggleSwitch.swift in Sources */,
 				AE598F3329E5B8C100D4CB8F /* ExperienceEngine.swift in Sources */,
 				AEEAF2B029CA1A0B002B3C37 /* TimelineView.swift in Sources */,
 				AEB39B8829B68D6A00F3C92E /* UserExperienceView.swift in Sources */,
@@ -1113,7 +1145,7 @@
 			repositoryURL = "https://github.com/tannerdsilva/hummingbird-websocket.git";
 			requirement = {
 				kind = revision;
-				revision = 80cf06a1462fd9bb59b3ac289bcf782deb5fe984;
+				revision = 75d994ff67d6b4bcae0fc08fa824ab7a1ca5c241;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

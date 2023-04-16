@@ -30,7 +30,7 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 	static let name = "topaz-base.mdb"
 	static let deltaSize = size_t(250000000)
 	static let maxDBs:MDB_dbi = 1
-	static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
+	static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir]
 	let env:QuickLMDB.Environment
 	let pubkey:nostr.Key
 	let base:URL
@@ -116,7 +116,7 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 			_currentUX = Published(wrappedValue:nil)
 		} else {
 			let getKeypair = try self.userStore.keypair(pubkey:curUser!)
-			let loadUX = try DBUX(base:base, keypair:getKeypair)
+			let loadUX = try! DBUX(base:base.deletingLastPathComponent(), keypair:getKeypair)
 			_currentUX = Published(wrappedValue:loadUX)
 		}
 		try subTrans.commit()
@@ -137,13 +137,14 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 	/// installs a user in the application and ensures that the state of the app is updated
 	@MainActor func installUser(publicKey:nostr.Key, privateKey:nostr.Key) throws {
 		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false)
+		try self.app_metadata.setEntry(value:ApplicationModel.State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
 		self.objectWillChange.send()
 		_state = Published(wrappedValue:.onboarded)
-		try self.app_metadata.setEntry(value:ApplicationModel.State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
+//		_currentUX = Published(wrappedValue:try! DBUX(base:Topaz.findApplicationBase(), keypair:nostr.KeyPair(pubkey:publicKey, privkey:privateKey)))
 		try self.userStore.addUser(publicKey, privateKey:privateKey)
 		try setCurrentlyLoggedInUser(publicKey, tx:newTrans)
 		try newTrans.commit()
-		_currentUX = Published(wrappedValue:try! DBUX(base:Topaz.findApplicationBase(), keypair:nostr.KeyPair(pubkey:publicKey, privkey:privateKey)))
+		
 	}
 
 
@@ -202,7 +203,7 @@ extension ApplicationModel {
 		@MainActor fileprivate func addUser(_ publicKey:nostr.Key, privateKey:nostr.Key) throws {
 			let subTrans = try QuickLMDB.Transaction(env, readOnly:false)
 			self.objectWillChange.send()
-			try userDB.setEntry(value:privateKey, forKey:publicKey, flags:[.noOverwrite], tx:subTrans)
+			try userDB.setEntry(value:privateKey, forKey:publicKey, tx:subTrans)
 			try subTrans.commit()
 		}
 

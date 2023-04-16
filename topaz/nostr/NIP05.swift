@@ -50,7 +50,7 @@ struct NIP05 {
 		components.queryItems = queryItems
 		// build the request
 		guard let requestURL = components.url else {
-			Self.logger.error("invalid URL.", metadata:["url":"\(url)"])
+			Self.logger.error("unable to execute NIP-05 request. an invalid url was provided.", metadata:["url":"\(url)"])
 			throw Error.invalidURL
 		}
 		let request = try HTTPClient.Request(url:requestURL, method:.GET)

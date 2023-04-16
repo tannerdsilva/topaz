@@ -55,10 +55,10 @@ import QuickLMDB
 			// get the badge status
 			do {
 				let decoded = try decoder.decode(DBUX.ViewBadgeStatus.self, from:try context.getEntry(type:Data.self, forKey:Contexts.badgeStatus, tx:subTrans)!)
-				_badgeStatus = Published(wrappedValue:decoded)
+				_badgeStatus = Published(decoded)
 			} catch LMDBError.notFound {
 				let newBadgeStatus = DBUX.ViewBadgeStatus.defaultViewBadgeStatus()
-				_badgeStatus = Published(wrappedValue:newBadgeStatus)
+				_badgeStatus = Published(newBadgeStatus)
 				try context.setEntry(value:try encoder.encode(newBadgeStatus), forKey:Contexts.badgeStatus, tx:subTrans)
 			}
 
