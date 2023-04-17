@@ -24,7 +24,7 @@ struct Topaz:App, Based {
 	
 	/// the default event loop group used for all relay connections (unless otherwise specified for a particular connection)
 	public static let defaultPool = MultiThreadedEventLoopGroup(numberOfThreads:System.coreCount)
-
+	public static let applicationDispatcher = Dispatcher<Topaz.Notification>(logLabel:"topaz", logLevel:.info)
 	public static let tester_account = try! KeyPair.from(nsec:"nsec1s23j6z0x4w2y35c5zkf6le539sdmkmw4r7mm9jj22gnltrllqxzqjnh2wm")
 	
 	public static func readSystemSecureData(length:size_t) throws -> Data {
@@ -51,7 +51,7 @@ struct Topaz:App, Based {
 		try FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true)
 	}
 	
-	static func launchExperienceEngine<T>(_ type: T.Type, from base: URL, for publicKey: nostr.Key) throws -> T where T: ExperienceEngine {
+	static func launchExperienceEngine<T>(_ type: T.Type, from base: URL, for publicKey: nostr.Key, dispatcher:Dispatcher<T.NotificationType>) throws -> T where T: ExperienceEngine {
 		let isDirectory = type.env_flags.contains(.noSubDir) ? false : true
 		let path = base.appendingPathComponent(type.name, isDirectory: isDirectory)
 
@@ -60,11 +60,11 @@ struct Topaz:App, Based {
 			let dataMdbPath = path.appendingPathComponent("data.mdb")
 			let increaseSize = size_t(dataMdbPath.getFileSize()) + size_t(type.deltaSize)
 			let makeEnv = try QuickLMDB.Environment(path: path.path, flags: type.env_flags, mapSize: increaseSize, maxDBs: type.maxDBs)
-			return try type.init(base: path, env: makeEnv, publicKey: publicKey)
+			return try type.init(base: path, env: makeEnv, publicKey: publicKey, dispatcher: dispatcher)
 		} else {
 			let increaseSize = size_t(path.getFileSize()) + size_t(type.deltaSize)
 			let makeEnv = try QuickLMDB.Environment(path: path.path, flags: type.env_flags, mapSize: increaseSize, maxDBs: type.maxDBs)
-			return try type.init(base: path, env: makeEnv, publicKey: publicKey)
+			return try type.init(base: path, env: makeEnv, publicKey: publicKey, dispatcher: dispatcher)
 		}
 	}
 
@@ -109,7 +109,7 @@ struct Topaz:App, Based {
 	
 	init() {
 		do {
-			let appModel = try! Topaz.launchExperienceEngine(ApplicationModel.self, from:self.base, for:nostr.Key.nullKey())
+			let appModel = try! Topaz.launchExperienceEngine(ApplicationModel.self, from:self.base, for:nostr.Key.nullKey(), dispatcher:Self.applicationDispatcher)
 			_localData = ObservedObject(wrappedValue: appModel)
 		} catch let error {
 			fatalError("false")
@@ -124,8 +124,9 @@ struct Topaz:App, Based {
 }
 
 
-/// returns the username that the calling process is running as
-public func getCurrentUser() -> String {
-	return String(validatingUTF8:getpwuid(geteuid()).pointee.pw_name)!
-}
 
+extension Topaz {
+	enum Notification:Hashable {
+		
+	}
+}

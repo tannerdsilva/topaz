@@ -60,6 +60,8 @@
 		AE771EAF29B5166A0019EDA1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE771EAE29B5166A0019EDA1 /* ContentView.swift */; };
 		AE7FE83929BBB7F80060DCE3 /* Parser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7FE83829BBB7F80060DCE3 /* Parser.swift */; };
 		AE7FE83B29BBBCBE0060DCE3 /* LNURLPayRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7FE83A29BBBCBE0060DCE3 /* LNURLPayRequest.swift */; };
+		AE8E034229ECEC5D0030745C /* RelayProtocolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8E034129ECEC5D0030745C /* RelayProtocolView.swift */; };
+		AE8E034429EDB14F0030745C /* DBUXNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8E034329EDB14F0030745C /* DBUXNotification.swift */; };
 		AE8F05B729CD44CB00D59FEC /* Warnings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8F05B629CD44CB00D59FEC /* Warnings.swift */; };
 		AEB39B6C29B52B1200F3C92E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB39B6B29B52B1200F3C92E /* OnboardingView.swift */; };
 		AEB39B6E29B52D5900F3C92E /* Topaz.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB39B6D29B52D5900F3C92E /* Topaz.swift */; };
@@ -169,6 +171,8 @@
 		AE771EAE29B5166A0019EDA1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AE7FE83829BBB7F80060DCE3 /* Parser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Parser.swift; sourceTree = "<group>"; };
 		AE7FE83A29BBBCBE0060DCE3 /* LNURLPayRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LNURLPayRequest.swift; sourceTree = "<group>"; };
+		AE8E034129ECEC5D0030745C /* RelayProtocolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayProtocolView.swift; sourceTree = "<group>"; };
+		AE8E034329EDB14F0030745C /* DBUXNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DBUXNotification.swift; path = topaz/Model/DBUX/DBUXNotification.swift; sourceTree = SOURCE_ROOT; };
 		AE8F05B629CD44CB00D59FEC /* Warnings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Warnings.swift; sourceTree = "<group>"; };
 		AEB39B6B29B52B1200F3C92E /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		AEB39B6D29B52D5900F3C92E /* Topaz.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Topaz.swift; sourceTree = "<group>"; };
@@ -244,6 +248,7 @@
 				AE010B5329C674A600ADECCA /* AllConnectionsScreen.swift */,
 				AE0C436B29EC6BC2000EC738 /* ConnectionStatusWidget.swift */,
 				AE0C436F29EC7583000EC738 /* UIRelays.swift */,
+				AE8E034129ECEC5D0030745C /* RelayProtocolView.swift */,
 			);
 			path = "Relay Connections";
 			sourceTree = "<group>";
@@ -382,6 +387,7 @@
 				AE598F7D29E91E3800D4CB8F /* ProfilesEngine.swift */,
 				AE598F8029E92C4500D4CB8F /* ContextEngine.swift */,
 				AE598F8429E92FC000D4CB8F /* ContactsEngine.swift */,
+				AE8E034329EDB14F0030745C /* DBUXNotification.swift */,
 			);
 			path = Engines;
 			sourceTree = "<group>";
@@ -680,8 +686,10 @@
 				AEB899F129B4FE4E004361B8 /* ApplicationModel.swift in Sources */,
 				AE1A59C629B7B0EA00D21AA0 /* Invoice.swift in Sources */,
 				AE598F3029E5AB3A00D4CB8F /* URL.swift in Sources */,
+				AE8E034429EDB14F0030745C /* DBUXNotification.swift in Sources */,
 				AEF298E729D4BE2800E50654 /* HTTPTool.swift in Sources */,
 				AEB39B8229B5C37800F3C92E /* Relay.swift in Sources */,
+				AE8E034229ECEC5D0030745C /* RelayProtocolView.swift in Sources */,
 				AE421C7129BC7EED009CB737 /* RelayRegistrar.swift in Sources */,
 				AED9D13429BA9828004AE0AE /* NIP05.swift in Sources */,
 				AE421C7329BD095B009CB737 /* EventReference.swift in Sources */,

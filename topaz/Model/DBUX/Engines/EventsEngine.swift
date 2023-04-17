@@ -37,10 +37,13 @@ extension DBUX.EventsEngine.KindsEngine {
 
 extension DBUX.EventsEngine {
 	struct KindsEngine:ExperienceEngine {
+		typealias NotificationType = DBUX.Notification
+		
 		static let name = "event-engine-kind-id.mdb"
 		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
+		let dispatcher: Dispatcher<DBUX.Notification>
 		let base:URL
 		let env:QuickLMDB.Environment
 		let pubkey:nostr.Key
@@ -57,7 +60,8 @@ extension DBUX.EventsEngine {
 		// stores the kind associated with the given UID
 		let uid_kind:Database
 
-		init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key) throws {
+		init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+			self.dispatcher = dispatcher
 			self.base = base
 			self.env = env
 			self.pubkey = publicKey
@@ -121,10 +125,14 @@ extension DBUX.EventsEngine {
 
 extension DBUX {
 	struct DatesEngine:ExperienceEngine {
+		typealias NotificationType = DBUX.Notification
+		
+		
 		static let name = "event-engine-date-id.mdb"
 		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
+		let dispatcher: Dispatcher<DBUX.Notification>
 		let base:URL
 		let env:QuickLMDB.Environment
 		let pubkey:nostr.Key
@@ -139,7 +147,8 @@ extension DBUX {
 		// stores the date associated with the given UID
 		let uid_date:Database	// [nostr.Event.UID:DBUX.Date]
 
-		init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key) throws {
+		init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+			self.dispatcher = dispatcher
 			self.base = base
 			self.env = env
 			self.pubkey = publicKey
@@ -165,10 +174,13 @@ extension DBUX {
 
 extension DBUX {
 	struct PublishersEngine: ExperienceEngine {
+		typealias NotificationType = DBUX.Notification
+		
 		static let name = "event-engine-key-uid.mdb"
 		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs: MDB_dbi = 2
 		static let env_flags: QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
+		let dispatcher: Dispatcher<NotificationType>
 		let base: URL
 		let env: QuickLMDB.Environment
 		let pubkey: nostr.Key
@@ -183,7 +195,8 @@ extension DBUX {
 		// stores the key associated with the given UID
 		let uid_key: Database // [nostr.Event.UID: nostr.Key]
 
-		init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key) throws {
+		init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+			self.dispatcher = dispatcher
 			self.base = base
 			self.env = env
 			self.pubkey = publicKey
@@ -211,26 +224,27 @@ extension DBUX {
 extension DBUX {
 	struct EventsEngine:Based {
 		let base:URL
-
+		let dispatcher:Dispatcher<DBUX.Notification>
 		let kindDB:KindsEngine
 		let dateIDs:DatesEngine
 		let publishers:PublishersEngine
 
 		let timelineEngine:TimelineEngine
 
-		init(base:URL, pubkey:nostr.Key) throws {
+		init(base:URL, pubkey:nostr.Key, dispatcher:Dispatcher<DBUX.Notification>) throws {
 			let eventsFolder = base.appendingPathComponent("events", isDirectory:true)
 			if !FileManager.default.fileExists(atPath:eventsFolder.path) {
 				try FileManager.default.createDirectory(at:eventsFolder, withIntermediateDirectories:true, attributes:nil)
 			}
-			self = try .init(explicit:eventsFolder, pubkey:pubkey)
+			self = try .init(explicit:eventsFolder, pubkey:pubkey, dispatcher:dispatcher)
 		}
-		private init(explicit:URL, pubkey:nostr.Key) throws {
+		private init(explicit:URL, pubkey:nostr.Key, dispatcher:Dispatcher<DBUX.Notification>) throws {
 			self.base = explicit
-			self.kindDB = try Topaz.launchExperienceEngine(KindsEngine.self, from:explicit, for:pubkey)
-			self.dateIDs = try Topaz.launchExperienceEngine(DatesEngine.self, from:explicit, for:pubkey)
-			self.publishers = try Topaz.launchExperienceEngine(PublishersEngine.self, from:explicit, for:pubkey)
-			self.timelineEngine = try Topaz.launchExperienceEngine(TimelineEngine.self, from:explicit, for:pubkey)
+			self.dispatcher = dispatcher
+			self.kindDB = try Topaz.launchExperienceEngine(KindsEngine.self, from:explicit, for:pubkey, dispatcher: dispatcher)
+			self.dateIDs = try Topaz.launchExperienceEngine(DatesEngine.self, from:explicit, for:pubkey, dispatcher: dispatcher)
+			self.publishers = try Topaz.launchExperienceEngine(PublishersEngine.self, from:explicit, for:pubkey, dispatcher: dispatcher)
+			self.timelineEngine = try Topaz.launchExperienceEngine(TimelineEngine.self, from:explicit, for:pubkey, dispatcher: dispatcher)
 		}
 
 	}
@@ -238,10 +252,13 @@ extension DBUX {
 
 extension DBUX.EventsEngine {
 	class TimelineEngine:ExperienceEngine {
+		typealias NotificationType = DBUX.Notification
+		
 		static let name = "timeline-engine.mdb"
 		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs: MDB_dbi = 1
 		static let env_flags: QuickLMDB.Environment.Flags = [.noSubDir, .noReadAhead]
+		let dispatcher:Dispatcher<NotificationType>
 		let base: URL
 		let env: QuickLMDB.Environment
 		let pubkey: nostr.Key
@@ -252,7 +269,8 @@ extension DBUX.EventsEngine {
 		
 		let allDB: Database // database structure [DBUX.DatedNostrEventUID: nostr.Event]
 
-		required init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key) throws {
+		required init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+			self.dispatcher = dispatcher
 			self.base = base
 			self.env = env
 			self.pubkey = publicKey

@@ -14,10 +14,12 @@ import AsyncAlgorithms
 
 extension DBUX {
 	class ContextEngine:ObservableObject, ExperienceEngine {
+		typealias NotificationType = DBUX.Notification
 		static let name = "context-engine.mdb"
 		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 1
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
+		let dispatcher:Dispatcher<NotificationType>
 		let base:URL
 		let env:QuickLMDB.Environment
 		let pubkey:nostr.Key
@@ -32,7 +34,8 @@ extension DBUX {
 		fileprivate let encoder:JSONEncoder
 		fileprivate let userContext:Database
 
-		required init(base:URL, env:QuickLMDB.Environment, publicKey pubkey:nostr.Key) throws {
+		required init(base:URL, env:QuickLMDB.Environment, publicKey pubkey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+			self.dispatcher = dispatcher
 			self.base = base
 			self.env = env
 			self.pubkey = pubkey

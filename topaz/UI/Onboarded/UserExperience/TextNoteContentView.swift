@@ -29,9 +29,9 @@ struct TextNoteContentView: View {
 			switch renderRichText() {
 			case .success(let richText):
 				Text(richText)
-					.font(.body) // Set your desired font
-					.foregroundColor(.primary) // Set your desired color
-					.multilineTextAlignment(.leading) // Set the desired alignment
+					.font(.body)
+					.foregroundColor(.primary)
+					.multilineTextAlignment(.leading)
 			case .failure:
 				Text(content) // Fallback to plain text if rich text rendering fails
 			}

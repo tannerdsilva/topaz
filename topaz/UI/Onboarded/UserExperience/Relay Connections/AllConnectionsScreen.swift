@@ -9,22 +9,91 @@ import SwiftUI
 
 extension UI.Relays {
 	struct AllConnectionsScreen: View {
+		struct ConnectionListItem: View {
+			let url: String
+			let state: RelayConnection.State
+			let showReconnectButton: Bool
+			
+			var body: some View {
+				HStack {
+					RelayProtocolView(url: url)
+						.padding(.trailing, 8)
+
+					VStack(alignment: .leading) {
+						Text("\(url.replacingOccurrences(of: "ws://", with: "").replacingOccurrences(of: "wss://", with: ""))")
+							.font(.system(size: 14))
+					}
+					Spacer()
+					
+					if showReconnectButton && state == .disconnected {
+						Button(action: {
+							// Reconnect action
+						}, label: {
+							Text("Reconnect")
+								.padding(.horizontal, 4)
+								.padding(.vertical, 1)
+								.background(.blue)
+								.foregroundColor(.primary)
+								.cornerRadius(4)
+						})
+					}
+				}
+				.padding(.vertical, 6)
+			}
+		}
+
+		struct CustomToolbar: View {
+			let isEditMode: EditMode
+			let onEditToggle: () -> Void
+
+			var body: some View {
+				HStack {
+					Spacer()
+					if isEditMode == .active {
+						Button(action: {
+							onEditToggle()
+						}) {
+							Text("Done")
+								.foregroundColor(.blue)
+								.padding(.horizontal, 16)
+								.padding(.vertical, 8)
+								.background(Color(.systemBackground))
+								.cornerRadius(8)
+								.overlay(
+									RoundedRectangle(cornerRadius: 8)
+										.stroke(Color(.systemBlue), lineWidth: 1)
+								)
+						}
+					} else {
+						Button(action: {
+							onEditToggle()
+						}) {
+							Text("Edit")
+								.foregroundColor(.blue)
+								.padding(.horizontal, 16)
+								.padding(.vertical, 8)
+								.background(Color(.systemBackground))
+								.cornerRadius(8)
+								.overlay(
+									RoundedRectangle(cornerRadius: 8)
+										.stroke(Color(.systemBlue), lineWidth: 1)
+								)
+						}
+					}
+					Spacer()
+				}
+				.padding(.top, 8)
+			}
+		}
+
 		@ObservedObject var relayDB: DBUX.RelaysEngine
+		
+		@State private var isEditMode: EditMode = .inactive
+		@State private var newRelayURL: String = ""
 		
 		var sortedConnections: [(String, RelayConnection.State)] {
 			relayDB.userRelayConnectionStates.sorted { lhs, rhs in
-				switch (lhs.value, rhs.value) {
-				case (.disconnected, .disconnected),
-					(.connecting, .connecting),
-					(.connected, .connected):
-					return lhs.key < rhs.key
-				case (.disconnected, _):
-					return true
-				case (.connecting, .connected):
-					return true
-				default:
-					return false
-				}
+				lhs.key < rhs.key
 			}
 		}
 		
@@ -34,45 +103,66 @@ extension UI.Relays {
 				.sorted { $0.0.rawValue < $1.0.rawValue }
 		}
 		
+		func deleteConnection(at offsets: IndexSet) {
+			var updatedURLs = Set<String>()
+
+			for (index, connection) in sortedConnections.enumerated() {
+				if !offsets.contains(index) {
+					updatedURLs.insert(connection.0)
+				}
+			}
+
+			do {
+				// Replace "pubkey" and "writeDate" with the appropriate values from your app
+				try relayDB.setRelays(updatedURLs, pubkey:relayDB.pubkey, asOf: DBUX.Date())
+			} catch {
+				// Handle the error if needed, e.g., show an alert or print a message
+				print("Error updating relays: \(error)")
+			}
+		}
+
+		
 		var body: some View {
 			NavigationView {
 				VStack {
-					List {
-						ForEach(connectionGroups, id: \.0) { state, connections in
-							Section(header: Text(state.description).font(.subheadline).foregroundColor(state.color).padding(.top)) {
-								ForEach(connections, id: \.0) { key, value in
-									HStack {
-										VStack(alignment: .leading) {
-											Text("\(key)")
-												.font(.system(size: 14))
-										}
-										Spacer()
-										
-										// Add the reconnect button for disconnected relays
-										if state == .disconnected {
-											Button(action: {
-												Task.detached { [relay = relayDB.userRelayConnections[key]!] in
-													do {
-														try await relay.connect(retryLaterIfFailed:true)
-													} catch {
-													}
-												}
-											}, label: {
-												Text("Reconnect")
-													.padding(.horizontal, 4)
-													.padding(.vertical, 1)
-													.background(.blue)
-													.foregroundColor(.primary)
-													.cornerRadius(4)
-											})
-										}
-									}
-									.padding(.vertical, 6)
+					CustomToolbar(isEditMode: isEditMode) {
+						isEditMode = isEditMode == .active ? .inactive : .active
+					}
+					
+					if isEditMode == .active {
+						Section(header: Text("Add New Relay").font(.subheadline)) {
+							HStack {
+								TextField("Enter Relay URL", text: $newRelayURL)
+									.textFieldStyle(RoundedBorderTextFieldStyle())
+								Button(action: {
+									// Add new relay logic here
+								}) {
+									Text("Add")
+										.foregroundColor(.blue)
 								}
 							}
 						}
 					}
+					
+					List {
+						// Add a section for adding a new relay
+						
+						if isEditMode == .inactive {
+							ForEach(connectionGroups, id: \.0) { state, connections in
+								Section(header: Text(state.description).font(.subheadline).foregroundColor(state.color).padding(.top)) {
+									ForEach(connections, id: \.0) { key, value in
+										ConnectionListItem(url: key, state: value, showReconnectButton: true)
+									}
+								}
+							}
+						} else {
+							ForEach(sortedConnections, id: \.0) { key, state in
+								ConnectionListItem(url: key, state: state, showReconnectButton: false)
+							}
+						}
+					}
 					.listStyle(InsetGroupedListStyle())
+					.environment(\.editMode, $isEditMode)
 				}
 			}
 		}

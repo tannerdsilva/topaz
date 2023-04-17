@@ -27,6 +27,10 @@ extension RawRepresentable where Self:MDB_convertible, RawValue:MDB_convertible 
 
 // not based because users get directories created alongside the same `base` as this engine
 class ApplicationModel:ObservableObject, ExperienceEngine {
+	let dispatcher:Dispatcher<Topaz.Notification>
+	
+	typealias NotificationType = Topaz.Notification
+	
 	static let name = "topaz-base.mdb"
 	static let deltaSize = size_t(250000000)
 	static let maxDBs:MDB_dbi = 1
@@ -51,7 +55,6 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 		case tosAcknowledged = "tosAcknlowledged?"	// Bool
 	}
 
-	
 	let logger = Topaz.makeDefaultLogger(label:"topaz-base.mdb")
 	let app_metadata:Database			// general metadata
 	
@@ -84,12 +87,13 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 	
 	@Published public private(set) var currentUX:DBUX?
 
-	required init(base: URL, env docEnv: QuickLMDB.Environment, publicKey: nostr.Key) throws {
+	required init(base: URL, env docEnv: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+		self.dispatcher = dispatcher
 		self.pubkey = publicKey
 		self.env = docEnv
 		self.base = base
 		let subTrans = try Transaction(docEnv, readOnly:false)
-		self.userStore = try Topaz.launchExperienceEngine(UserStore.self, from:self.base.deletingLastPathComponent(), for:nostr.Key.nullKey())
+		self.userStore = try Topaz.launchExperienceEngine(UserStore.self, from:self.base.deletingLastPathComponent(), for:nostr.Key.nullKey(), dispatcher:dispatcher)
 		let getMetadata = try docEnv.openDatabase(named:Databases.app_metadata.rawValue, flags:[.create], tx:subTrans)
 		self.app_metadata = getMetadata
 		// load the app state
@@ -167,6 +171,10 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 
 extension ApplicationModel {
 	class UserStore:ObservableObject, ExperienceEngine {
+		let dispatcher:Dispatcher<NotificationType>
+		
+		typealias NotificationType = Topaz.Notification
+		
 		static let name = "topaz-users.mdb"
 		static let deltaSize = size_t(250000000)
 		static let maxDBs:MDB_dbi = 1
@@ -184,7 +192,8 @@ extension ApplicationModel {
 		/// all the users in the store
 		@Published public private(set) var users:Set<nostr.Key>
 
-		required init(base: URL, env docEnv: QuickLMDB.Environment, publicKey: nostr.Key) throws {
+		required init(base: URL, env docEnv: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+			self.dispatcher = dispatcher
 			self.env = docEnv
 			self.base = base
 			let subTrans = try QuickLMDB.Transaction(docEnv, readOnly:false)

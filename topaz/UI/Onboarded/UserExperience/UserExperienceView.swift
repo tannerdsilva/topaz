@@ -71,7 +71,7 @@ struct HomeView: View {
 		NavigationStack {
 			CustomTitleBar(dbux:dbux)
 			Spacer()
-			TimelineView(dbux:dbux)
+			UI.TimelineView(dbux:dbux)
 		}
 		
 	}
@@ -214,8 +214,10 @@ struct EventViewCell: View {
 
 struct CustomTitleBar: View {
 	let dbux:DBUX
+	@State var showReplies:Bool = false
 	var body: some View {
 		HStack {
+			CustomToggle(isOn:$showReplies, symbolOn:"star.fill", symbolOff:"star")
 			Spacer()
 			UI.Relays.ConnectionStatusWidget(relays: dbux.relaysEngine).border(.orange)
 		}

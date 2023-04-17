@@ -17,6 +17,11 @@ extension DBUX.ContactsEngine {
 	// following related
 	/// this database stores the list of users that the user is following
 	class FollowsEngine:ExperienceEngine {
+		
+		let dispatcher: Dispatcher<DBUX.Notification>
+		
+		typealias NotificationType = DBUX.Notification
+		
 		static let name = "follows-engine.mdb"
 		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 2
@@ -34,7 +39,8 @@ extension DBUX.ContactsEngine {
 		let pubkey_date:Database			// stores the last time that the user profile information was updated.			[nostr.Key:DBUX.Date]
 		let pubkey_following:Database		// stores the list of pubkeys that the user is following						[nostr.Key:nostr.Key?] * DUP * (value will be \0 if an account follows nobody)
 
-		required init(base:URL, env:QuickLMDB.Environment, publicKey pubkey:nostr.Key) throws {
+		required init(base:URL, env:QuickLMDB.Environment, publicKey pubkey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+			self.dispatcher = dispatcher
 			let newTrans = try Transaction(env, readOnly:false)
 			self.pubkey_date = try env.openDatabase(named:Databases.pubkey_refreshDate.rawValue, flags:[.create], tx:newTrans)
 			self.pubkey_following = try env.openDatabase(named:Databases.user_following.rawValue, flags:[.create], tx:newTrans)
@@ -43,6 +49,7 @@ extension DBUX.ContactsEngine {
 			self.env = env
 			self.logger = Logger(label: "follows-engine.mdb")
 			try newTrans.commit()
+			
 		}
 
 		func set(pubkey:nostr.Key, follows:Set<nostr.Key>, tx someTrans:QuickLMDB.Transaction) throws {
@@ -81,6 +88,11 @@ extension DBUX.ContactsEngine {
 			for curAdd in needsAdding {
 				try dateCursor.setEntry(value:nowDate, forKey:pubkey)
 				try cursor.setEntry(value:curAdd, forKey:pubkey)
+			}
+			if pubkey == self.pubkey {
+				Task.detached { [disp = self.dispatcher] in
+					await disp.fireEvent(.currentUserFollowsUpdated)
+				}
 			}
 		}
 
@@ -124,6 +136,10 @@ extension DBUX.ContactsEngine {
 
 extension DBUX {
 	struct ContactsEngine:ExperienceEngine {
+		var dispatcher: Dispatcher<DBUX.Notification>
+		
+		typealias NotificationType = DBUX.Notification
+		
 		static let name = "contacts-engine.mdb"
 		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 1
@@ -135,12 +151,13 @@ extension DBUX {
 
 		let followsEngine:FollowsEngine
 
-		init(base:URL, env:QuickLMDB.Environment, publicKey pubkey:nostr.Key) throws {
+		init(base:URL, env:QuickLMDB.Environment, publicKey pubkey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+			self.dispatcher = dispatcher
 			self.base = base
 			self.env = env
 			self.pubkey = pubkey
 			self.logger = Logger(label: "contacts-engine.mdb")
-			self.followsEngine = try Topaz.launchExperienceEngine(FollowsEngine.self, from:base.deletingLastPathComponent(), for:pubkey)
+			self.followsEngine = try Topaz.launchExperienceEngine(FollowsEngine.self, from:base.deletingLastPathComponent(), for:pubkey, dispatcher: dispatcher)
 		}
 
 		// returns a boolean indicating whether or not the given pubkey is a friend of the current user

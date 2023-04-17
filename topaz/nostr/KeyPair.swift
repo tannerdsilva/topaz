@@ -10,14 +10,24 @@ import QuickLMDB
 import secp256k1
 
 extension nostr {
-	struct Key:MDB_convertible, MDB_comparable, LosslessStringConvertible, Codable, Hashable, Equatable, Comparable {
-		enum Error:Swift.Error {
+	struct Key: MDB_convertible, MDB_comparable, LosslessStringConvertible, Codable, Hashable, Equatable, Comparable, ContiguousBytes {
+		enum Error: Swift.Error {
 			case encodedStringInvalid
 		}
+
 		static func nullKey() -> Self {
 			return Self()
 		}
+
+		// 32 byte static buffer
 		var bytes: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+		func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+			return try Swift.withUnsafeBytes(of: bytes) { buffer in
+				try body(buffer)
+			}
+		}
+
 		
 		// Lexigraphical sorting here
 		@usableFromInline static let mdbCompareFunction:@convention(c) (UnsafePointer<MDB_val>?, UnsafePointer<MDB_val>?) -> Int32 = { a, b in

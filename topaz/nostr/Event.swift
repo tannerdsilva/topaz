@@ -430,8 +430,6 @@ extension nostr.Event {
 				})
 			})
 		}
-		
-		static let hashLength = 32
 
 		var bytes: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 		
@@ -446,7 +444,7 @@ extension nostr.Event {
 				return nil
 			}
 			
-			guard asBytes.count == Self.hashLength else {
+			guard asBytes.count == MemoryLayout<Self>.size else {
 				return nil
 			}
 			self = Self.init(Data(asBytes))
@@ -455,7 +453,7 @@ extension nostr.Event {
 		/// Initialize from Data containing SHA256 hash
 		internal init(_ hashData: Data) {
 			hashData.withUnsafeBytes({ byteBuffer in
-				memcpy(&bytes, byteBuffer, Self.hashLength)
+				memcpy(&bytes, byteBuffer, MemoryLayout<Self>.size)
 			})
 		}
 
@@ -464,14 +462,14 @@ extension nostr.Event {
 
 		// MDB_convertible
 		@usableFromInline internal init?(_ value: MDB_val) {
-			guard value.mv_size == Self.hashLength else {
+			guard value.mv_size == MemoryLayout<Self>.size else {
 				return nil
 			}
-			_ = memcpy(&bytes, value.mv_data, Self.hashLength)
+			_ = memcpy(&bytes, value.mv_data, MemoryLayout<Self>.size)
 		}
 		public func asMDB_val<R>(_ valFunc: (inout MDB_val) throws -> R) rethrows -> R {
 			return try withUnsafePointer(to: bytes, { unsafePointer in
-				var val = MDB_val(mv_size: Self.hashLength, mv_data: UnsafeMutableRawPointer(mutating: unsafePointer))
+				var val = MDB_val(mv_size: MemoryLayout<Self>.size, mv_data: UnsafeMutableRawPointer(mutating: unsafePointer))
 				return try valFunc(&val)
 			})
 		}
@@ -479,7 +477,7 @@ extension nostr.Event {
 		// Hashable
 		public func hash(into hasher:inout Hasher) {
 			withUnsafePointer(to:bytes) { byteBuff in
-				for i in 0..<Self.hashLength {
+				for i in 0..<MemoryLayout<Self>.size {
 					hasher.combine(byteBuff.advanced(by: i))
 				}
 			}
@@ -488,7 +486,7 @@ extension nostr.Event {
 		/// Export the hash as a Data struct
 		public func exportData() -> Data {
 			withUnsafePointer(to:bytes) { byteBuff in
-				return Data(bytes:byteBuff, count:Self.hashLength)
+				return Data(bytes:byteBuff, count:MemoryLayout<Self>.size)
 			}
 		}
 		
@@ -542,12 +540,26 @@ extension nostr.Event {
 				return .success(.bad_sig)
 			}
 			var raw_id_bytes = raw_id.bytes
-			ok = secp256k1_schnorrsig_verify(ctx, &sig64, &raw_id_bytes, UID.hashLength, &xonly_pubkey) > 0
+			ok = secp256k1_schnorrsig_verify(ctx, &sig64, &raw_id_bytes, MemoryLayout<UID>.size, &xonly_pubkey) > 0
 			let result:ValidationResult = ok ? .ok : .bad_sig
 			return .success(result)
 		} catch let error {
 			return .failure(error)
 		}
+	}
+	func sign(privateKey:nostr.Key) throws -> String {
+		let priv_key_bytes = Data(privateKey.bytes).bytes
+		let key = try secp256k1.Signing.PrivateKey(rawRepresentation: priv_key_bytes)
+
+		// Extra params for custom signing
+
+		var aux_rand = random_bytes(count: 64)
+		var digest = Data(privateKey.bytes).bytes
+
+		// API allows for signing variable length messages
+		let signature = try key.schnorr.signature(message: &digest, auxiliaryRand: &aux_rand)
+
+		return hex_encode(signature.rawRepresentation)
 	}
 	func firstEventTag() -> String? {
 		for tag in tags {
@@ -593,7 +605,6 @@ extension nostr.Event {
 	func getEventReferences(privkey:String) -> [EventReference] {
 		return interpret_event_refs(blocks:self.blocks(privkey), tags:self.tags.compactMap({ $0.toArray() }))
 	}
-//	static func createFromPost(_ )
 }
 
 extension KeyPair {

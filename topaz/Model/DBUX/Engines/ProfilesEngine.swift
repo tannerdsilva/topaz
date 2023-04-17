@@ -14,10 +14,12 @@ import AsyncAlgorithms
 
 extension DBUX {
 	class ProfilesEngine:ObservableObject, ExperienceEngine {
+		typealias NotificationType = DBUX.Notification
 		static let name = "profile-engine.mdb"
 		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
+		let dispatcher: Dispatcher<DBUX.Notification>
 		let base:URL
 		let env:QuickLMDB.Environment
 		let pubkey:nostr.Key
@@ -35,7 +37,8 @@ extension DBUX {
 
 		@MainActor @Published var currentUserProfile:nostr.Profile
 
-		required init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key) throws {
+		required init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<DBUX.Notification>) throws {
+			self.dispatcher = dispatcher
 			self.base = base
 			self.env = env
 			self.pubkey = publicKey
@@ -79,13 +82,16 @@ extension DBUX {
 				let encoded = try encoder.encode(curProfile)
 				try profileCursor.setEntry(value:encoded, forKey:pubkey)
 			}
+			try newTrans.commit()
 			if let hasMyProfile = profiles[pubkey] {
 				Task.detached { @MainActor [weak self, myprof = hasMyProfile] in
 					guard let self = self else { return }
 					self.currentUserProfile = myprof
+					Task.detached(operation: { [disp = self.dispatcher] in
+						await disp.fireEvent(DBUX.Notification.currentUserProfileUpdated)
+					})
 				}
 			}
-			try newTrans.commit()
 		}
 	}
 }

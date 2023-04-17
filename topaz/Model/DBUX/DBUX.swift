@@ -11,6 +11,8 @@ import SwiftBlake2
 
 // encompasses the user experience 
 public class DBUX:Based {
+	let dispatcher:Dispatcher<DBUX.Notification>
+	
 	let logger:Logger
 	let base:URL
 	
@@ -27,19 +29,20 @@ public class DBUX:Based {
 	let relaysEngine:RelaysEngine
 
 	init(base:URL, keypair:nostr.KeyPair) throws {
+		self.dispatcher = Dispatcher<Notification>(logLabel:"dbux-\(keypair.pubkey.description)", logLevel:.info)
 		let makeLogger = Topaz.makeDefaultLogger(label:"dbux")
 		self.keypair = keypair
 		self.logger = makeLogger
-		let makeBase = base.appendingPathComponent("uid-\(keypair)", isDirectory:true)
+		let makeBase = base.appendingPathComponent("uid-\(keypair.pubkey.description)", isDirectory:true)
 		if FileManager.default.fileExists(atPath: makeBase.path) == false {
 			try FileManager.default.createDirectory(atPath:makeBase.path, withIntermediateDirectories:true)
 		}
 		
-		self.contactsEngine = try! Topaz.launchExperienceEngine(ContactsEngine.self, from:makeBase, for:keypair.pubkey)
-		self.profilesEngine = try! Topaz.launchExperienceEngine(ProfilesEngine.self, from:makeBase, for:keypair.pubkey)
-		self.contextEngine = try! Topaz.launchExperienceEngine(ContextEngine.self, from:makeBase, for:keypair.pubkey)
-		self.eventsEngine = try! EventsEngine(base:makeBase, pubkey:keypair.pubkey)
-		self.relaysEngine = try! Topaz.launchExperienceEngine(RelaysEngine.self, from:makeBase, for:keypair.pubkey)
+		self.contactsEngine = try! Topaz.launchExperienceEngine(ContactsEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
+		self.profilesEngine = try! Topaz.launchExperienceEngine(ProfilesEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
+		self.contextEngine = try! Topaz.launchExperienceEngine(ContextEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
+		self.eventsEngine = try! EventsEngine(base:makeBase, pubkey:keypair.pubkey, dispatcher:dispatcher)
+		self.relaysEngine = try! Topaz.launchExperienceEngine(RelaysEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
 		self.base = makeBase
 		
 		let myRelays:Set<String>
@@ -52,7 +55,7 @@ public class DBUX:Based {
 		for curRelay in myRelays {
 			try relaysEngine.add(subscriptions:[nostr.Subscribe(sub_id:UUID().uuidString, filters:homeSubs)], to:curRelay)
 		}
-//		
+		
 		Task.detached { [weak self, hol = self.relaysEngine.holder] in
 			guard let self = self else {
 				return
@@ -86,26 +89,46 @@ public class DBUX:Based {
 							try self.relaysEngine.setRelays(relays, pubkey:curEv.pubkey, asOf:curEv.created)
 							let followsTx = try self.contactsEngine.followsEngine.transact(readOnly:false)
 							try self.contactsEngine.followsEngine.set(pubkey:curEv.pubkey, follows:following, tx:followsTx)
+							if curEv.pubkey == self.keypair.pubkey {
+								// write the new home subscription
+								var homeFilter = nostr.Filter()
+								homeFilter.kinds = [.text_note, .like, .boost]
+								homeFilter.authors = Array(following.compactMap({ $0.description }))
+								
+							}
 							try followsTx.commit()
-							self.logger.info("updated contact information for ")
-						} catch let error {
-							
-						}
+							self.logger.info("updated contact information.", metadata:["pubkey":"\(curEv.pubkey)"])
+						} catch let error {}
 						
 					default:
 						self.logger.debug("got event.", metadata:["kind":"\(curEv.kind)"])
 					}
 				}
-				let newEvsSet = Set(curEvs)
-				let tltx = try self.eventsEngine.timelineEngine.transact(readOnly:false)
-				try self.eventsEngine.timelineEngine.writeEvents(newEvsSet, tx:tltx)
-				try tltx.commit()
 				
-				let pftx = try self.profilesEngine.transact(readOnly:false)
-				try self.profilesEngine.setPublicKeys(buildProfiles, tx:pftx)
-				try pftx.commit()
+				await withThrowingTaskGroup(of:Void.self, body: { [pe = self.profilesEngine, newEvsSet = Set(curEvs), tle = self.eventsEngine.timelineEngine, bp = buildProfiles] tg in
+					
+//					 write the events to the timeline
+					tg.addTask { [newEvsSet, tle] in
+						let tltx = try tle.transact(readOnly:false)
+						try tle.writeEvents(newEvsSet, tx:tltx)
+						try tltx.commit()
+					}
+					
+					// write the new profiles to the database
+					tg.addTask { [pe, bp] in
+						let pftx = try pe.transact(readOnly:false)
+						try pe.setPublicKeys(bp, tx:pftx)
+						try pftx.commit()
+					}
+				})
 			}
 		}
+		Task.detached {
+			await self.dispatcher.addListener(forEventType:.currentUserFollowsUpdated, { _ in
+				print("DOING IT")
+			})
+		}
+		
 	}
 //	
 	func getHomeTimelineState() throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {

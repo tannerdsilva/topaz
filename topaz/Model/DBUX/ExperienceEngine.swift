@@ -14,16 +14,20 @@ import class QuickLMDB.Transaction
 protocol Based {
 	var base:URL { get }
 }
-protocol ExperienceEngine:Based {
-	static var name:String { get }
-	static var deltaSize:size_t { get }
-	static var maxDBs:MDB_dbi { get }
-	static var env_flags:QuickLMDB.Environment.Flags { get }
-	var env:QuickLMDB.Environment { get }
-	var pubkey:nostr.Key { get }
-	init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key) throws
-	// static func create(base:URL, env:QuickLMDB.Environment, keypair:KeyPair) throws -> Self
+protocol ExperienceEngine: Based {
+	associatedtype NotificationType: Hashable
+	static var name: String { get }
+	static var deltaSize: size_t { get }
+	static var maxDBs: MDB_dbi { get }
+	static var env_flags: QuickLMDB.Environment.Flags { get }
+	var dispatcher: Dispatcher<NotificationType> { get }
+	var env: QuickLMDB.Environment { get }
+	var pubkey: nostr.Key { get }
+	init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws
+	// static func create(base: URL, env: QuickLMDB.Environment, keypair: KeyPair) throws -> Self
 }
+
+
 
 extension ExperienceEngine {
 	/// opens a new transaction for the user environment
