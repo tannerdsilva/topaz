@@ -11,11 +11,13 @@ struct ContentView: View {
 	@ObservedObject var appData:ApplicationModel
 	
     var body: some View {
-		if (appData.state == .onboarded) {
-			UserExperienceView(dbux:appData.currentUX!).background(.yellow)
-		} else {
-			UI.OnboardingView(appData:appData)
-		}
+//		if let hasCurrentUX = appData.currentUX {
+			if (appData.state == .onboarded) {
+				UserExperienceView(dbux:appData.currentUX!)
+			} else {
+				UI.OnboardingView(appData:appData)
+			}
+//		}
     }
 }
 

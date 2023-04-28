@@ -36,7 +36,7 @@ extension DBUX.EventsEngine.KindsEngine {
 }
 
 extension DBUX.EventsEngine {
-	struct KindsEngine:ExperienceEngine {
+	struct KindsEngine:SharedExperienceEngine {
 		typealias NotificationType = DBUX.Notification
 		
 		static let name = "event-engine-kind-id.mdb"
@@ -44,7 +44,7 @@ extension DBUX.EventsEngine {
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let dispatcher: Dispatcher<DBUX.Notification>
-		let base:URL
+
 		let env:QuickLMDB.Environment
 		let pubkey:nostr.Key
 		
@@ -60,9 +60,8 @@ extension DBUX.EventsEngine {
 		// stores the kind associated with the given UID
 		let uid_kind:Database
 
-		init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+		init(env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
 			self.dispatcher = dispatcher
-			self.base = base
 			self.env = env
 			self.pubkey = publicKey
 			self.logger = try Topaz.makeDefaultLogger(label:"event-engine-kind-id.mdb")
@@ -102,7 +101,7 @@ extension DBUX.EventsEngine {
 		}
 
 		/// removes the given uids from the database
-		func deleteEvents(uids:Set<nostr.Event.UID>, tx someTrans:QuickLMDB.Transaction? = nil) throws {
+		func deleteEvents(uids:Set<nostr.Event.UID>, tx someTrans:QuickLMDB.Transaction) throws {
 			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
 			let uidKCursor = try self.uid_kind.cursor(tx:subTrans)
 			let kindUIDCursor = try self.kind_uid.cursor(tx:subTrans)
@@ -124,16 +123,13 @@ extension DBUX.EventsEngine {
 }
 
 extension DBUX {
-	struct DatesEngine:ExperienceEngine {
+	struct DatesEngine:SharedExperienceEngine {
 		typealias NotificationType = DBUX.Notification
 		
-		
 		static let name = "event-engine-date-id.mdb"
-		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let dispatcher: Dispatcher<DBUX.Notification>
-		let base:URL
 		let env:QuickLMDB.Environment
 		let pubkey:nostr.Key
 		let logger:Logger
@@ -147,9 +143,8 @@ extension DBUX {
 		// stores the date associated with the given UID
 		let uid_date:Database	// [nostr.Event.UID:DBUX.Date]
 
-		init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+		init(env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
 			self.dispatcher = dispatcher
-			self.base = base
 			self.env = env
 			self.pubkey = publicKey
 			self.logger = Topaz.makeDefaultLogger(label:"event-engine-date-id.mdb")
@@ -160,7 +155,7 @@ extension DBUX {
 		}
 
 		func set(events:Set<nostr.Event>, tx someTrans:QuickLMDB.Transaction) throws {
-			let subTrans = try Transaction(env, readOnly:false, parent: someTrans)
+			let subTrans = try Transaction(env, readOnly:false, parent:someTrans)
 			let dateUCursor = try self.date_uid.cursor(tx:subTrans)
 			let uidDCursor = try self.uid_date.cursor(tx:subTrans)
 			for event in events {
@@ -173,15 +168,11 @@ extension DBUX {
 }
 
 extension DBUX {
-	struct PublishersEngine: ExperienceEngine {
+	struct PublishersEngine:SharedExperienceEngine {
 		typealias NotificationType = DBUX.Notification
-		
-		static let name = "event-engine-key-uid.mdb"
-		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs: MDB_dbi = 2
 		static let env_flags: QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let dispatcher: Dispatcher<NotificationType>
-		let base: URL
 		let env: QuickLMDB.Environment
 		let pubkey: nostr.Key
 		let logger: Logger
@@ -195,9 +186,8 @@ extension DBUX {
 		// stores the key associated with the given UID
 		let uid_key: Database // [nostr.Event.UID: nostr.Key]
 
-		init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+		init(env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
 			self.dispatcher = dispatcher
-			self.base = base
 			self.env = env
 			self.pubkey = publicKey
 			self.logger = Topaz.makeDefaultLogger(label: "event-engine-key-uid.mdb")
@@ -222,68 +212,79 @@ extension DBUX {
 
 
 extension DBUX {
-	struct EventsEngine:Based {
-		let base:URL
-		let dispatcher:Dispatcher<DBUX.Notification>
+	struct EventsEngine:ExperienceEngine {
+		typealias NotificationType = DBUX.Notification
+		static let name = "events-engine.mdb"
+		static let deltaSize = size_t(419430400)
+		static let maxDBs:MDB_dbi = 32
+		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
+		let dispatcher: Dispatcher<DBUX.Notification>
+		var base:URL
+		let env:QuickLMDB.Environment
+		let pubkey:nostr.Key
+
+		let logger:Logger
 		let kindDB:KindsEngine
 		let dateIDs:DatesEngine
 		let publishers:PublishersEngine
-
 		let timelineEngine:TimelineEngine
-
-		init(base:URL, pubkey:nostr.Key, dispatcher:Dispatcher<DBUX.Notification>) throws {
-			let eventsFolder = base.appendingPathComponent("events", isDirectory:true)
-			if !FileManager.default.fileExists(atPath:eventsFolder.path) {
-				try FileManager.default.createDirectory(at:eventsFolder, withIntermediateDirectories:true, attributes:nil)
-			}
-			self = try .init(explicit:eventsFolder, pubkey:pubkey, dispatcher:dispatcher)
-		}
-		private init(explicit:URL, pubkey:nostr.Key, dispatcher:Dispatcher<DBUX.Notification>) throws {
-			self.base = explicit
+		let followsEngine:FollowsEngine
+		let relaysEngine:RelaysEngine
+		let profilesEngine:ProfilesEngine
+		
+		init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher: Dispatcher<DBUX.Notification>) throws {
+			self.base = base
 			self.dispatcher = dispatcher
-			self.kindDB = try Topaz.launchExperienceEngine(KindsEngine.self, from:explicit, for:pubkey, dispatcher: dispatcher)
-			self.dateIDs = try Topaz.launchExperienceEngine(DatesEngine.self, from:explicit, for:pubkey, dispatcher: dispatcher)
-			self.publishers = try Topaz.launchExperienceEngine(PublishersEngine.self, from:explicit, for:pubkey, dispatcher: dispatcher)
-			self.timelineEngine = try Topaz.launchExperienceEngine(TimelineEngine.self, from:explicit, for:pubkey, dispatcher: dispatcher)
+			self.kindDB = try Topaz.launchSharedExperienceEngine(KindsEngine.self, base:base, env:env, for: publicKey, dispatcher:dispatcher)
+			self.dateIDs = try Topaz.launchSharedExperienceEngine(DatesEngine.self, base:base, env:env, for:publicKey, dispatcher: dispatcher)
+			self.publishers = try Topaz.launchSharedExperienceEngine(PublishersEngine.self, base:base, env:env, for:publicKey, dispatcher: dispatcher)
+			self.timelineEngine = try Topaz.launchSharedExperienceEngine(TimelineEngine.self, base:base, env:env, for:publicKey, dispatcher: dispatcher)
+			self.followsEngine = try Topaz.launchSharedExperienceEngine(FollowsEngine.self, base: base, env:env, for:publicKey, dispatcher: dispatcher)
+			self.relaysEngine = try Topaz.launchSharedExperienceEngine(RelaysEngine.self, base:base, env:env, for:publicKey, dispatcher:dispatcher)
+			self.profilesEngine = try Topaz.launchSharedExperienceEngine(ProfilesEngine.self, base:base, env: env, for: publicKey, dispatcher: dispatcher)
+			self.env = env
+			self.pubkey = publicKey
+			self.base = base
+			self.logger = Topaz.makeDefaultLogger(label: "events-engine")
 		}
-
 	}
 }
 
 extension DBUX.EventsEngine {
-	class TimelineEngine:ExperienceEngine {
+	class TimelineEngine:SharedExperienceEngine {
 		typealias NotificationType = DBUX.Notification
-		
-		static let name = "timeline-engine.mdb"
 		static let deltaSize = size_t(5.12e+8)
 		static let maxDBs: MDB_dbi = 1
-		static let env_flags: QuickLMDB.Environment.Flags = [.noSubDir, .noReadAhead]
+		static let env_flags: QuickLMDB.Environment.Flags = [.noSubDir, .noReadAhead, .noSync]
 		let dispatcher:Dispatcher<NotificationType>
-		let base: URL
 		let env: QuickLMDB.Environment
 		let pubkey: nostr.Key
 		let logger: Logger
+		enum Databases: String {
+			case timelineMain_DB = "timelineMain_DB"
+		}
 		
 		let decoder = JSONDecoder()
 		let encoder = JSONEncoder()
 		
 		let allDB: Database // database structure [DBUX.DatedNostrEventUID: nostr.Event]
 
-		required init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+		required init(env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
 			self.dispatcher = dispatcher
-			self.base = base
 			self.env = env
 			self.pubkey = publicKey
 			self.logger = Topaz.makeDefaultLogger(label: "timeline-engine.mdb")
 			let someTrans = try Transaction(env, readOnly: false)
-			self.allDB = try env.openDatabase(flags:[.create], tx: someTrans)
+			self.allDB = try env.openDatabase(named:Databases.timelineMain_DB.rawValue, flags:[.create], tx: someTrans)
 			try self.allDB.setCompare(tx:someTrans, DBUX.DatedNostrEventUID.mdbCompareFunction)
+			let getEventsCount = try self.allDB.getStatistics(tx:someTrans).entries
 			try someTrans.commit()
 		}
 
 		@discardableResult
 		func writeEvents(_ events: Set<nostr.Event>, tx someTrans: QuickLMDB.Transaction) throws -> Set<DBUX.DatedNostrEventUID> {
-			let eventsByDateID = Dictionary(grouping: events, by: { DBUX.DatedNostrEventUID(event:$0) })
+//			let subTrans = Transaction(self.env, readOnly:false, parent:someTrans)
+			let eventsByDateID = Dictionary(grouping: events, by: { DBUX.DatedNostrEventUID(event:$0) }).compactMapValues({ $0.first })
 			let sortedDateIDs = eventsByDateID.keys.sorted(by: { $0 < $1 })
 			var returnValues = Set<DBUX.DatedNostrEventUID>()
 
@@ -311,34 +312,65 @@ extension DBUX.EventsEngine {
 			}
 			return returnValues
 		}
-
-		func readEvents(from marker:DBUX.DatedNostrEventUID?, limit:UInt16 = 48, tx someTrans:QuickLMDB.Transaction, filter shouldInclude:(nostr.Event.UID) throws -> Bool) throws -> Set<nostr.Event> {
+		
+		@discardableResult func deleteEvents(_ ids:Set<DBUX.DatedNostrEventUID>, tx someTrans:QuickLMDB.Transaction) throws -> [DBUX.DatedNostrEventUID:Result<nostr.Event, Swift.Error>] {
+			var returnValues = [DBUX.DatedNostrEventUID:Result<nostr.Event, Swift.Error>]()
+			let allDBCursor = try self.allDB.cursor(tx: someTrans)
+			for curID in ids.sorted(by: { $0 < $1 }) {
+				do {
+					let curEvent = Data(try allDBCursor.getEntry(.set, key:curID).value)!
+					returnValues[curID] = .success(try decoder.decode(nostr.Event.self, from:curEvent))
+					try allDBCursor.deleteEntry()
+				} catch let error {
+					returnValues[curID] = .failure(error)
+				}
+			}
+			return returnValues
+		}
+		
+		enum ReadDirection {
+			case forward
+			case backward
+		}
+		func readEvents(from marker: DBUX.DatedNostrEventUID?, limit: UInt16 = 25, direction: ReadDirection = .backward, tx someTrans: QuickLMDB.Transaction, filter shouldInclude: (nostr.Event.UID) throws -> Bool) throws -> Set<nostr.Event> {
 			let allDBCursor = try self.allDB.cursor(tx: someTrans)
 			var returnValues = Set<nostr.Event>()
-			var currentEntry:(key:MDB_val, value:MDB_val)
+			var currentEntry: (key: MDB_val, value: MDB_val)
+			
 			if let hasMarker = marker {
 				do {
-					currentEntry = try allDBCursor.getEntry(.setRange, key:hasMarker)
+					currentEntry = try allDBCursor.getEntry(.set, key: hasMarker)
 				} catch LMDBError.notFound {
-					currentEntry = try allDBCursor.getEntry(.last)
+					do {
+						currentEntry = try allDBCursor.getEntry(.setRange, key: hasMarker)
+					} catch LMDBError.notFound {
+						currentEntry = try allDBCursor.getEntry(.last)
+					}
 				}
 			} else {
 				currentEntry = try allDBCursor.getEntry(.last)
 			}
+			
 			do {
 				repeat {
 					let getUID = DBUX.DatedNostrEventUID(currentEntry.key)!.uid
 					if try shouldInclude(getUID) == true {
-						let parsed = try decoder.decode(nostr.Event.self, from:Data(currentEntry.value)!)
-						returnValues.update(with:parsed)
+						let getString = String(currentEntry.value)!
+						print(getString)
+						let parsed = try! decoder.decode(nostr.Event.self, from: Data(currentEntry.value)!)
+						returnValues.update(with: parsed)
 					}
-					try allDBCursor.getEntry(.previous)
+					
+					switch direction {
+					case .forward:
+						currentEntry = try allDBCursor.getEntry(.next)
+					case .backward:
+						currentEntry = try allDBCursor.getEntry(.previous)
+					}
 				} while returnValues.count < limit
 			} catch LMDBError.notFound {
-				// we're done
 			}
 			
-			try someTrans.commit()
 			return returnValues
 		}
 	}

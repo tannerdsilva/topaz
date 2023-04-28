@@ -10,6 +10,32 @@ import Foundation
 extension nostr {
 	/// Profile is a struct that represents a user's profile on Nostr
 	struct Profile:Codable {
+		struct Wallets: Codable, Hashable {
+			var btc: String? = nil
+			var ltc: String? = nil
+			var xmr: String? = nil
+
+			enum CodingKeys: String, CodingKey {
+				case btc = "bitcoin"
+				case ltc = "litecoin"
+				case xmr = "monero"
+			}
+			
+			func hash(into hasher: inout Hasher) {
+				hasher.combine(btc)
+				hasher.combine(ltc)
+				hasher.combine(xmr)
+			}
+			
+			func isEmpty() -> Bool {
+				if (btc == nil || btc!.count == 0) && (xmr == nil || xmr!.count == 0) && (ltc == nil || ltc!.count == 0) {
+					return true
+				} else {
+					return false
+				}
+			}
+		}
+
 		/// name of the profile
 		var name:String? = nil
 		/// display name of the profile
@@ -31,7 +57,7 @@ extension nostr {
 		/// nip05 verification address
 		var nip05:String? = nil
 		/// wallets associated with the profile
-		var wallets:[String:String]? = nil
+		var wallets:Wallets? = nil
 		
 		var website_url:URL? {
 			return self.website.flatMap { URL(string: $0) }

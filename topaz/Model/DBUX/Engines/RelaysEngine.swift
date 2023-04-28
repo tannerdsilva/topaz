@@ -13,15 +13,10 @@ import Logging
 import AsyncAlgorithms
 
 extension DBUX {
-	class RelaysEngine:ObservableObject, ExperienceEngine {
+	class RelaysEngine:ObservableObject, SharedExperienceEngine {
 		typealias NotificationType = DBUX.Notification
-		
-		static let name = "relay-engine.mdb"
-		static let deltaSize = size_t(1.28e+8)
-		static let maxDBs:MDB_dbi = 6
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let dispatcher: Dispatcher<DBUX.Notification>
-		let base:URL
 		let env:QuickLMDB.Environment
 		let pubkey:nostr.Key
 
@@ -37,7 +32,7 @@ extension DBUX {
 			case relayHash_currentSubscriptions = "relayHash-currentSubscriptions"	//[Data:[nostr.Subscribe]]
 		}
 
-		let holder:Holder<nostr.Event>
+		let holder:Holder<(String, nostr.Event)>
 
 		// stores the relay connections for the current user
 		@MainActor @Published public private(set) var userRelayConnections = [String:RelayConnection]()
@@ -60,16 +55,16 @@ extension DBUX {
 		let relayHash_pendingEvents:Database
 		let relayHash_currentSubscriptions:Database
 		
-		required init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<Notification>) throws {
+		required init(env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher: Dispatcher<DBUX.Notification>) throws {
 			self.dispatcher = dispatcher
-			self.base = base
 			self.env = env
-			self.holder = Holder<nostr.Event>(holdInterval:0.35)
+			self.holder = Holder<(String, nostr.Event)>(holdInterval:0.35)
 			var newLogger = Topaz.makeDefaultLogger(label:"relay-engine.mdb")
 			newLogger.logLevel = .trace
 			self.logger = newLogger
 			self.pubkey = publicKey
 			let subTrans = try Transaction(env, readOnly:false)
+			
 			self.pubkey_relays_asof = try env.openDatabase(named:Databases.pubkey_relays_asof.rawValue, flags:[.create], tx:subTrans)
 			self.pubkey_relayHash = try env.openDatabase(named:Databases.pubkey_relayHash.rawValue, flags:[.create, .dupSort], tx:subTrans)
 			self.relayHash_pubKey = try env.openDatabase(named:Databases.relayHash_pubKey.rawValue, flags:[.create, .dupSort], tx:subTrans)
@@ -109,7 +104,6 @@ extension DBUX {
 			var buildConnections = [String:RelayConnection]()
 			var buildStates = [String:RelayConnection.State]()
 			for curRelay in getRelays {
-//				let relayHash = try DBUX.RelayHash(curRelay)
 				let newConnection = RelayConnection(url:curRelay, stateChannel:stateC, eventChannel:eventC)
 				buildConnections[curRelay] = newConnection
 				buildStates[curRelay] = .disconnected
@@ -119,24 +113,24 @@ extension DBUX {
 			try subTrans.commit()
 			try env.sync()
 			
-			self.digestTask = Task.detached { [weak self, sc = stateC, newEnv = env, logThing = newLogger, eventC = eventC] in
+			self.digestTask = Task.detached { [weak self, sc = stateC, newEnv = env, logThing = newLogger, eventC = eventC, pk = self.pubkey, rhCS = self.relayHash_currentSubscriptions] in
 				await withThrowingTaskGroup(of:Void.self, body: { [weak self, sc = sc, newEnv = newEnv, ec = eventC] tg in
 					// status
 					tg.addTask { [weak self, sc = sc, newEnv = newEnv] in
-						guard let self = self else { return }
 						for await (curChanger, newState) in sc {
+//							guard let self = self else { return }
 							let relayHash = try RelayHash(curChanger.url)
 							let newTrans = try Transaction(newEnv, readOnly:false)
-							if newState == .connected {
+							if case .connected = newState {
 								// need to send all subscriptions to relay
 								do {
 									var ourContactsFilter = nostr.Filter()
 									ourContactsFilter.kinds = [.metadata, .contacts]
-									ourContactsFilter.authors = [self.pubkey.description]
-									
+									ourContactsFilter.authors = [pk.description]
+
 									let makeSub = nostr.Subscribe.init(sub_id:"-ux-self-", filters: [ourContactsFilter])
 									try await curChanger.send(.subscribe(makeSub))
-									let getSubs = try self.relayHash_currentSubscriptions.getEntry(type:[nostr.Subscribe].self, forKey:relayHash, tx:newTrans)!
+									let getSubs = try rhCS.getEntry(type:[nostr.Subscribe].self, forKey:relayHash, tx:newTrans)!
 									for curSub in getSubs {
 										do {
 											try await curChanger.send(.subscribe(curSub))
@@ -146,20 +140,20 @@ extension DBUX {
 									}
 								} catch {}
 							}
-							self.relayConnectionStatusUpdated(relay:curChanger.url, state:newState)
+							self?.relayConnectionStatusUpdated(relay:curChanger.url, state:newState)
 							logThing.trace("successfully updated relay connection state \(newState)", metadata:["url":"\(curChanger.url)"])
 							try newTrans.commit()
 						}
 					}
-					
+
 					// events
 					tg.addTask { [weak self, ec = ec] in
-						guard let self = self else { return }
 						for await curEvent in ec {
+							guard let self = self else { return }
 							switch curEvent.1 {
-							case let .event(_/*subID*/, myEvent):
+							case let .event(subID, myEvent):
 								logThing.trace("got event.", metadata:["kind":"\(myEvent.kind.rawValue)", "pubkey":"\(myEvent.pubkey)"])
-								await self.holder.append(element: myEvent)
+								await self.holder.append(element: (subID, myEvent))
 								break;
 							case .endOfStoredEvents(let subID):
 								logThing.trace("end of events", metadata:["sub_id":"\(subID)"])
@@ -171,6 +165,21 @@ extension DBUX {
 					}
 				})
 			}
+
+			Task.detached { [weak self] in
+				guard let self = self else { return }
+				await self.dispatcher.addListener(forEventType:DBUX.Notification.applicationMovedToBackground) { [weak self] event, _ in
+					Task.detached { [weak self] in
+						guard let self = self else { return }
+						do {
+							try self.env.sync()
+							self.logger.debug("successfully synced lmdb environment.")
+						} catch let error {
+							self.logger.error("failed to sync lmdb environment.", metadata:["error":"\(error)"])
+						}
+					}
+				}
+			}
 		}
 		
 		fileprivate func relayConnectionStatusUpdated(relay:String, state:RelayConnection.State) {
@@ -180,26 +189,45 @@ extension DBUX {
 			}
 		}
 		
-		// gets the relays for a given pubkey
-		//  - throws LMDBError.notFound if the pubkey is not found
-		func getRelays(pubkey:String) throws -> Set<String> {
-			try env.transact(readOnly:true) { someTrans in
-				var buildRelays = Set<String>()
-				let relayHashCursor = try self.pubkey_relayHash.cursor(tx:someTrans)
-				let relayStringCursor = try self.relayHash_relayString.cursor(tx:someTrans)
-				for (_, curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
-					let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
-					buildRelays.update(with:String(relayString)!)
+		@MainActor func write(event:nostr.Event, to relays:Set<String>, tx someTrans:QuickLMDB.Transaction) throws {
+			for relay in relays {
+				let makeRelayHash = try RelayHash(relay)
+				var existingEvents:[nostr.Event]
+				do {
+					existingEvents = try self.relayHash_pendingEvents.getEntry(type:[nostr.Event].self, forKey:makeRelayHash, tx:someTrans)!
+				} catch LMDBError.notFound {
+					existingEvents = [nostr.Event]()
 				}
-				return buildRelays
+				existingEvents.append(event)
+				try self.relayHash_pendingEvents.setEntry(value:existingEvents, forKey:makeRelayHash, tx:someTrans)
+			}
+			Task.detached { [relaysCopy = relays, event, conns = self.userRelayConnections] in
+				for curRelay in relaysCopy {
+					if let getConnection = conns[curRelay] {
+						try? await getConnection.send(event)
+					}
+				}
 			}
 		}
+		
+		// gets the relays for a given pubkey
+		//  - throws LMDBError.notFound if the pubkey is not found
+		func getRelays(pubkey:nostr.Key, tx someTrans:QuickLMDB.Transaction) throws -> Set<String> {
+			var buildRelays = Set<String>()
+			let relayHashCursor = try self.pubkey_relayHash.cursor(tx:someTrans)
+			let relayStringCursor = try self.relayHash_relayString.cursor(tx:someTrans)
+			for (_, curRelayHash) in try relayHashCursor.makeDupIterator(key:pubkey) {
+				let relayString = try relayStringCursor.getEntry(.set, key:curRelayHash).value
+				buildRelays.update(with:String(relayString)!)
+			}
+			return buildRelays
+		}
 
-		func setRelays(_ relays:Set<String>, pubkey:nostr.Key, asOf writeDate:DBUX.Date) throws {
+		func setRelays(_ relays:Set<String>, pubkey:nostr.Key, asOf writeDate:DBUX.Date, tx someTrans:QuickLMDB.Transaction) throws {
 			#if DEBUG
 			self.logger.critical("attempting to assign \(relays.count) relays for pubkey \(pubkey) as of \(writeDate.exportDate())")
 			#endif
-			let newTrans = try Transaction(self.env, readOnly:false)
+			let newTrans = try Transaction(self.env, readOnly:false, parent:someTrans)
 			do {
 				let checkDate = try self.pubkey_relays_asof.getEntry(type:DBUX.Date.self, forKey:pubkey, tx:newTrans)!
 				guard checkDate < writeDate else {
@@ -224,6 +252,14 @@ extension DBUX {
 			let pubkey_relayHashC = try self.pubkey_relayHash.cursor(tx:newTrans)
 			let relayHash_pubkeyC = try self.relayHash_pubKey.cursor(tx:newTrans)
 			let relayStringC = try self.relayHash_relayString.cursor(tx:newTrans)
+			
+			// delete all entries for this pubkey
+			for (_, curHash) in try pubkey_relayHashC.makeDupIterator(key:pubkey) {
+				try relayHash_pubkeyC.getEntry(.set, key:curHash)
+				try relayHash_pubkeyC.deleteEntry()
+				try pubkey_relayHashC.deleteEntry()
+			}
+			
 			// write all the new relays
 			for curRelay in relays {
 				let relayHash = try RelayHash(curRelay)
@@ -250,8 +286,8 @@ extension DBUX {
 			
 		}
 
-		func add(subscriptions:[nostr.Subscribe], to relayURL:String) throws {
-			let newTransaction = try Transaction(self.env, readOnly:false)
+		func add(subscriptions:[nostr.Subscribe], to relayURL:String, tx subTrans:QuickLMDB.Transaction) throws {
+			let newTransaction = try Transaction(self.env, readOnly:false, parent:subTrans)
 			let relayHash = try RelayHash(relayURL)
 			let relaySubscriptionsCursor = try self.relayHash_currentSubscriptions.cursor(tx:newTransaction)
 			// load the existing subscriptions
@@ -271,12 +307,16 @@ extension DBUX {
 				guard case .connected = getConnectionState, let getConnection = self.userRelayConnections[rlurl] else { return }
 				Task.detached { [conn = getConnection, subSubs = subs] in
 					for curSub in subSubs {
-						try await conn.send(.subscribe(curSub))
+						try? await conn.send(.subscribe(curSub))
 					}
 				}
 			}
 			try newTransaction.commit()
-			try env.sync()
+		}
+		
+		deinit {
+			eventChannel.finish()
+			stateChannel.finish()
 		}
 	}
 }

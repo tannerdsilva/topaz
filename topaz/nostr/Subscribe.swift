@@ -28,7 +28,7 @@ extension nostr {
 		/// unsubscribe from a subscription ID
 		case unsubscribe(String)
 
-		/// send an event to the server(?)
+		/// send an event to the server
 		case event(String, Event)
 		
 		/// the end of a stored event list

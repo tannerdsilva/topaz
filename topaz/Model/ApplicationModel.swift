@@ -52,7 +52,7 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 	private enum Metadatas:String {
 		case appState = "appState"					// State
 		case currentUser = "currentUser"			// nostr.Key
-		case tosAcknowledged = "tosAcknlowledged?"	// Bool
+		case tosAcknowledged = "tosAcknlowledged?"	// Foundation.Date
 	}
 
 	let logger = Topaz.makeDefaultLogger(label:"topaz-base.mdb")
@@ -71,13 +71,18 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 	}
 
 	/// whether the user has acknowledged the terms of service
-	@Published public var isTOSAcknowledged:Bool {
-		didSet {
-			do {
-				try self.app_metadata.setEntry(value:isTOSAcknowledged, forKey:Metadatas.tosAcknowledged.rawValue, tx:nil)
-				self.logger.info("committed transaction to update TOS acknowledgement.", metadata:["acknowledged": "\(isTOSAcknowledged)"])
-			} catch let error {
-				self.logger.critical("could not commit database transaction.", metadata:["error": "\(error)"])
+	@Published public var isTOSAcknowledged:Foundation.Date? {
+		willSet {
+			if newValue == nil {
+				try? self.app_metadata.deleteEntry(key:Metadatas.tosAcknowledged.rawValue, tx:nil)
+				return
+			} else {
+				do {
+					try self.app_metadata.setEntry(value:newValue!, forKey:Metadatas.tosAcknowledged.rawValue, tx:nil)
+					self.logger.info("committed transaction to update TOS acknowledgement.", metadata:["acknowledged": "\(isTOSAcknowledged)"])
+				} catch let error {
+					self.logger.critical("could not commit database transaction.", metadata:["error": "\(error)"])
+				}
 			}
 		}
 	}
@@ -104,9 +109,9 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 		}
 		// load the TOS acknowledgement
 		do {
-			_isTOSAcknowledged = Published(wrappedValue:try getMetadata.getEntry(type:Bool.self, forKey:Metadatas.tosAcknowledged.rawValue, tx:subTrans)!)
+			_isTOSAcknowledged = Published(wrappedValue:try getMetadata.getEntry(type:Foundation.Date.self, forKey:Metadatas.tosAcknowledged.rawValue, tx:subTrans)!)
 		} catch LMDBError.notFound {
-			_isTOSAcknowledged = Published(wrappedValue:false)
+			_isTOSAcknowledged = Published(wrappedValue:nil)
 		}
 		// determine the current user logged in
 		let curUser:nostr.Key?
@@ -117,13 +122,23 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 		}
 		// initialize the current user experience if there is one
 		if curUser == nil {
-			_currentUX = Published(wrappedValue:nil)
+			currentUX = nil
 		} else {
 			let getKeypair = try self.userStore.keypair(pubkey:curUser!)
-			let loadUX = try! DBUX(base:base.deletingLastPathComponent(), keypair:getKeypair)
-			_currentUX = Published(wrappedValue:loadUX)
+			currentUX = try! DBUX(app:self, base:base.deletingLastPathComponent(), keypair:getKeypair, appDispatcher: dispatcher)
 		}
 		try subTrans.commit()
+		
+		Task.detached { [dsp = dispatcher, userstore = self.userStore] in
+			await dsp.addListener(forEventType:Topaz.Notification.userProfileInfoUpdated) { [ust = userstore] _, newProf in
+				guard let getAccount = newProf as? Topaz.Account else {
+					return
+				}
+				Task.detached { @MainActor in
+					try? ust.updateUserProfile(getAccount.profile, for:getAccount.key)
+				}
+			}
+		}
 	}
 
 	//set a user to be the currently assigned user
@@ -132,23 +147,21 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 		// verify that the public key exists
 		let getKeypair = try self.userStore.keypair(pubkey:publicKey)
 		self.objectWillChange.send()
-		let asUX = try DBUX(base:Topaz.findApplicationBase(), keypair:getKeypair)
-		_currentUX = Published(wrappedValue:asUX)
+		let asUX = try! DBUX(app:self, base:Topaz.findApplicationBase(), keypair:getKeypair, appDispatcher: dispatcher)
+		currentUX = asUX
 		try self.app_metadata.setEntry(value:publicKey, forKey:Metadatas.currentUser.rawValue, tx:newTrans)
 		try newTrans.commit()
 	}
 	
 	/// installs a user in the application and ensures that the state of the app is updated
-	@MainActor func installUser(publicKey:nostr.Key, privateKey:nostr.Key) throws {
+	@MainActor func installUser(publicKey:nostr.Key, privateKey:nostr.Key, profile:nostr.Profile = nostr.Profile()) throws {
 		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false)
 		try self.app_metadata.setEntry(value:ApplicationModel.State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
 		self.objectWillChange.send()
 		_state = Published(wrappedValue:.onboarded)
-//		_currentUX = Published(wrappedValue:try! DBUX(base:Topaz.findApplicationBase(), keypair:nostr.KeyPair(pubkey:publicKey, privkey:privateKey)))
-		try self.userStore.addUser(publicKey, privateKey:privateKey)
-		try setCurrentlyLoggedInUser(publicKey, tx:newTrans)
-		try newTrans.commit()
-		
+		try! self.userStore.addUser(publicKey, privateKey:privateKey, profile:profile)
+		try! setCurrentlyLoggedInUser(publicKey, tx:newTrans)
+		try! newTrans.commit()
 	}
 
 
@@ -161,8 +174,7 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 		if self.currentUX!.keypair.pubkey == publicKey {
 			let getUsers = try self.userStore.allUsers()
 			if getUsers.count == 0 {
-				self.objectWillChange.send()
-				_currentUX = Published(wrappedValue:nil)
+				currentUX = nil
 				_state = Published(wrappedValue:.welcomeFlow)
 			}
 		}
@@ -177,20 +189,24 @@ extension ApplicationModel {
 		
 		static let name = "topaz-users.mdb"
 		static let deltaSize = size_t(250000000)
-		static let maxDBs:MDB_dbi = 1
+		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let pubkey:nostr.Key
 		let base:URL
 
 		fileprivate enum Databases:String {
 			case app_users = "app_users"
+			case profiledb = "profiledb"
 		}
+		let decoder = JSONDecoder()
+		let encoder = JSONEncoder()
 		
 		let env:QuickLMDB.Environment		// the environment this store is in
 		let userDB:Database 				// [nostr.Key:nostr.Key] where (pubkey : privkey)
+		let profileDB:Database
 
 		/// all the users in the store
-		@Published public private(set) var users:Set<nostr.Key>
+		@Published public private(set) var users:[Topaz.Account]
 
 		required init(base: URL, env docEnv: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
 			self.dispatcher = dispatcher
@@ -198,21 +214,52 @@ extension ApplicationModel {
 			self.base = base
 			let subTrans = try QuickLMDB.Transaction(docEnv, readOnly:false)
 			self.userDB = try docEnv.openDatabase(named:Databases.app_users.rawValue, flags:[.create], tx:subTrans)
-			let userCursor = try userDB.cursor(tx:subTrans)
-			var users = Set<nostr.Key>()
-			for (pubKey, _) in userCursor {
-				users.update(with:nostr.Key(pubKey)!)
+			self.profileDB = try docEnv.openDatabase(named:Databases.profiledb.rawValue, flags:[.create], tx:subTrans)
+			let profileCursor = try profileDB.cursor(tx:subTrans)
+			var users = [Topaz.Account]()
+			let decoder = JSONDecoder()
+			for (pubKey, profileInfo) in profileCursor {
+				let nkey = nostr.Key(pubKey)!
+				let getData = Data(profileInfo)!
+				let parsed = try decoder.decode(nostr.Profile.self, from:getData)
+				users.append(Topaz.Account(key:nkey, profile: parsed))
 			}
 			_users = Published(wrappedValue:users)
 			self.pubkey = publicKey
 			try subTrans.commit()
+			
+		}
+		
+		fileprivate func reloadAllUserInfo(profileCursor cursor:QuickLMDB.Cursor) throws -> [Topaz.Account] {
+			var allAccounts = [Topaz.Account]()
+			for (curPK, curProfile) in cursor {
+				let decoded = try decoder.decode(nostr.Profile.self, from:Data(curProfile)!)
+				let makeAccount = Topaz.Account(key:nostr.Key(curPK)!, profile:decoded)
+				allAccounts.append(makeAccount)
+			}
+			return allAccounts
 		}
 
 		/// add a user to the store
-		@MainActor fileprivate func addUser(_ publicKey:nostr.Key, privateKey:nostr.Key) throws {
+		@MainActor fileprivate func addUser(_ publicKey:nostr.Key, privateKey:nostr.Key, profile:nostr.Profile) throws {
 			let subTrans = try QuickLMDB.Transaction(env, readOnly:false)
 			self.objectWillChange.send()
+			users.append(Topaz.Account(key:publicKey, profile:profile))
 			try userDB.setEntry(value:privateKey, forKey:publicKey, tx:subTrans)
+			let encodedObject = try encoder.encode(profile)
+			let profilesCursor = try self.profileDB.cursor(tx:subTrans)
+			try profilesCursor.setEntry(value:encodedObject, forKey:publicKey)
+			self.users = try self.reloadAllUserInfo(profileCursor: profilesCursor)
+			try subTrans.commit()
+		}
+
+		@MainActor func updateUserProfile(_ profileInfo:nostr.Profile, for key:nostr.Key) throws {
+			let subTrans = try QuickLMDB.Transaction(env, readOnly:false)
+			self.objectWillChange.send()
+			let getCursor = try self.profileDB.cursor(tx:subTrans)
+			let encodedObject = try encoder.encode(profileInfo)
+			try getCursor.setEntry(value:encodedObject, forKey:key)
+			self.users = try self.reloadAllUserInfo(profileCursor: getCursor)
 			try subTrans.commit()
 		}
 
@@ -229,12 +276,12 @@ extension ApplicationModel {
 
 		/// get all the users in the store
 		/// - if there are no users, a set of zero items are returned
-		func allUsers() throws -> Set<nostr.Key> {
+		func allUsers() throws -> [nostr.Key:nostr.Profile] {
 			let someTrans = try QuickLMDB.Transaction(env, readOnly:true)
 			let userCursor = try userDB.cursor(tx:someTrans)
-			var buildPubs = Set<nostr.Key>()
-			for (curPub, _) in userCursor {
-				buildPubs.update(with:nostr.Key(curPub)!)
+			var buildPubs = [nostr.Key:nostr.Profile]()
+			for (curPub, curProfile) in userCursor {
+				buildPubs[nostr.Key(curPub)!] = try decoder.decode(nostr.Profile.self, from:Data(curProfile)!)
 			}
 			try someTrans.commit()
 			return buildPubs
@@ -244,6 +291,7 @@ extension ApplicationModel {
 		func removeUser(pubkey:nostr.Key) throws {
 			let subTrans = try Transaction(env, readOnly:false)
 			try self.userDB.deleteEntry(key:pubkey, tx:subTrans)
+			users.removeAll(where:{ $0.key == pubkey })
 			try subTrans.commit()
 		}
 	}

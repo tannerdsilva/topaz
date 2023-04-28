@@ -10,15 +10,17 @@ import SwiftUI
 
 extension UI {
 	struct NavButton: View {
+		let dbux:DBUX
 		let myView: DBUX.ViewMode
 		let icon: String
 		let index: Int
 		@Binding var selectedTab: DBUX.ViewMode
 		let accentColor: Color
 		@Binding var showBadge: Bool
-		@State var profileIndicate: nostr.Profile?
+		var profileIndicate: nostr.Profile?
 		@Environment(\.sizeCategory) var sizeCategory
-
+		private let feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+		let longPressAction: () -> Void // Add a closure for the long press action
 		var imageSize: CGFloat {
 			switch sizeCategory {
 			case .accessibilityExtraExtraExtraLarge:
@@ -41,8 +43,8 @@ extension UI {
 			}) {
 				GeometryReader { geometry in
 					ZStack {
-						if let profileImgUrl = profileIndicate?.picture {
-							AsyncImage(url: URL(string:profileImgUrl), content: { image in
+						if let profileImgUrl = profileIndicate?.picture, let hasURL = URL(string:profileImgUrl) {
+							CachedAsyncImage(url:hasURL, imageCache: dbux.imageCache, content: { image in
 								image
 									.resizable()
 									.aspectRatio(contentMode: .fill)
@@ -75,37 +77,50 @@ extension UI {
 				}
 			}
 			.background(Color.clear)
+			.simultaneousGesture(
+				TapGesture()
+					.onEnded { _ in
+						// This space is intentionally left empty, as the Button action handles the tap
+					}
+					.simultaneously(with: LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+						longPressAction()
+					})
+			)
 		}
 	}
 
 
 	struct NavBar: View {
 		let dbux:DBUX
+		@ObservedObject var appData:ApplicationModel
 		@Binding var viewMode: DBUX.ViewMode
 		@Binding var badgeStatus: DBUX.ViewBadgeStatus
-		@State private var showAccountPicker = false
+		@Binding var showAccountPicker:Bool
+		private let feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
 		
 		var body: some View {
 			HStack {
-				NavButton(myView: .home, icon: "house.fill", index: 0, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.homeBadge, profileIndicate: nil)
-					.frame(maxWidth: .infinity, maxHeight: .infinity).border(.pink)
+				NavButton(dbux:dbux, myView: .home, icon: "house.fill", index: 0, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.homeBadge, profileIndicate: nil, longPressAction: {})
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
 
-				NavButton(myView: .notifications, icon: "bell.fill", index: 1, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.notificationsBadge, profileIndicate: nil)
-					.frame(maxWidth: .infinity, maxHeight: .infinity).border(.pink)
+				NavButton(dbux:dbux, myView: .notifications, icon: "bell.fill", index: 1, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.notificationsBadge, profileIndicate: nil, longPressAction: {})
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
 
-				NavButton(myView: .dms, icon: "envelope.fill", index: 2, selectedTab: $viewMode, accentColor: .pink, showBadge: $badgeStatus.dmsBadge, profileIndicate: nil)
-					.frame(maxWidth: .infinity, maxHeight: .infinity).border(.pink)
+				NavButton(dbux:dbux, myView: .dms, icon: "envelope.fill", index: 2, selectedTab: $viewMode, accentColor: .pink, showBadge: $badgeStatus.dmsBadge, profileIndicate: nil, longPressAction: {})
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
 
-				NavButton(myView: .search, icon: "magnifyingglass", index: 3, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.searchBadge, profileIndicate: nil)
-					.frame(maxWidth: .infinity, maxHeight: .infinity).border(.pink)
+				NavButton(dbux:dbux, myView: .search, icon: "magnifyingglass", index: 3, selectedTab: $viewMode, accentColor: .orange, showBadge: $badgeStatus.searchBadge, profileIndicate: nil, longPressAction: {})
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
 
-				NavButton(myView: .profile, icon: "person.fill", index: 4, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.profileBadge, profileIndicate:dbux.profilesEngine.currentUserProfile) // Pass the profile image here
-					.frame(maxWidth: .infinity, maxHeight: .infinity).border(.pink)
-					.onLongPressGesture {
-					showAccountPicker.toggle()
-				}
+				NavButton(dbux:dbux, myView: .profile, icon: "person.fill", index: 4, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.profileBadge, profileIndicate:dbux.eventsEngine.profilesEngine.currentUserProfile, longPressAction: {
+					showAccountPicker = true
+				}) // Pass the profile image here
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
+					
 			}
-			.frame(maxWidth: .infinity).background(Color(.systemBackground)).border(.yellow)
+			.frame(maxWidth: .infinity).background(Color(.systemBackground)).sheet(isPresented:$showAccountPicker, onDismiss: { showAccountPicker = false }, content: {
+				UI.Account.PickerScren(dbux:dbux)
+			})
 		}
 	}
 }

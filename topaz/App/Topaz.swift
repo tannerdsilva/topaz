@@ -13,13 +13,31 @@ import NIO
 
 @main
 struct Topaz:App, Based {
+	struct Account:Hashable, Identifiable {
+		var id:nostr.Key {
+			get {
+				return key
+			}
+		}
+		let key:nostr.Key
+		let profile:nostr.Profile
+		
+		static func == (lhs:Account, rhs:Account) -> Bool {
+			return lhs.key == rhs.key
+		}
+		
+		func hash(into hasher:inout Hasher) {
+			hasher.combine(self.key)
+		}
+	}
 	enum Error:Swift.Error {
 		case systemReadError
 		case memoryAllocationError
 	}
 	public static let defaultRelays:Set<Relay> = Set([
 		Relay("wss://relay.snort.social"),
-		Relay("wss://relay.damus.io")
+		Relay("wss://relay.damus.io"),
+		Relay("wss://welcome.nostr.wine")
 	])
 	
 	/// the default event loop group used for all relay connections (unless otherwise specified for a particular connection)
@@ -67,6 +85,10 @@ struct Topaz:App, Based {
 			return try type.init(base: path, env: makeEnv, publicKey: publicKey, dispatcher: dispatcher)
 		}
 	}
+	
+	static func launchSharedExperienceEngine<T>(_ type: T.Type, base:URL, env environment:QuickLMDB.Environment, for publicKey: nostr.Key, dispatcher:Dispatcher<T.NotificationType>) throws -> T where T:SharedExperienceEngine {
+		return try type.init(env:environment, publicKey:publicKey, dispatcher:dispatcher)
+	}
 
 	
 	public static func makeDefaultLogger(label:String) -> Logger {
@@ -109,9 +131,9 @@ struct Topaz:App, Based {
 	
 	init() {
 		do {
-			let appModel = try! Topaz.launchExperienceEngine(ApplicationModel.self, from:self.base, for:nostr.Key.nullKey(), dispatcher:Self.applicationDispatcher)
+			let appModel = try Topaz.launchExperienceEngine(ApplicationModel.self, from:self.base, for:nostr.Key.nullKey(), dispatcher:Self.applicationDispatcher)
 			_localData = ObservedObject(wrappedValue: appModel)
-		} catch let error {
+		} catch _ {
 			fatalError("false")
 		}
 	}
@@ -127,6 +149,6 @@ struct Topaz:App, Based {
 
 extension Topaz {
 	enum Notification:Hashable {
-		
+		case userProfileInfoUpdated
 	}
 }

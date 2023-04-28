@@ -29,6 +29,7 @@ extension DBUX {
 			case badgeStatus = "badge_status" // ViewBadgeStatus
 			case viewMode = "view_mode" // ViewMode
 			case timelineAnchor = "timeline_anchor" // TimelineAnchor
+			case timelineRepliesToggleEnabled = "timeline_replies_toggle_enabled"
 		}
 
 		fileprivate let encoder:JSONEncoder
@@ -74,6 +75,14 @@ extension DBUX {
 			} catch LMDBError.notFound {
 				_timelineAnchor = Published(wrappedValue:nil)
 			}
+			
+			do {
+				let getBool = try context.getEntry(type:Bool.self, forKey:Contexts.timelineRepliesToggleEnabled, tx:newTrans)!
+				_timelineRepliesToggleEnabled = Published(wrappedValue:getBool)
+			} catch LMDBError.notFound {
+				_timelineRepliesToggleEnabled = Published(wrappedValue:false)
+			}
+
 			try newTrans.commit()
 		}
 
@@ -108,6 +117,13 @@ extension DBUX {
 				let encoded = try! encoder.encode(newValue)
 				try! self.userContext.setEntry(value:encoded, forKey:Contexts.viewMode, tx:nil)
 				self.logger.debug("successfully updated view mode.", metadata:["viewMode": "\(newValue)"])
+			}
+		}
+		
+		@Published var timelineRepliesToggleEnabled:Bool {
+			willSet {
+				try! self.userContext.setEntry(value:newValue, forKey:Contexts.timelineRepliesToggleEnabled, tx:nil)
+				self.logger.debug("successfully updated toggle reply state.", metadata:["isEnabled": "\(newValue)"])
 			}
 		}
 	}

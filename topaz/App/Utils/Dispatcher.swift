@@ -7,22 +7,24 @@
 
 import Logging
 
-actor Dispatcher<T:Hashable> {
-	let logger:Logger
+actor Dispatcher<T: Hashable> {
+	let logger: Logger
 	typealias Event = T
-	typealias EventHandler = (T) -> Void
+	typealias AssociatedObject = Any
+	typealias EventHandler = (T, AssociatedObject?) -> Void
 	
 	private var listeners: [T: [UInt32: EventHandler]] = [:]
 
-	init(logLabel:String, logLevel:Logger.Level) {
-		let makeLogger = Logger(label:"dispatcher-\(logLabel)")
+	init(logLabel: String, logLevel: Logger.Level) {
+		let makeLogger = Logger(label: "dispatcher-\(logLabel)")
 		self.logger = makeLogger
 	}
-		
+	
+	@discardableResult
 	func addListener(forEventType eventType: T, _ handler: @escaping EventHandler) -> UInt32 {
 		let id = UInt32.random(in: 0..<UInt32.max)
 		if listeners[eventType] == nil {
-			listeners[eventType] = [id:handler]
+			listeners[eventType] = [id: handler]
 		} else {
 			var getExisting = listeners[eventType]!
 			getExisting[id] = handler
@@ -38,10 +40,10 @@ actor Dispatcher<T:Hashable> {
 		}
 	}
 
-	func fireEvent(_ event: T) {
+	func fireEvent(_ event: T, associatedObject: AssociatedObject? = nil) {
 		if let eventTypeListeners = listeners[event] {
 			for (_, listener) in eventTypeListeners {
-				listener(event)
+				listener(event, associatedObject)
 			}
 		}
 	}

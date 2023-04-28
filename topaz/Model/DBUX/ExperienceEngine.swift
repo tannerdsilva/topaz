@@ -24,9 +24,16 @@ protocol ExperienceEngine: Based {
 	var env: QuickLMDB.Environment { get }
 	var pubkey: nostr.Key { get }
 	init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws
-	// static func create(base: URL, env: QuickLMDB.Environment, keypair: KeyPair) throws -> Self
 }
 
+protocol SharedExperienceEngine {
+	associatedtype NotificationType: Hashable
+	static var env_flags: QuickLMDB.Environment.Flags { get }
+	var dispatcher: Dispatcher<NotificationType> { get }
+	var env: QuickLMDB.Environment { get }
+	var pubkey: nostr.Key { get }
+	init(env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws
+}
 
 
 extension ExperienceEngine {

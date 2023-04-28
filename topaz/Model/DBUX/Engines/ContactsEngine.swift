@@ -13,20 +13,14 @@ import SwiftBlake2
 import Logging
 import AsyncAlgorithms
 
-extension DBUX.ContactsEngine {
+extension DBUX {
 	// following related
 	/// this database stores the list of users that the user is following
-	class FollowsEngine:ExperienceEngine {
-		
+	class FollowsEngine:SharedExperienceEngine {
+
 		let dispatcher: Dispatcher<DBUX.Notification>
-		
 		typealias NotificationType = DBUX.Notification
-		
-		static let name = "follows-engine.mdb"
-		static let deltaSize = size_t(5.12e+8)
-		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
-		let base:URL
 		let env:QuickLMDB.Environment
 		let pubkey:nostr.Key
 		let logger:Logger
@@ -39,13 +33,19 @@ extension DBUX.ContactsEngine {
 		let pubkey_date:Database			// stores the last time that the user profile information was updated.			[nostr.Key:DBUX.Date]
 		let pubkey_following:Database		// stores the list of pubkeys that the user is following						[nostr.Key:nostr.Key?] * DUP * (value will be \0 if an account follows nobody)
 
-		required init(base:URL, env:QuickLMDB.Environment, publicKey pubkey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+		required init(env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher: Dispatcher<DBUX.Notification>) throws {
 			self.dispatcher = dispatcher
 			let newTrans = try Transaction(env, readOnly:false)
 			self.pubkey_date = try env.openDatabase(named:Databases.pubkey_refreshDate.rawValue, flags:[.create], tx:newTrans)
-			self.pubkey_following = try env.openDatabase(named:Databases.user_following.rawValue, flags:[.create], tx:newTrans)
-			self.pubkey = pubkey
-			self.base = base
+			do {
+				self.pubkey_following = try env.openDatabase(named:Databases.user_following.rawValue, flags:[.create, .dupSort], tx:newTrans)
+			} catch LMDBError.incompatible {
+				let getDB = try env.openDatabase(named:Databases.user_following.rawValue, flags:[.create, .dupSort], tx:newTrans)
+				try getDB.deleteDatabase(tx:newTrans)
+				self.pubkey_following = try env.openDatabase(named:Databases.user_following.rawValue, flags:[.create, .dupSort], tx:newTrans)
+			}
+			
+			self.pubkey = publicKey
 			self.env = env
 			self.logger = Logger(label: "follows-engine.mdb")
 			try newTrans.commit()
@@ -57,51 +57,25 @@ extension DBUX.ContactsEngine {
 			// open cursors
 			let dateCursor = try pubkey_date.cursor(tx:someTrans)
 			let cursor = try pubkey_following.cursor(tx:someTrans)
-			var needsAdding = follows
-			let dupIterator:QuickLMDB.Cursor.CursorDupIterator
 			do {
-				dupIterator = try cursor.makeDupIterator(key:pubkey)
-			} catch LMDBError.notFound {
-				// there are no entries for this user, so we can just add them all
-				for curAdd in needsAdding {
-					try dateCursor.setEntry(value:nowDate, forKey:pubkey)
-					try cursor.setEntry(value:curAdd, forKey:pubkey)
-					// try invertCursor.setEntry(value:pubkey, forKey:curAdd)
-				}
-				return
+				_ = try cursor.getEntry(.set, key:pubkey)
+				try cursor.deleteEntry(flags:[.noDupData])
+			} catch LMDBError.notFound {}
+			let follows = follows.sorted(by: { $0 < $1 })
+			for curFollow in follows {
+				try cursor.setEntry(value:curFollow, forKey:pubkey)
 			}
-			// check the status of all the current follow entries in the database
-			for (_, curFollow) in dupIterator {
-				let curFollowStr = nostr.Key(curFollow)!
-				if needsAdding.contains(curFollowStr) {
-					// the entry is already in the database, so we don't need to add it
-					needsAdding.remove(curFollowStr)
-				} else {
-					// the entry is in the database, but it is no longer present in the latest followers list, so we need to remove it
-					try dateCursor.getEntry(.set, key:pubkey)
-					try dateCursor.deleteEntry()
-					try cursor.getEntry(.set, key:pubkey)
-					try cursor.deleteEntry()
-				}
-			}
-			// add any outstanding entries that did not get resolved in the previous loop
-			for curAdd in needsAdding {
-				try dateCursor.setEntry(value:nowDate, forKey:pubkey)
-				try cursor.setEntry(value:curAdd, forKey:pubkey)
-			}
-			if pubkey == self.pubkey {
-				Task.detached { [disp = self.dispatcher] in
-					await disp.fireEvent(.currentUserFollowsUpdated)
-				}
-			}
+			try dateCursor.setEntry(value:nowDate, forKey:pubkey)
 		}
 
 		func getFollows(pubkey:nostr.Key, tx someTrans:QuickLMDB.Transaction) throws -> Set<nostr.Key> {
 			let followsCursor = try pubkey_following.cursor(tx:someTrans)
 			var buildVal = Set<nostr.Key>()
-			for (_, curFollow) in followsCursor {
-				buildVal.update(with:nostr.Key(curFollow)!)
-			}
+			do {
+				for (_, curFollow) in try followsCursor.makeDupIterator(key: pubkey) {
+					buildVal.update(with:nostr.Key(curFollow)!)
+				}
+			} catch LMDBError.notFound {}
 			return buildVal
 		}
 
@@ -134,59 +108,32 @@ extension DBUX.ContactsEngine {
 	}
 }
 
-extension DBUX {
-	struct ContactsEngine:ExperienceEngine {
-		var dispatcher: Dispatcher<DBUX.Notification>
-		
-		typealias NotificationType = DBUX.Notification
-		
-		static let name = "contacts-engine.mdb"
-		static let deltaSize = size_t(5.12e+8)
-		static let maxDBs:MDB_dbi = 1
-		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
-		let base:URL
-		let env:QuickLMDB.Environment
-		let pubkey:nostr.Key
-		let logger:Logger
-
-		let followsEngine:FollowsEngine
-
-		init(base:URL, env:QuickLMDB.Environment, publicKey pubkey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
-			self.dispatcher = dispatcher
-			self.base = base
-			self.env = env
-			self.pubkey = pubkey
-			self.logger = Logger(label: "contacts-engine.mdb")
-			self.followsEngine = try Topaz.launchExperienceEngine(FollowsEngine.self, from:base.deletingLastPathComponent(), for:pubkey, dispatcher: dispatcher)
+extension DBUX.FollowsEngine {
+	// returns a boolean indicating whether or not the given pubkey is a friend of the current user
+	func isFriend(pubkey:nostr.Key) throws -> Bool {
+		return try self.env.transact(readOnly:true) { newTrans in
+			return try self.isFriend(pubkey:self.pubkey, with:pubkey, tx:newTrans)
 		}
+	}
 
-		// returns a boolean indicating whether or not the given pubkey is a friend of the current user
-		func isFriend(pubkey:nostr.Key) throws -> Bool {
-			let newTrans = try self.followsEngine.transact(readOnly:true)
-			defer {
-				try? newTrans.commit()
-			}
-			return try self.followsEngine.isFriend(pubkey:self.pubkey, with:pubkey, tx:newTrans)
-		}
-
-		// returns a boolean indicating whether or not the given pubkey is a friend of a friend of the current user
-		func isFriendOfFriend(pubkey:nostr.Key) throws -> Bool {
-			let followsTrans = try followsEngine.transact(readOnly:true)
-			let myFriends = try self.followsEngine.getFollows(pubkey:self.pubkey, tx:followsTrans)
-			let allFriendFollows = try self.followsEngine.getFriends(myFriends, tx:followsTrans)
-			try followsTrans.commit()
+	// returns a boolean indicating whether or not the given pubkey is a friend of a friend of the current user
+	func isFriendOfFriend(pubkey:nostr.Key) throws -> Bool {
+		return try self.env.transact(readOnly:true) { newTrans in
+			let myFriends = try self.getFollows(pubkey:self.pubkey, tx:newTrans)
+			let allFriendFollows = try self.getFriends(myFriends, tx:newTrans)
 			var allUIDs = Set<nostr.Key>()
 			for (_, curFollows) in allFriendFollows {
 				allUIDs.formUnion(curFollows)
 			}
 			return allUIDs.contains(pubkey)
 		}
+	}
 
-		func isInFriendosphere(pubkey:nostr.Key) throws -> Bool {
-			let followTrans = try followsEngine.transact(readOnly:true)
-			let isf = try self.followsEngine.isFriend(pubkey:self.pubkey, with:pubkey, tx:followTrans)
-			let myFriends = try self.followsEngine.getFollows(pubkey:self.pubkey, tx:followTrans)
-			let allFriendFollows = try self.followsEngine.getFriends(myFriends, tx:followTrans)
+	func isInFriendosphere(pubkey:nostr.Key) throws -> Bool {
+		try self.env.transact(readOnly:true) { followTrans in
+			let isf = try self.isFriend(pubkey:self.pubkey, with:pubkey, tx:followTrans)
+			let myFriends = try self.getFollows(pubkey:self.pubkey, tx:followTrans)
+			let allFriendFollows = try self.getFriends(myFriends, tx:followTrans)
 			var allUIDs = Set<nostr.Key>()
 			for (_, curFollows) in allFriendFollows {
 				allUIDs.formUnion(curFollows)
@@ -198,7 +145,7 @@ extension DBUX {
 	}
 }
 
-extension DBUX.ContactsEngine {
+extension DBUX {
 	// mute related - allows a local user to mute a given event or user
 	struct ModerationDB {
 		static let name = "moderation-engine.mdb"

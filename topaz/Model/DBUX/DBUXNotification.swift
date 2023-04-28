@@ -9,6 +9,8 @@ import Foundation
 
 extension DBUX {
 	enum Notification {
+		case applicationBecameFrontmost
+		case applicationMovedToBackground
 		case currentUserProfileUpdated		// fired when a new profile is written for the current user
 		case currentUserFollowsUpdated
 	}

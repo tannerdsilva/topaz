@@ -12,49 +12,44 @@ struct UserExperienceView: View {
 	
 	let dbux:DBUX
 	@ObservedObject var context:DBUX.ContextEngine
+	@State var showingAccountPicker:Bool = false
 	
 	init(dbux:DBUX) {
 		self.dbux = dbux
 		self.context = dbux.contextEngine
 	}
     var body: some View {
-		VStack {
-			switch context.viewMode {
-			case .home:
-				HomeView(dbux:dbux)
-			case .notifications:
-				MentionsView()
-			case .dms:
-				MessagesView(isUnread:$context.badgeStatus.dmsBadge)
-			case .search:
-				SearchView()
-			case .profile:
-				ProfileDetailView(pubkey:dbux.keypair.pubkey.description, profile:dbux.profilesEngine.currentUserProfile)
+		GeometryReader { geometry in
+			VStack {
+				switch context.viewMode {
+				case .home:
+					HomeView(dbux: dbux).frame(width: geometry.size.width)
+				case .notifications:
+					MentionsView().frame(width: geometry.size.width)
+				case .dms:
+					MessagesView(isUnread: $context.badgeStatus.dmsBadge).frame(width: geometry.size.width)
+				case .search:
+					SearchView().frame(width: geometry.size.width)
+				case .profile:
+					ProfileDetailView(dbux:dbux, pubkey: dbux.keypair.pubkey, profileEngine: dbux.eventsEngine.profilesEngine).frame(width: geometry.size.width)
+				}
+				Spacer()
+				UI.NavBar(dbux: dbux, appData:dbux.application, viewMode: $context.viewMode, badgeStatus: $context.badgeStatus, showAccountPicker: $showingAccountPicker)
+					.frame(maxWidth:geometry.size.width, maxHeight: 70)
 			}
-			Spacer()
-			UI.NavBar(dbux:dbux, viewMode:$context.viewMode, badgeStatus:$context.badgeStatus)
-				.frame(maxWidth: .infinity, maxHeight: 70)
-		}.background(Color(.systemBackground)).border(.cyan).onChange(of:scenePhase) { newValue in
+		}.background(Color(.systemBackground)).onChange(of:scenePhase) { newValue in
 			switch newValue {
 			case .active:
-				Task.detached { [dbux = dbux] in
-					let getItAll = await dbux.relaysEngine.getConnectionsAndStates()
-					let getDisconnected = getItAll.1.values.filter({ $0 == .disconnected })
-					if getDisconnected.count > 0 {
-						Task.detached { [relays = getItAll.0] in
-							await withTaskGroup(of:Void.self) { tg in
-								for curRelay in relays {
-									tg.addTask { [cr = curRelay] in
-										try? await cr.value.connect()
-									}
-								}
-							}
-						}
-					}
+				Task.detached { [disp = self.dbux.dispatcher] in
+					await disp.fireEvent(DBUX.Notification.applicationBecameFrontmost)
 				}
 			case .inactive:
+				Task.detached { [disp = self.dbux.dispatcher] in
+					await disp.fireEvent(DBUX.Notification.applicationMovedToBackground)
+				}
 				break;
 			case .background:
+				
 				break;
 			@unknown default:
 				break;
@@ -63,15 +58,13 @@ struct UserExperienceView: View {
 	}
 }
 
-
-
 struct HomeView: View {
 	let dbux:DBUX
 	var body: some View {
 		NavigationStack {
 			CustomTitleBar(dbux:dbux)
 			Spacer()
-			UI.TimelineView(dbux:dbux)
+			UI.TimelineView(viewModel:UI.TimelineViewModel(dbux:dbux), dbux:dbux)
 		}
 		
 	}
@@ -99,10 +92,10 @@ struct SearchView: View {
 }
 
 struct PV: View {
-	let ue:DBUX
+	let dbux:DBUX
 	
 	var body: some View {
-		ProfileDetailView(pubkey:ue.keypair.pubkey.description, profile:ue.profilesEngine.currentUserProfile)
+		ProfileDetailView(dbux:dbux, pubkey:dbux.keypair.pubkey, profileEngine:dbux.eventsEngine.profilesEngine)
 	}
 }
 
@@ -118,6 +111,7 @@ struct DisplayNameText: View {
 
 
 struct EventViewCell: View {
+	let dbux:DBUX
 	let event: nostr.Event
 	let profile: nostr.Profile?
 
@@ -132,7 +126,7 @@ struct EventViewCell: View {
 		VStack(alignment: .leading, spacing: 8) {
 			HStack {
 				if let profilePicture = profile?.picture, let url = URL(string: profilePicture) {
-					AsyncImage(url: url) { image in
+					CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
 						image
 							.resizable()
 							.aspectRatio(contentMode: .fill)
@@ -165,8 +159,7 @@ struct EventViewCell: View {
 				}
 			}
 
-			TextNoteContentView(content: event.content)
-
+			UI.Events.UserFacingTextContentView(content: event.content)
 			
 			HStack {
 				Text(dateFormatter.string(from: event.created.exportDate()))
@@ -194,14 +187,6 @@ struct EventViewCell: View {
 				}
 				
 				Spacer()
-				if let boostedBy = event.boosted_by {
-					HStack {
-						Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
-						Text(boostedBy)
-					}
-					.font(.caption)
-					.foregroundColor(.accentColor)
-				}
 
 				Spacer()
 				Text("Tags: \(event.tags.count)").font(.caption).foregroundColor(.gray)
@@ -215,14 +200,24 @@ struct EventViewCell: View {
 struct CustomTitleBar: View {
 	let dbux:DBUX
 	@State var showReplies:Bool = false
+	@State var showingCompose = false
 	var body: some View {
 		HStack {
-			CustomToggle(isOn:$showReplies, symbolOn:"star.fill", symbolOff:"star")
+			UI.Relays.ConnectionStatusWidget(dbux:dbux, relays: dbux.eventsEngine.relaysEngine)
+			Spacer().frame(width:5)
+			UI.Relays.SyncStatusWidget(dbux:dbux, relays:dbux.eventsEngine.relaysEngine)
+			UI.CustomToggle(isOn:$showReplies, symbolOn:"arrowshape.turn.up.backward.fill", symbolOff:"person.fill").frame(width:60)
 			Spacer()
-			UI.Relays.ConnectionStatusWidget(relays: dbux.relaysEngine).border(.orange)
+			Button("Compose", action: {
+				showingCompose = true
+			})
+			Spacer().frame(width:10)
 		}
 		.padding(.vertical, 8) // Adjust the vertical padding for less height
 		.frame(height: 44) // Set the height of the title bar
 		.background(Color(.systemBackground))
+		.sheet(isPresented:$showingCompose) {
+			UI.Events.NewPostView(dbux:dbux, isShowingSheet: $showingCompose)
+		}
 	}
 }

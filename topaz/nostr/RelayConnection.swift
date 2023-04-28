@@ -36,13 +36,37 @@ final actor RelayConnection:ObservableObject {
     public let logger:Logger
 
     /// The various states that a relay connection can be in
-	public enum State:UInt8, MDB_convertible {
+	public enum State:UInt8 {
         /// There is no connection to the relay
 		case disconnected
         /// There is a connection attempt in progress
 		case connecting
         /// There is an active connection to the relay
 		case connected
+		
+//		public static func == (lhs: State, rhs: State) -> Bool {
+//			switch (lhs, rhs) {
+//			case (.disconnected, .disconnected),
+//				 (.connecting, .connecting):
+//				return true
+//			case let (.connected(leftValue), .connected(rightValue)):
+//				return leftValue == rightValue
+//			default:
+//				return false
+//			}
+//		}
+		
+//		public func hash(into hasher: inout Hasher) {
+//			switch self {
+//			case .disconnected:
+//				hasher.combine(0)
+//			case .connecting:
+//				hasher.combine(1)
+//			case .connected:
+//				hasher.combine(2)
+//				hasher.combine(value)
+//			}
+//		}
 	}
 
     /// the multi-threaded event loop group used for this connection
@@ -72,6 +96,9 @@ final actor RelayConnection:ObservableObject {
 	fileprivate var reconnectionTask:Task<(), Swift.Error>?
 
 	fileprivate let encoder = JSONEncoder()
+	
+	fileprivate var subscriptions = Set<String>()
+	fileprivate var endedSubs = Set<String>()
 
     /// initialize a new relay connection. the connection will be started immediately.
 	init(url:String, stateChannel:AsyncChannel<StateChangeEvent>, eventChannel:AsyncChannel<EventCapture>) {
@@ -202,17 +229,20 @@ final actor RelayConnection:ObservableObject {
 				for await curItem in ms {
 					switch curItem {
 					case let .data(capData):
-//						do {
-							let someString = String(data:capData, encoding:.utf8)
-							
-							do {
-								let decodedItem = try decoder.decode(nostr.Subscription.self, from:capData)
-								await ec.send((self.url, decodedItem))
-							} catch let error {
-								print(someString!)
-								self.logger.error("error trying to decode subscription", metadata:["error":"\(error)"])
+						let someString = String(data:capData, encoding:.utf8)
+						do {
+							let decodedItem = try decoder.decode(nostr.Subscription.self, from:capData)
+							await ec.send((self.url, decodedItem))
+							switch decodedItem {
+							case .endOfStoredEvents(let sub): break
+//								await self.subscriptionReachedEnd(sub)
+							default:
+								break;
 							}
-							
+						} catch let error {
+							print(someString!)
+							self.logger.error("error trying to decode subscription", metadata:["error":"\(error)"])
+						}
 					case .pingPong:
 						break;
 					}
@@ -260,6 +290,34 @@ final actor RelayConnection:ObservableObject {
 			try await hasSocket.write(.text(String(data: try encoder.encode(req), encoding:.utf8)!)).get()
 		} catch let error {
 			self.logger.error("failed to send subscription request to relay.", metadata:["url":"\(self.url)", "error":"\(error)"])
+		}
+		
+		switch req {
+		case let .subscribe(subEvent):
+			self.subscriptions.update(with:subEvent.sub_id)
+			self.endedSubs.remove(subEvent.sub_id)
+		case let .unsubscribe(unsubString):
+			self.subscriptions.remove(unsubString)
+			self.endedSubs.remove(unsubString)
+		default:
+			break;
+		}
+		
+//		await self.updateRelaySyncState()
+	}
+	
+	func send(_ ev:nostr.Event) async throws {
+		guard case .connected = self.state, let hasSocket = self.websocket else {
+			self.logger.error("unable to send event - not currently connected.", metadata:["state":"\(self.state)", "sock":"\(self.websocket)"])
+			throw Error.invalidState
+		}
+		
+		do {
+			let getData = try encoder.encode(nostr.Subscription.event("", ev))
+			try await hasSocket.write(.text(String(data:getData, encoding:.utf8)!)).get()
+		} catch let error {
+			self.logger.error("failed to send event to relay.", metadata:["url":"\(self.url)", "error":"\(error)"])
+			throw error
 		}
 	}
 

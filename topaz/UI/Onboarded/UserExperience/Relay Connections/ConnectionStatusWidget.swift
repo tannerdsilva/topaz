@@ -10,6 +10,8 @@ import SwiftUI
 
 extension UI.Relays {
 	struct ConnectionStatusWidget: View {
+		
+		let dbux:DBUX
 		@ObservedObject var relays:DBUX.RelaysEngine
 		@State private var isTextVisible = false
 		@State var showModal = false
@@ -22,14 +24,10 @@ extension UI.Relays {
 				let connCount = succ.filter { $0 == .connected }
 				
 				VStack {
-					if succ.count <= DotsLayout.maxShapesInFrame(maxWidth:geometry.size.width, maxHeight:geometry.size.height, shapeSize:circleSize, spacing:spacing) {
-						DotsLayout(spacing:spacing, shapeSize:circleSize, status:succ)
-					} else {
-						ProgressRingShape(progress: Double(connCount.count) / Double(succ.count))
+					ProgressRingShape(progress: Double(connCount.count) / Double(succ.count))
 							.stroke(Color.green, lineWidth: 4)
 							.frame(width: 22, height: 22)
-					}
-					
+
 					if isTextVisible {
 						Text("\(connCount.count)/\(succ.count)")
 							.font(.system(size: 12))
@@ -38,7 +36,54 @@ extension UI.Relays {
 					}
 				}
 				.frame(width: geometry.size.width, height: geometry.size.height).sheet(isPresented: $showModal) {
-					AllConnectionsScreen(relayDB: relays)
+					AllConnectionsScreen(dbux: dbux, relayDB: relays)
+				}
+			}
+			.frame(width: 45, height: 30)
+			.onTapGesture {
+				showModal.toggle()
+				if isTextVisible {
+					Task.detached {
+						try await Task.sleep(nanoseconds:5_000_000_000)
+						await MainActor.run { () -> Void in
+							withAnimation(.easeInOut(duration:0.25)) {
+								isTextVisible = true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	struct SyncStatusWidget: View {
+		
+		let dbux:DBUX
+		@ObservedObject var relays:DBUX.RelaysEngine
+		@State private var isTextVisible = false
+		@State var showModal = false
+		
+		var body: some View {
+			GeometryReader { geometry in
+				let circleSize: CGFloat = 6
+				let spacing: CGFloat = 4
+				let succ = relays.userRelayConnectionStates.sorted(by: { $0.key < $1.key }).compactMap({ $0.value })
+				let connCount = succ.filter { $0 == .connected }
+				
+				VStack {
+						ProgressRingShape(progress: Double(connCount.count) / Double(succ.count))
+							.stroke(Color.cyan, lineWidth: 4)
+							.frame(width: 22, height: 22)
+
+					if isTextVisible {
+						Text("\(connCount.count)/\(succ.count)")
+							.font(.system(size: 12))
+							.foregroundColor(.white)
+							.transition(.opacity)
+					}
+				}
+				.frame(width: geometry.size.width, height: geometry.size.height).sheet(isPresented: $showModal) {
+					AllConnectionsScreen(dbux: dbux, relayDB: relays)
 				}
 			}
 			.frame(width: 45, height: 30)
@@ -59,7 +104,7 @@ extension UI.Relays {
 	}
 }
 
-extension UI.Relays.ConnectionStatusWidget {
+extension UI.Relays {
 	struct ProgressRingShape: Shape {
 		let progress: Double
 		

@@ -134,17 +134,6 @@ extension UI {
 						.font(.subheadline)
 						.lineLimit(1)
 				}
-				
-				if let boosted_by = event.boosted_by {
-					HStack {
-						Text("Boosted by")
-							.font(.headline)
-						Spacer()
-						Text(boosted_by)
-							.font(.subheadline)
-							.lineLimit(1)
-					}
-				}
 			}
 		}
 		
@@ -168,68 +157,128 @@ extension UI {
 			return formatter
 		}
 	}
-	
-	struct TimelineView: View {
+
+	@MainActor
+	class TimelineViewModel: ObservableObject {
 		let dbux: DBUX
-		@State private var timeline = [TimelineModel]()
-		@State private var isLoading: Bool = false
-		@State private var lastEventDate: Date? = nil
-		@State private var lastEventUID: nostr.Event.UID? = nil
+		@Published private(set) var timeline: [TimelineModel] = []
+		@Published private(set) var isLoading: Bool = false
+		private let maxItemsInMemory = 20
+		private let loadingBuffer = 5
+		private var lastLoadDirection: DBUX.EventsEngine.TimelineEngine.ReadDirection?
+			
+		init(dbux: DBUX) {
+			self.dbux = dbux
+		}
 		
-		// The maximum number of timeline items to keep in memory
-		let maxItemsInMemory = 20
-		
-		var body: some View {
-			ScrollView {
-				LazyVStack {
-					ForEach(timeline) { item in
-						NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
-							EventViewCell(event: item.event, profile: item.profile)
-						}
-						
-						if timeline.last?.id == item.id && !isLoading {
-							Divider()
-							ProgressView() // Loading indicator
-								.onAppear {
-									loadMoreData()
-								}
-						}
+		func updateAnchorPoint(_ currentItem: TimelineModel) {
+			let anchor = DBUX.DatedNostrEventUID(date: currentItem.event.created, obj: currentItem.event.uid)
+			dbux.contextEngine.timelineAnchor = anchor
+				
+				let index = timeline.firstIndex(where: { $0.id == currentItem.id }) ?? 0
+				if index < loadingBuffer && lastLoadDirection != .forward {
+					Task {
+						lastLoadDirection = .forward
+						await loadMoreData(direction: .forward)
+					}
+				} else if index > timeline.count - loadingBuffer - 1 && lastLoadDirection != .backward {
+					Task {
+						lastLoadDirection = .backward
+						await loadMoreData(direction: .backward)
 					}
 				}
 			}
-			.onAppear {
-				loadMoreData()
-			}
-			.onDisappear {
-				trimTimeline()
-			}
-		}
-		func loadMoreData() {
+
+		
+		func loadMoreData(direction: DBUX.EventsEngine.TimelineEngine.ReadDirection = .backward) {
 			isLoading = true
-			
 			do {
-				let newEventsAndProfiles = try dbux.getHomeTimelineState()
-				
+				let anchor: DBUX.DatedNostrEventUID?
+				switch direction {
+				case .forward:
+					anchor = timeline.first.map { DBUX.DatedNostrEventUID(date: $0.event.created, obj: $0.event.uid) }
+				case .backward:
+					anchor = timeline.last.map { DBUX.DatedNostrEventUID(date: $0.event.created, obj: $0.event.uid) }
+				}
+				let newEventsAndProfiles = try dbux.getHomeTimelineState(anchor: anchor, direction: direction)
 				var newTimelineItems = [TimelineModel]()
 				for newEvent in newEventsAndProfiles.0 {
 					let getProf = newEventsAndProfiles.1[newEvent.pubkey]
-					newTimelineItems.append(TimelineModel(event:newEvent, profile:getProf))
+					newTimelineItems.append(TimelineModel(event: newEvent, profile: getProf))
+				}
+
+				// Reverse the order of newTimelineItems
+				newTimelineItems.reverse()
+
+				switch direction {
+				case .forward:
+					timeline = newTimelineItems + timeline
+				case .backward:
+					timeline.append(contentsOf: newTimelineItems)
 				}
 				
-				timeline.append(contentsOf: newTimelineItems)
 				isLoading = false
-				
-				// Update the last event's date and UID for the next pagination request
-				if let lastEvent = newEventsAndProfiles.0.last {
-					lastEventDate = lastEvent.created.exportDate()
-					lastEventUID = lastEvent.uid
-				}
 			} catch {}
 		}
 		
 		func trimTimeline() {
 			if timeline.count > maxItemsInMemory {
 				timeline = Array(timeline.suffix(maxItemsInMemory))
+			}
+		}
+	}
+
+
+	struct TimelineView: View {
+		@ObservedObject var viewModel: TimelineViewModel
+		let dbux: DBUX
+
+		var body: some View {
+			ScrollView {
+				LazyVStack {
+					if viewModel.timeline.isEmpty {
+						Text("No events to display.")
+							.font(.title)
+							.foregroundColor(.secondary)
+							.padding()
+					} else {
+						ForEach(viewModel.timeline) { item in
+							if viewModel.timeline.first?.id == item.id && !viewModel.isLoading {
+								ProgressView() // Loading indicator for forwards
+									.onAppear {
+										Task {
+											viewModel.loadMoreData(direction: .forward)
+										}
+									}
+							}
+
+							NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
+								EventViewCell(dbux: dbux, event: item.event, profile: item.profile)
+									.onAppear {
+										viewModel.updateAnchorPoint(item)
+									}
+							}
+
+							if viewModel.timeline.last?.id == item.id && !viewModel.isLoading {
+								Divider()
+								ProgressView() // Loading indicator for backwards
+									.onAppear {
+										Task {
+											viewModel.loadMoreData(direction: .backward)
+										}
+									}
+							}
+						}
+					}
+				}
+			}
+			.onAppear {
+				Task {
+					viewModel.loadMoreData()
+				}
+			}
+			.onDisappear {
+				viewModel.trimTimeline()
 			}
 		}
 	}

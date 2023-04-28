@@ -106,15 +106,6 @@
       }
     },
     {
-      "identity" : "swift-cmark",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-cmark.git",
-      "state" : {
-        "branch" : "gfm",
-        "revision" : "86aeb491675de6f077a3a6df6cbcac1a25dcbee1"
-      }
-    },
-    {
       "identity" : "swift-collections",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-collections.git",
@@ -148,15 +139,6 @@
       "state" : {
         "revision" : "32e8d724467f8fe623624570367e3d50c5638e46",
         "version" : "1.5.2"
-      }
-    },
-    {
-      "identity" : "swift-markdown",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-markdown",
-      "state" : {
-        "branch" : "main",
-        "revision" : "4cbd46eab22cbeef307095d17958b6ed23b5f38f"
       }
     },
     {

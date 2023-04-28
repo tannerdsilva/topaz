@@ -57,7 +57,7 @@ extension nostr {
 			if let rid = relay_id {
 				tag.append(rid)
 			}
-			return try Event.Tag(tag)
+			return Event.Tag(tag)
 		}
 	}
 	
@@ -123,6 +123,11 @@ extension nostr {
 			enum Error:Swift.Error {
 				case unknownTagKind
 			}
+			
+			static func fromPublicKey(_ key:nostr.Key) -> Tag {
+				return Self(["p", key.description])
+			}
+			
 			static let logger = Topaz.makeDefaultLogger(label:"nostr.Event.Tag")
 
 			enum Kind:Codable, LosslessStringConvertible, Equatable {
@@ -275,26 +280,26 @@ extension nostr {
 		
 		private static let df = ISO8601DateFormatter()
 
-		let uid:UID
-		let sig:String
-		let tags:[Tag]
-		let boosted_by:String?
+		var uid = UID.nullUID()
+		var sig = "* a very invalid sig lol *"
+		var tags = [Tag]()
 
-		let pubkey:Key
-		let created:DBUX.Date
-		let kind:Kind
-		let content:String
+		var pubkey:Key = nostr.Key.nullKey()
+		var created = DBUX.Date()
+		var kind = Kind.text_note
+		var content:String = ""
 		
 		// used to render the UI during development
 		static func createTestPost() -> Self {
 			return Self(uid:UID.nullUID(), sig:"", tags:[], boosted_by: nil, pubkey:nostr.Key.nullKey(), created:DBUX.Date(Date(timeIntervalSinceNow:-300)), kind:Kind.text_note, content:"oh jeez look here at all this content wowweee")
 		}
 		
+		init() {}
+		
 		fileprivate init(uid:UID, sig:String, tags:[Tag], boosted_by:String?, pubkey:Key, created:DBUX.Date, kind:Kind, content:String) {
 			self.uid = uid
 			self.sig = sig
 			self.tags = tags
-			self.boosted_by = boosted_by
 			self.pubkey = pubkey
 			self.created = created
 			self.kind = kind
@@ -302,30 +307,28 @@ extension nostr {
 		}
 
 		@usableFromInline init(from decoder:Decoder) throws {
-			let container = try decoder.container(keyedBy: CodingKeys.self)
-			self.uid = try container.decode(UID.self, forKey: .uid)
-			let getSig = try container.decode(String.self, forKey: .sig)
+			let container = try! decoder.container(keyedBy: CodingKeys.self)
+			self.uid = try! container.decode(UID.self, forKey: .uid)
+			let getSig = try! container.decode(String.self, forKey: .sig)
 			self.sig = getSig
-			self.tags = try container.decode([Tag].self, forKey: .tags)
-			self.boosted_by = try container.decodeIfPresent(String.self, forKey: .boosted_by)
-			self.pubkey = try container.decode(Key.self, forKey: .pubkey)
-			let getTI = try container.decode(TimeInterval.self, forKey: .created)
-			let getCreateDate = Date(timeIntervalSince1970:getTI)
+			self.tags = try! container.decode([Tag].self, forKey: .tags)
+			self.pubkey = try! container.decode(Key.self, forKey: .pubkey)
+			let getTI = try! container.decode(Int.self, forKey: .created)
+			let getCreateDate = Date(timeIntervalSince1970:TimeInterval(getTI))
 			self.created = DBUX.Date(getCreateDate)
-			self.kind = Kind(rawValue:try container.decode(Int.self, forKey: .kind))!
-			self.content = try container.decode(String.self, forKey: .content)
+			self.kind = Kind(rawValue:try! container.decode(Int.self, forKey: .kind))!
+			self.content = try! container.decode(String.self, forKey: .content)
 		}
 
 		@usableFromInline func encode(to encoder:Encoder) throws {
 			var container = encoder.container(keyedBy: CodingKeys.self)
-			try container.encode(uid, forKey: .uid)
-			try container.encode(sig, forKey: .sig)
-			try container.encode(tags, forKey: .tags)
-			try container.encode(boosted_by, forKey: .boosted_by)
-			try container.encode(pubkey, forKey: .pubkey)
-			try container.encode(created.exportDate().timeIntervalSince1970, forKey: .created)
-			try container.encode(kind.rawValue, forKey: .kind)
-			try container.encode(content, forKey: .content)
+			try! container.encode(uid, forKey: .uid)
+			try! container.encode(sig, forKey: .sig)
+			try! container.encode(tags, forKey: .tags)
+			try! container.encode(pubkey, forKey: .pubkey)
+			try! container.encode(Int(created.exportDate().timeIntervalSince1970), forKey: .created)
+			try! container.encode(kind.rawValue, forKey: .kind)
+			try! container.encode(content, forKey: .content)
 		}
 		
 		func getReferencedIDs(_ key:String = "e") -> [ReferenceID] {
@@ -397,6 +400,12 @@ extension nostr.Event {
 
 		static func nullUID() -> Self {
 			return Self()
+		}
+		
+		static func generatedFrom(event:nostr.Event) throws -> Self {
+			let commitment = try event.commitment()
+			let hashed = sha256(commitment)
+			return Self(hashed)
 		}
 
 		// Lexigraphical sorting here
@@ -476,11 +485,9 @@ extension nostr.Event {
 		
 		// Hashable
 		public func hash(into hasher:inout Hasher) {
-			withUnsafePointer(to:bytes) { byteBuff in
-				for i in 0..<MemoryLayout<Self>.size {
-					hasher.combine(byteBuff.advanced(by: i))
-				}
-			}
+			asMDB_val({ hashVal in
+				hasher.combine(hashVal)
+			})
 		}
 		
 		/// Export the hash as a Data struct
@@ -517,6 +524,9 @@ extension nostr.Event {
 		let commit = "[0,\"\(self.pubkey)\",\(Int64(self.created.exportDate().timeIntervalSince1970)),\(self.kind.rawValue),\(tagsString),\(contentString)]"
 		return Data(commit.utf8)
 	}
+	mutating func computeUID() throws {
+		self.uid = try UID.generatedFrom(event: self)
+	}
 	func validate() -> Result<ValidationResult, Swift.Error> {
 		do {
 			let raw_id = UID(sha256(try self.commitment()))
@@ -547,19 +557,18 @@ extension nostr.Event {
 			return .failure(error)
 		}
 	}
-	func sign(privateKey:nostr.Key) throws -> String {
-		let priv_key_bytes = Data(privateKey.bytes).bytes
-		let key = try secp256k1.Signing.PrivateKey(rawRepresentation: priv_key_bytes)
+	mutating func sign(privateKey:nostr.Key) throws {
+		let key = try secp256k1.Signing.PrivateKey(rawRepresentation: privateKey.bytes)
 
 		// Extra params for custom signing
 
 		var aux_rand = random_bytes(count: 64)
-		var digest = Data(privateKey.bytes).bytes
+		var digest = self.uid.exportData().bytes
 
 		// API allows for signing variable length messages
 		let signature = try key.schnorr.signature(message: &digest, auxiliaryRand: &aux_rand)
 
-		return hex_encode(signature.rawRepresentation)
+		self.sig = hex_encode(signature.rawRepresentation)
 	}
 	func firstEventTag() -> String? {
 		for tag in tags {
@@ -607,10 +616,10 @@ extension nostr.Event {
 	}
 }
 
-extension KeyPair {
-	static func getSharedSecret(pubkey:String, privkey:String) throws -> [UInt8]? {
-		let privkey_bytes = try privkey.bytes
-		var pk_bytes = try pubkey.bytes
+extension nostr.KeyPair {
+	public static func getSharedSecret(from keypair:nostr.KeyPair) throws -> [UInt8]? {
+		let privkey_bytes = Data(keypair.privkey.bytes).bytes
+		var pk_bytes = Data(keypair.pubkey.bytes).bytes
 		pk_bytes.insert(2, at: 0)
 		
 		var publicKey = secp256k1_pubkey()
@@ -648,7 +657,7 @@ func decrypt_dm(_ privkey: String?, pubkey: String, content:String, encoding:nos
 	guard let privkey = privkey else {
 		return nil
 	}
-	guard let shared_sec = try? KeyPair.getSharedSecret(pubkey:pubkey, privkey: privkey) else {
+	guard let shared_sec = try? nostr.KeyPair.getSharedSecret(from: nostr.KeyPair(pubkey:nostr.Key(pubkey)!, privkey:nostr.Key(privkey)!)) else {
 		return nil
 	}
 	guard let dat = (encoding == .base64 ? decode_dm_base64(content) : decode_dm_bech32(content)) else {

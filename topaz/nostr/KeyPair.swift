@@ -119,11 +119,9 @@ extension nostr {
 
 		// Hashable
 		public func hash(into hasher:inout Hasher) {
-			withUnsafePointer(to:bytes) { byteBuff in
-				for i in 0..<MemoryLayout<Self>.size {
-					hasher.combine(byteBuff.advanced(by: i))
-				}
-			}
+			self.asMDB_val({ mdbVal in
+				hasher.combine(mdbVal)
+			})
 		}
 		
 		/// Export the hash as a Data struct
@@ -131,6 +129,11 @@ extension nostr {
 			withUnsafePointer(to:bytes) { byteBuff in
 				return Data(bytes:byteBuff, count:MemoryLayout<Self>.size)
 			}
+		}
+		
+		func getNpubString() -> String {
+			let asBytes = Data(bytes).bytes
+			return bech32_encode(hrp:"npub", asBytes)
 		}
 	}
 

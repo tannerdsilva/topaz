@@ -13,14 +13,11 @@ import Logging
 import AsyncAlgorithms
 
 extension DBUX {
-	class ProfilesEngine:ObservableObject, ExperienceEngine {
+	class ProfilesEngine:ObservableObject, SharedExperienceEngine {
+		
 		typealias NotificationType = DBUX.Notification
-		static let name = "profile-engine.mdb"
-		static let deltaSize = size_t(5.12e+8)
-		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let dispatcher: Dispatcher<DBUX.Notification>
-		let base:URL
 		let env:QuickLMDB.Environment
 		let pubkey:nostr.Key
 		let logger:Logger
@@ -37,9 +34,8 @@ extension DBUX {
 
 		@MainActor @Published var currentUserProfile:nostr.Profile
 
-		required init(base:URL, env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<DBUX.Notification>) throws {
+		required init(env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher: Dispatcher<DBUX.Notification>) throws {
 			self.dispatcher = dispatcher
-			self.base = base
 			self.env = env
 			self.pubkey = publicKey
 			self.logger = Topaz.makeDefaultLogger(label:"profile-engine.mdb")
@@ -49,6 +45,7 @@ extension DBUX {
 			try self.profilesDB.setCompare(tx:newTrans, nostr.Key.mdbCompareFunction)
 			do {
 				let myProfile = try self.profilesDB.getEntry(type:Data.self, forKey:pubkey, tx:newTrans)!
+				let getString = String(data:myProfile, encoding:.utf8)
 				let decoded = try decoder.decode(nostr.Profile.self, from:myProfile)
 				_currentUserProfile = Published(wrappedValue:decoded)
 			} catch LMDBError.notFound {
@@ -74,21 +71,33 @@ extension DBUX {
 		}
 
 		/// set a profile in the database
-		func setPublicKeys(_ profiles:[nostr.Key:nostr.Profile], tx someTrans:QuickLMDB.Transaction) throws {
+		func setPublicKeys(_ profiles:[nostr.Key:nostr.Profile], asOf:[nostr.Key:DBUX.Date], tx someTrans:QuickLMDB.Transaction) throws {
 			let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
 			let encoder = JSONEncoder()
+			var currentUserChanged:Bool = false
 			let profileCursor = try self.profilesDB.cursor(tx:newTrans)
+			let dateCursor = try self.profile_asofDB.cursor(tx:newTrans)
 			for (pubkey, curProfile) in profiles {
+				do {
+					let getDate = DBUX.Date(try dateCursor.getEntry(.set, key:pubkey).value)!
+					if getDate >= asOf[pubkey]! {
+						continue
+					}
+				} catch LMDBError.notFound {}
 				let encoded = try encoder.encode(curProfile)
+				if pubkey == self.pubkey {
+					currentUserChanged = true
+				}
 				try profileCursor.setEntry(value:encoded, forKey:pubkey)
+				try dateCursor.setEntry(value:asOf[pubkey]!, forKey:pubkey)
 			}
 			try newTrans.commit()
-			if let hasMyProfile = profiles[pubkey] {
-				Task.detached { @MainActor [weak self, myprof = hasMyProfile] in
+			if currentUserChanged {
+				Task.detached { @MainActor [weak self, myprof = profiles[pubkey]!] in
 					guard let self = self else { return }
 					self.currentUserProfile = myprof
-					Task.detached(operation: { [disp = self.dispatcher] in
-						await disp.fireEvent(DBUX.Notification.currentUserProfileUpdated)
+					Task.detached(operation: { [disp = self.dispatcher, myprof = myprof] in
+						await disp.fireEvent(DBUX.Notification.currentUserProfileUpdated, associatedObject:myprof)
 					})
 				}
 			}

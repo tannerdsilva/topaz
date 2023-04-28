@@ -10,24 +10,37 @@ import SwiftUI
 extension UI.Relays {
 	struct AllConnectionsScreen: View {
 		struct ConnectionListItem: View {
+			let dbux: DBUX
 			let url: String
 			let state: RelayConnection.State
 			let showReconnectButton: Bool
+			@Binding var editMode: EditMode
+			@State private var inputURL: String = "" // Add a State property to store the input URL
+			
+			private var isValidURL: Bool {
+				if let url = URL(string: inputURL), url.scheme == "ws" || url.scheme == "wss" {
+					return true
+				} else {
+					return false
+				}
+			}
 			
 			var body: some View {
 				HStack {
-					RelayProtocolView(url: url)
+					RelayProtocolView(url: URL(string: url)) // Update to use URL struct
 						.padding(.trailing, 8)
-
+					
 					VStack(alignment: .leading) {
 						Text("\(url.replacingOccurrences(of: "ws://", with: "").replacingOccurrences(of: "wss://", with: ""))")
-							.font(.system(size: 14))
+							.font(.system(size: 14, design: .monospaced)) // Use a monospaced font
 					}
 					Spacer()
 					
 					if showReconnectButton && state == .disconnected {
 						Button(action: {
-							// Reconnect action
+							Task.detached {
+								try await dbux.eventsEngine.relaysEngine.userRelayConnections[url]!.connect()
+							}
 						}, label: {
 							Text("Reconnect")
 								.padding(.horizontal, 4)
@@ -37,55 +50,58 @@ extension UI.Relays {
 								.cornerRadius(4)
 						})
 					}
+					
+					if editMode == .active {
+						Button(action: {
+							try? dbux.removeRelay(url)
+						}) {
+							Image(systemName: "trash")
+								.foregroundColor(.red)
+						}
+						.contentShape(Rectangle()) // Make only the button's area tappable
+					}
 				}
 				.padding(.vertical, 6)
+				.onChange(of: inputURL) { newValue in
+					if isValidURL {
+						try? dbux.addRelay(newValue)
+						inputURL = ""
+					}
+				}
 			}
 		}
-
+		
 		struct CustomToolbar: View {
 			let isEditMode: EditMode
 			let onEditToggle: () -> Void
-
+			
 			var body: some View {
 				HStack {
 					Spacer()
 					if isEditMode == .active {
-						Button(action: {
-							onEditToggle()
-						}) {
-							Text("Done")
-								.foregroundColor(.blue)
-								.padding(.horizontal, 16)
-								.padding(.vertical, 8)
-								.background(Color(.systemBackground))
-								.cornerRadius(8)
-								.overlay(
-									RoundedRectangle(cornerRadius: 8)
-										.stroke(Color(.systemBlue), lineWidth: 1)
-								)
-						}
+						actionButton(title: "Done", action: onEditToggle)
 					} else {
-						Button(action: {
-							onEditToggle()
-						}) {
-							Text("Edit")
-								.foregroundColor(.blue)
-								.padding(.horizontal, 16)
-								.padding(.vertical, 8)
-								.background(Color(.systemBackground))
-								.cornerRadius(8)
-								.overlay(
-									RoundedRectangle(cornerRadius: 8)
-										.stroke(Color(.systemBlue), lineWidth: 1)
-								)
-						}
+						actionButton(title: "Edit", action: onEditToggle)
 					}
 					Spacer()
 				}
 				.padding(.top, 8)
 			}
+			
+			func actionButton(title: String, action: @escaping () -> Void) -> some View {
+				Button(action: action) {
+					Text(title)
+						.font(.system(size: 14))
+						.foregroundColor(.white)
+						.padding(.horizontal, 12)
+						.padding(.vertical, 6)
+						.background(Color.blue)
+						.cornerRadius(4)
+				}
+			}
 		}
-
+		
+		let dbux:DBUX
 		@ObservedObject var relayDB: DBUX.RelaysEngine
 		
 		@State private var isEditMode: EditMode = .inactive
@@ -102,26 +118,7 @@ extension UI.Relays {
 				.map { ($0.key, $0.value) }
 				.sorted { $0.0.rawValue < $1.0.rawValue }
 		}
-		
-		func deleteConnection(at offsets: IndexSet) {
-			var updatedURLs = Set<String>()
 
-			for (index, connection) in sortedConnections.enumerated() {
-				if !offsets.contains(index) {
-					updatedURLs.insert(connection.0)
-				}
-			}
-
-			do {
-				// Replace "pubkey" and "writeDate" with the appropriate values from your app
-				try relayDB.setRelays(updatedURLs, pubkey:relayDB.pubkey, asOf: DBUX.Date())
-			} catch {
-				// Handle the error if needed, e.g., show an alert or print a message
-				print("Error updating relays: \(error)")
-			}
-		}
-
-		
 		var body: some View {
 			NavigationView {
 				VStack {
@@ -130,34 +127,35 @@ extension UI.Relays {
 					}
 					
 					if isEditMode == .active {
-						Section(header: Text("Add New Relay").font(.subheadline)) {
-							HStack {
-								TextField("Enter Relay URL", text: $newRelayURL)
-									.textFieldStyle(RoundedBorderTextFieldStyle())
-								Button(action: {
-									// Add new relay logic here
-								}) {
-									Text("Add")
-										.foregroundColor(.blue)
-								}
+						HStack {
+							TextField("wss://relay.url.here", text: $newRelayURL)
+								.textFieldStyle(RoundedBorderTextFieldStyle())
+								.font(.system(size: 15, design: .monospaced))
+								.disableAutocorrection(true)
+								.autocapitalization(.none)
+								.padding(.horizontal, 3)
+							Button(action: {
+								try? dbux.addRelay(newRelayURL)
+							}) {
+								Text("Add")
+									.foregroundColor(.blue)
 							}
-						}
+						}.padding(.horizontal, 20)
 					}
+
 					
 					List {
-						// Add a section for adding a new relay
-						
 						if isEditMode == .inactive {
 							ForEach(connectionGroups, id: \.0) { state, connections in
 								Section(header: Text(state.description).font(.subheadline).foregroundColor(state.color).padding(.top)) {
 									ForEach(connections, id: \.0) { key, value in
-										ConnectionListItem(url: key, state: value, showReconnectButton: true)
+										ConnectionListItem(dbux: dbux, url: key, state: value, showReconnectButton: true, editMode:$isEditMode)
 									}
 								}
 							}
 						} else {
 							ForEach(sortedConnections, id: \.0) { key, state in
-								ConnectionListItem(url: key, state: state, showReconnectButton: false)
+								ConnectionListItem(dbux: dbux, url: key, state: state, showReconnectButton: false, editMode:$isEditMode)
 							}
 						}
 					}

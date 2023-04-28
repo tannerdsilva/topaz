@@ -1,4 +1,5 @@
 import QuickLMDB
+import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
 import struct Foundation.TimeInterval
 import struct Foundation.UUID
@@ -11,24 +12,27 @@ import SwiftBlake2
 
 // encompasses the user experience 
 public class DBUX:Based {
+	enum Error:Swift.Error {
+		case unableToEncrypt
+	}
+	let application:ApplicationModel
+	let appDispatcher:Dispatcher<Topaz.Notification>
 	let dispatcher:Dispatcher<DBUX.Notification>
 	
 	let logger:Logger
 	let base:URL
 	
 	let keypair:nostr.KeyPair
-	
-	let contactsEngine:ContactsEngine
-
-	let profilesEngine:ProfilesEngine
 
 	let contextEngine:ContextEngine
 
 	let eventsEngine:EventsEngine
+	
+	let imageCache:ImageCache
 
-	let relaysEngine:RelaysEngine
-
-	init(base:URL, keypair:nostr.KeyPair) throws {
+	init(app:ApplicationModel, base:URL, keypair:nostr.KeyPair, appDispatcher:Dispatcher<Topaz.Notification>) throws {
+		self.application = app
+		self.appDispatcher = appDispatcher
 		self.dispatcher = Dispatcher<Notification>(logLabel:"dbux-\(keypair.pubkey.description)", logLevel:.info)
 		let makeLogger = Topaz.makeDefaultLogger(label:"dbux")
 		self.keypair = keypair
@@ -38,116 +42,212 @@ public class DBUX:Based {
 			try FileManager.default.createDirectory(atPath:makeBase.path, withIntermediateDirectories:true)
 		}
 		
-		self.contactsEngine = try! Topaz.launchExperienceEngine(ContactsEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
-		self.profilesEngine = try! Topaz.launchExperienceEngine(ProfilesEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
 		self.contextEngine = try! Topaz.launchExperienceEngine(ContextEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
-		self.eventsEngine = try! EventsEngine(base:makeBase, pubkey:keypair.pubkey, dispatcher:dispatcher)
-		self.relaysEngine = try! Topaz.launchExperienceEngine(RelaysEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
+		self.eventsEngine = try! Topaz.launchExperienceEngine(EventsEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
+		self.imageCache = try! Topaz.launchExperienceEngine(ImageCache.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
+		
 		self.base = makeBase
 		
+		let relaysTX = try self.eventsEngine.transact(readOnly:false)
 		let myRelays:Set<String>
 		do {
-			myRelays = try self.relaysEngine.getRelays(pubkey:keypair.pubkey.description)
+			myRelays = try self.eventsEngine.relaysEngine.getRelays(pubkey:keypair.pubkey, tx:relaysTX)
 		} catch LMDBError.notFound {
 			myRelays = Set(Topaz.defaultRelays.compactMap { $0.url })
 		}
-		let homeSubs = try! self.buildMainUserFilters()
+		let myFollows:Set<nostr.Key>
+		do {
+			myFollows = try self.eventsEngine.followsEngine.getFollows(pubkey:keypair.pubkey, tx:relaysTX)
+		} catch LMDBError.notFound {
+			myFollows = Set<nostr.Key>()
+		}
+		let homeSubs = Self.generateMainSubscription(pubkey:self.keypair.pubkey, following:myFollows)
 		for curRelay in myRelays {
-			try relaysEngine.add(subscriptions:[nostr.Subscribe(sub_id:UUID().uuidString, filters:homeSubs)], to:curRelay)
+			try self.eventsEngine.relaysEngine.add(subscriptions:[homeSubs], to:curRelay, tx:relaysTX)
 		}
-		
-		Task.detached { [weak self, hol = self.relaysEngine.holder] in
-			guard let self = self else {
-				return
-			}
-			let decoder = JSONDecoder()
-			for try await curEvs in hol {
-				var buildProfiles = [nostr.Key:nostr.Profile]()
-				var profileUpdateDates = [nostr.Key:DBUX.Date]()
-				for curEv in curEvs {
-					switch curEv.kind {
-					case .metadata:
-						do {
-							let asData = Data(curEv.content.utf8)
-							let decoded = try decoder.decode(nostr.Profile.self, from:asData)
-							self.logger.info("successfully decoded profile", metadata:["pubkey":"\(curEv.pubkey)"])
-							buildProfiles[curEv.pubkey] = decoded
-							profileUpdateDates[curEv.pubkey] = curEv.created
-						} catch {
-							self.logger.error("failed to decode profile.")
-						}
-					case .contacts:
-						do {
-							let asData = Data(curEv.content.utf8)
-							let relays = Set(try decoder.decode([String:[String:Bool]].self, from:asData).keys)
-							var following = Set<nostr.Key>()
-							for curTag in curEv.tags {
-								if case curTag.kind = nostr.Event.Tag.Kind.pubkey, let getPubKey = curTag.info.first, let asKey = nostr.Key(getPubKey) {
-									following.update(with:asKey)
-								}
-							}
-							try self.relaysEngine.setRelays(relays, pubkey:curEv.pubkey, asOf:curEv.created)
-							let followsTx = try self.contactsEngine.followsEngine.transact(readOnly:false)
-							try self.contactsEngine.followsEngine.set(pubkey:curEv.pubkey, follows:following, tx:followsTx)
-							if curEv.pubkey == self.keypair.pubkey {
-								// write the new home subscription
-								var homeFilter = nostr.Filter()
-								homeFilter.kinds = [.text_note, .like, .boost]
-								homeFilter.authors = Array(following.compactMap({ $0.description }))
-								
-							}
-							try followsTx.commit()
-							self.logger.info("updated contact information.", metadata:["pubkey":"\(curEv.pubkey)"])
-						} catch let error {}
-						
-					default:
-						self.logger.debug("got event.", metadata:["kind":"\(curEv.kind)"])
-					}
-				}
-				
-				await withThrowingTaskGroup(of:Void.self, body: { [pe = self.profilesEngine, newEvsSet = Set(curEvs), tle = self.eventsEngine.timelineEngine, bp = buildProfiles] tg in
-					
-//					 write the events to the timeline
-					tg.addTask { [newEvsSet, tle] in
-						let tltx = try tle.transact(readOnly:false)
-						try tle.writeEvents(newEvsSet, tx:tltx)
-						try tltx.commit()
-					}
-					
-					// write the new profiles to the database
-					tg.addTask { [pe, bp] in
-						let pftx = try pe.transact(readOnly:false)
-						try pe.setPublicKeys(bp, tx:pftx)
-						try pftx.commit()
-					}
-				})
-			}
-		}
-		Task.detached {
-			await self.dispatcher.addListener(forEventType:.currentUserFollowsUpdated, { _ in
-				print("DOING IT")
-			})
-		}
-		
+		try relaysTX.commit()
+//		Task.detached { [weak self, disp = dispatcher, appDisp = appDispatcher, pubkey = self.keypair.pubkey] in
+//			await disp.addListener(forEventType:DBUX.Notification.applicationBecameFrontmost) { [weak self] _, _ in
+//				Task.detached { [weak self] in
+//					if let getItAll = await self?.eventsEngine.relaysEngine.getConnectionsAndStates() {
+//						let getDisconnected = getItAll.1.values.filter({ $0 == .disconnected })
+//						if getDisconnected.count > 0 {
+//							await withTaskGroup(of:Void.self) { tg in
+//								for curRelay in getItAll.0 {
+//									tg.addTask { [cr = curRelay] in
+//										try? await cr.value.connect()
+//									}
+//								}
+//							}
+//						}
+//					}
+//				}
+//			}
+//
+//			await disp.addListener(forEventType:DBUX.Notification.currentUserProfileUpdated) { [appDisp = appDisp, pubkey = pubkey] _, newProf in
+//				guard let getProf = newProf as? nostr.Profile else {
+//					return
+//				}
+//				Task.detached { [appDisp = appDisp, newProf = getProf] in
+//					await appDisp.fireEvent(Topaz.Notification.userProfileInfoUpdated, associatedObject:Topaz.Account(key:pubkey, profile:newProf))
+//				}
+//			}
+//		}
+//
+//
+//		Task.detached { [weak self, hol = self.eventsEngine.relaysEngine.holder] in
+//			guard let self = self else {
+//				return
+//			}
+//			let decoder = JSONDecoder()
+//			for try await curEvs in hol {
+//				var profileDates = [nostr.Key:DBUX.Date]()
+//				var buildProfiles = [nostr.Key:nostr.Profile]()
+//				var profileUpdateDates = [nostr.Key:DBUX.Date]()
+//
+//				var timelineEvents = Set<nostr.Event>()
+//
+//				for (subID, curEv) in curEvs {
+//					switch curEv.kind {
+//					case .metadata:
+//						do {
+//							let asData = Data(curEv.content.utf8)
+//							let decoded = try decoder.decode(nostr.Profile.self, from:asData)
+//							self.logger.info("successfully decoded profile", metadata:["pubkey":"\(curEv.pubkey)"])
+//							profileDates[curEv.pubkey] = curEv.created
+//							buildProfiles[curEv.pubkey] = decoded
+//							profileUpdateDates[curEv.pubkey] = curEv.created
+//						} catch {
+//							self.logger.error("failed to decode profile.")
+//						}
+//					case .contacts:
+//						do {
+//							let asData = Data(curEv.content.utf8)
+//							let relays = Set(try decoder.decode([String:[String:Bool]].self, from:asData).keys)
+//							var following = Set<nostr.Key>()
+//							for curTag in curEv.tags {
+//								if case curTag.kind = nostr.Event.Tag.Kind.pubkey, let getPubKey = curTag.info.first, let asKey = nostr.Key(getPubKey) {
+//									following.update(with:asKey)
+//								}
+//							}
+//							let relaysTX = try self.eventsEngine.transact(readOnly:false)
+//							try self.eventsEngine.relaysEngine.setRelays(relays, pubkey:curEv.pubkey, asOf:curEv.created, tx:relaysTX)
+//							try self.eventsEngine.followsEngine.set(pubkey:curEv.pubkey, follows:following, tx:relaysTX)
+//							if curEv.pubkey == self.keypair.pubkey {
+//								let homeSubs = Self.generateMainSubscription(pubkey:self.keypair.pubkey, following:myFollows)
+//								for curRelay in myRelays {
+//									try self.eventsEngine.relaysEngine.add(subscriptions:[homeSubs], to:curRelay, tx:relaysTX)
+//								}
+//							}
+//							try relaysTX.commit()
+//							self.logger.info("updated contact information.", metadata:["pubkey":"\(curEv.pubkey)"])
+//						} catch let error {}
+//
+//					case .text_note:
+//						timelineEvents.update(with:curEv)
+//						self.logger.debug("got event.", metadata:["kind":"\(curEv.kind)"])
+//					default: break
+//					}
+//				}
+//
+//				await withThrowingTaskGroup(of:Void.self, body: { [pe = self.eventsEngine.profilesEngine, newEvsSet = timelineEvents, tle = self.eventsEngine, bp = buildProfiles, pd = profileDates] tg in
+//
+////					 write the events to the timeline
+//					tg.addTask { [newEvsSet, tle, pe, bp, pd] in
+//						let tltx = try tle.transact(readOnly:false)
+//						try tle.timelineEngine.writeEvents(newEvsSet, tx:tltx)
+//						try pe.setPublicKeys(bp, asOf:pd, tx:tltx)
+//						try tltx.commit()
+//					}
+//
+//				})
+//			}
+//		}
 	}
-//	
-	func getHomeTimelineState() throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {
-		let contextOpen = try contextEngine.getTimelineAnchor()
-		let tltx = try eventsEngine.timelineEngine.transact(readOnly:true)
-		let events = try eventsEngine.timelineEngine.readEvents(from:contextOpen, tx:tltx, filter: { nostrID in
+	
+	@MainActor func addFollow(_ key:nostr.Key) throws {
+//		let relaysTX = try self.eventsEngine.transact(readOnly:true)
+//		let getRelays = try self.eventsEngine.relaysEngine.getRelays(pubkey:self.keypair.pubkey, tx:relaysTX)
+//		try relaysTX.commit()
+//
+//		try contactsTX.commit()
+	}
+	
+	@MainActor func removeFollow(_ key:nostr.Key) throws {
+//		let relaysTX = try self.eventsEngine.transact(readOnly:true)
+//		let getRelays = try self.eventsEngine.relaysEngine.getRelays(pubkey: self.keypair.pubkey, tx:relaysTX)
+//		try relaysTX.commit()
+//		let contactsTX = try self.eventsEngine.followsEngine.transact(readOnly:false)
+//		var getFollows = try self.followsEngine.getFollows(pubkey:self.keypair.pubkey, tx:contactsTX)
+//		getFollows.remove(key)
+//		try self.followsEngine.set(pubkey:self.keypair.pubkey, follows:getFollows, tx:contactsTX)
+//		let newContactsEvent = try self.generateContactEvent(contacts:getFollows, relays: getRelays)
+//		let getAllRelays = try self.relaysEngine.userRelayConnections
+//		Task.detached { [conns = getAllRelays] in
+//
+//		}
+	}
+	
+	@MainActor func addRelay(_ relay:String) throws {
+		let openTx = try self.eventsEngine.transact(readOnly:false)
+		let myFollows = try self.eventsEngine.followsEngine.getFollows(pubkey:self.keypair.pubkey, tx:openTx)
+		var getRelays = try self.eventsEngine.relaysEngine.getRelays(pubkey:self.keypair.pubkey, tx:openTx)
+		getRelays.update(with:relay)
+		try self.eventsEngine.relaysEngine.setRelays(getRelays, pubkey:self.keypair.pubkey, asOf:DBUX.Date(), tx:openTx)
+		let newEvent = try self.generateContactEvent(contacts:myFollows, relays:getRelays)
+		try self.eventsEngine.relaysEngine.write(event:newEvent, to:getRelays, tx:openTx)
+		try openTx.commit()
+	}
+	
+	@MainActor func removeRelay(_ relay:String) throws {
+		let openTx = try self.eventsEngine.transact(readOnly:false)
+		let myFollows = try self.eventsEngine.followsEngine.getFollows(pubkey:self.keypair.pubkey, tx:openTx)
+		var getRelays = try self.eventsEngine.relaysEngine.getRelays(pubkey:self.keypair.pubkey, tx:openTx)
+		getRelays.remove(relay)
+		try self.eventsEngine.relaysEngine.setRelays(getRelays, pubkey:self.keypair.pubkey, asOf:DBUX.Date(), tx:openTx)
+		let newEvent = try self.generateContactEvent(contacts:myFollows, relays:getRelays)
+		try self.eventsEngine.relaysEngine.write(event:newEvent, to:getRelays, tx:openTx)
+		try openTx.commit()
+	}
+	
+	@MainActor func updateProfile(_ newCurrentUserProfileInfo:nostr.Profile) throws {
+		let newDAte = DBUX.Date()
+		let encodedProfile = try JSONEncoder().encode(newCurrentUserProfileInfo)
+		let encodedString = String(data:encodedProfile, encoding:.utf8)
+		let openTx = try self.eventsEngine.transact(readOnly:false)
+		try self.eventsEngine.profilesEngine.setPublicKeys([self.keypair.pubkey:newCurrentUserProfileInfo], asOf: [self.keypair.pubkey:newDAte], tx: openTx)
+		var getRelays = try self.eventsEngine.relaysEngine.getRelays(pubkey:self.keypair.pubkey, tx:openTx)
+		let getEvent = try self.generateMetadataEvent(content: newCurrentUserProfileInfo, with: newDAte)
+		try self.eventsEngine.relaysEngine.write(event:getEvent, to:getRelays, tx:openTx)
+		try openTx.commit()
+	}
+	
+	@MainActor func sendTextNoteContentToAllRelays(_ content:String) throws {
+		if content.filter({ $0.isWhitespace == false }).count == 0 {
+			return
+		}
+		let getEvent = try self.generateContentEvent(content:content)
+		let openTx = try self.eventsEngine.transact(readOnly:false)
+		var getRelays = try self.eventsEngine.relaysEngine.getRelays(pubkey:self.keypair.pubkey, tx:openTx)
+		try self.eventsEngine.relaysEngine.write(event:getEvent, to:getRelays, tx:openTx)
+		try openTx.commit()
+	}
+	
+
+	func getHomeTimelineState(anchor:DBUX.DatedNostrEventUID?, direction:DBUX.EventsEngine.TimelineEngine.ReadDirection) throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {
+		let tltx = try eventsEngine.transact(readOnly:true)
+		let events = try eventsEngine.timelineEngine.readEvents(from:anchor, direction:direction, tx:tltx, filter: { nostrID in
 			return true
 		})
+		let profiles = try self.eventsEngine.profilesEngine.getPublicKeys(publicKeys:Set(events.compactMap({ $0.pubkey })), tx: tltx)
 		try tltx.commit()
-		let profilesTx = try profilesEngine.transact(readOnly:true)
-		let profiles = try self.profilesEngine.getPublicKeys(publicKeys:Set(events.compactMap({ $0.pubkey })), tx: profilesTx)
-		try profilesTx.commit()
 		return (events.sorted(by: { $0.created < $1.created }), profiles)
 	}
 
 	func buildMainUserFilters() throws -> [nostr.Filter] {
-		let newTransaction = try self.contactsEngine.followsEngine.transact(readOnly:true)
+		let newTransaction = try self.eventsEngine.transact(readOnly:true)
 		// get the friends list
-		let myFriends = try self.contactsEngine.followsEngine.getFollows(pubkey:self.keypair.pubkey, tx:newTransaction)
+		let myFriends = try self.eventsEngine.followsEngine.getFollows(pubkey:self.keypair.pubkey, tx:newTransaction)
 		try newTransaction.commit()
 		
 		let friendString = myFriends.compactMap({ $0.description })
@@ -155,8 +255,11 @@ public class DBUX:Based {
 		// build the contacts filter
 		var contactsFilter = nostr.Filter()
 		contactsFilter.authors = Array(friendString)
-		contactsFilter.kinds = [.metadata]
-
+		contactsFilter.kinds = [.metadata, .contacts]
+		
+		var homeFilter = nostr.Filter()
+		homeFilter.kinds = [.text_note, .like, .boost]
+		homeFilter.authors = Array(friendString)
 		
 		// build "blocklist" filter
 		var blocklistFilter = nostr.Filter()
@@ -174,11 +277,6 @@ public class DBUX:Based {
 		ourDMsFilter.kinds = [.dm]
 		ourDMsFilter.authors = [self.keypair.pubkey.description]
 
-		// create home filter
-		var homeFilter = nostr.Filter()
-		homeFilter.kinds = [.text_note, .like, .boost]
-		homeFilter.authors = Array(friendString)
-
 		// // create "notifications" filter
 		// var notificationsFilter = nostr.Filter()
 		// notificationsFilter.kinds = [.like, .boost, .text_note, .zap]
@@ -186,6 +284,11 @@ public class DBUX:Based {
 
 		// return [contactsFilter]
 		return [contactsFilter, blocklistFilter, dmsFilter, ourDMsFilter, homeFilter]
+	}
+	
+	
+	deinit {
+		print("this is deinit")
 	}
 }
 
@@ -342,14 +445,6 @@ extension DBUX {
 			}
 		}
 
-		@usableFromInline static func invertedDateCompare(_ lhs: Self, _ rhs: Self) -> Bool {
-			return lhs.asMDB_val({ lhsVal in
-				rhs.asMDB_val({ rhsVal in
-					return Self.invertedDateMDBCompareFunction(&lhsVal, &rhsVal) < 0
-				})
-			})
-		}
-
 		@usableFromInline static func < (lhs: Self, rhs: Self) -> Bool {
 			return lhs.asMDB_val({ lhsVal in
 				rhs.asMDB_val({ rhsVal in
@@ -373,6 +468,91 @@ extension DBUX {
 			uid.asMDB_val({ objVal in
 				hasher.combine(bytes: UnsafeRawBufferPointer(start: objVal.mv_data, count: objVal.mv_size))
 			})
+		}
+	}
+}
+
+extension DBUX {
+	struct URLHash: MDB_convertible, MDB_comparable, Hashable, Equatable, Comparable {
+		fileprivate static func produceHash(from url:String) throws -> Data {
+			var hasher = try Blake2bHasher(outputLength: 32)
+			try Data(url.utf8).withUnsafeBytes { relayBytes in
+				try hasher.update(relayBytes)
+			}
+			return try hasher.export()
+		}
+
+		var bytes: (
+			UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+			UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+			UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+			UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8
+		) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+		@usableFromInline init(rawHashData: Data) {
+			guard rawHashData.count == MemoryLayout<Self>.size else {
+				return
+			}
+			rawHashData.withUnsafeBytes { byteBuffer in
+				memcpy(&bytes, byteBuffer, MemoryLayout<Self>.size)
+			}
+		}
+		@usableFromInline init(_ string: String) throws {
+			self = .init(rawHashData: try Self.produceHash(from: string))
+		}
+		@usableFromInline init() {}
+		@usableFromInline init(_ value: MDB_val) {
+			let totalSize = value.mv_size
+			guard totalSize == MemoryLayout<Self>.size else {
+				return
+			}
+			let bytes = value.mv_data!.assumingMemoryBound(to: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+																 UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+																 UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+																 UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+			self.bytes = bytes.pointee
+		}
+		@usableFromInline func asMDB_val<R>(_ valFunc: (inout MDB_val) throws -> R) rethrows -> R {
+			try withUnsafePointer(to: self) { unsafePointer in
+				var val = MDB_val(mv_size: MemoryLayout<Self>.size, mv_data: UnsafeMutableRawPointer(mutating: unsafePointer))
+				return try valFunc(&val)
+			}
+		}
+
+		@usableFromInline static func < (lhs: Self, rhs: Self) -> Bool {
+			return lhs.asMDB_val { lhsVal in
+				rhs.asMDB_val { rhsVal in
+					Self.mdbCompareFunction(&lhsVal, &rhsVal) < 0
+				}
+			}
+		}
+		@usableFromInline static func == (lhs: Self, rhs: Self) -> Bool {
+			return lhs.asMDB_val { lhsVal in
+				rhs.asMDB_val { rhsVal in
+					Self.mdbCompareFunction(&lhsVal, &rhsVal) == 0
+				}
+			}
+		}
+
+		public func hash(into hasher: inout Hasher) {
+			self.asMDB_val { selfVal in
+				hasher.combine(bytes: UnsafeRawBufferPointer(start:selfVal.mv_data, count: MemoryLayout<Self>.size))
+			}
+		}
+
+		@usableFromInline static let mdbCompareFunction: @convention(c) (UnsafePointer<MDB_val>?, UnsafePointer<MDB_val>?) -> Int32 = { a, b in
+			let aData = a!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
+			let bData = b!.pointee.mv_data!.assumingMemoryBound(to: Self.self)
+
+			let minLength = min(a!.pointee.mv_size, b!.pointee.mv_size)
+			let comparisonResult = memcmp(aData, bData, minLength)
+
+			if comparisonResult != 0 {
+				return Int32(comparisonResult)
+			} else {
+				// If the common prefix is the same, compare their lengths.
+			 	return Int32(a!.pointee.mv_size) - Int32(b!.pointee.mv_size)
+			}
 		}
 	}
 }
@@ -454,5 +634,80 @@ extension DBUX {
 				return Int32(a!.pointee.mv_size) - Int32(b!.pointee.mv_size)
 			}
 		}
+	}
+}
+
+
+extension DBUX {
+	static func generateMainSubscription(pubkey:nostr.Key, following:Set<nostr.Key>) -> nostr.Subscribe {
+		var homeFilter = nostr.Filter()
+		homeFilter.kinds = [.text_note, .like, .boost, .metadata, .contacts]
+		homeFilter.authors = Array(following.compactMap { $0.description })
+		return nostr.Subscribe(sub_id: "_ux_home_\(pubkey.description.prefix(10))", filters: [homeFilter])
+	}
+}
+
+extension DBUX {
+	fileprivate func generateContactEvent(contacts followsList:Set<nostr.Key>, relays getRelays:Set<String>) throws -> nostr.Event {
+		var newEvent = nostr.Event()
+		newEvent.pubkey = self.keypair.pubkey
+		newEvent.kind = .contacts
+		// generate the list of people we are following
+		newEvent.tags = followsList.compactMap({ nostr.Event.Tag.fromPublicKey($0) })
+		
+		var buildRelays = [String:[String:Bool]]()
+		for curRelay in getRelays {
+			buildRelays[curRelay] = ["read":true, "write":true]
+		}
+		let encoded = try JSONEncoder().encode(buildRelays)
+		newEvent.content = String(data:encoded, encoding:.utf8)!
+		try newEvent.computeUID()
+		try newEvent.sign(privateKey:self.keypair.privkey)
+		return newEvent
+	}
+	
+	fileprivate func generateContentEvent(content:String) throws -> nostr.Event {
+		var newEvent = nostr.Event()
+		newEvent.pubkey = self.keypair.pubkey
+		newEvent.kind = .text_note
+		
+		newEvent.content = content
+		try newEvent.computeUID()
+		try newEvent.sign(privateKey:self.keypair.privkey)
+		return newEvent
+	}
+	
+	fileprivate func generateMetadataEvent(content:nostr.Profile, with date:DBUX.Date) throws -> nostr.Event {
+		var newEvent = nostr.Event()
+		newEvent.pubkey = self.keypair.pubkey
+		newEvent.kind = .metadata
+		newEvent.created = date
+		let encoder = JSONEncoder()
+		let data = try encoder.encode(content)
+		newEvent.content = String(data:data, encoding:.utf8)!
+		try newEvent.computeUID()
+		try newEvent.sign(privateKey:self.keypair.privkey)
+		return newEvent
+	}
+	
+	fileprivate func generateDirectMessage(content:String, to publicKey:nostr.Key, tags:[nostr.Event.Tag], createdOn:DBUX.Date) throws -> nostr.Event {
+		let iv = random_bytes(count:16).bytes
+		guard let shared_sec = try nostr.KeyPair.getSharedSecret(from:self.keypair) else {
+			throw Error.unableToEncrypt
+		}
+		let utf8_message = Data(content.utf8).bytes
+		guard let enc_message = aes_encrypt(data: utf8_message, iv: iv, shared_sec: shared_sec) else {
+			throw Error.unableToEncrypt
+		}
+		
+		let enc_content = encode_dm_base64(content: enc_message.bytes, iv: iv.bytes)
+		var newEvent = nostr.Event()
+		newEvent.pubkey = self.keypair.pubkey
+		newEvent.kind = .dm
+		newEvent.created = createdOn
+		newEvent.content = enc_content
+		try newEvent.computeUID()
+		try newEvent.sign(privateKey:self.keypair.privkey)
+		return newEvent
 	}
 }
