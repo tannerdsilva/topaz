@@ -171,8 +171,12 @@ extension UI {
 		@Published var posts: [TimelineModel] = []
 		private var postUIDs: Set<nostr.Event.UID> = []
 		let dbux:DBUX
-		private let anchorDate: DBUX.DatedNostrEventUID?
+		@Published private(set) var anchorDate: DBUX.DatedNostrEventUID?
 		private let batchSize: Int
+		
+		func updateAnchorDate(to newAnchorDate: DBUX.DatedNostrEventUID) {
+			anchorDate = newAnchorDate
+		}
 		
 		init(dbux: DBUX, anchorDate: DBUX.DatedNostrEventUID? = nil, batchSize: Int = 20) {
 			self.dbux = dbux
@@ -270,6 +274,11 @@ extension UI {
 
 				NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
 					EventViewCell(dbux: viewModel.dbux, event: item.event, profile: item.profile)
+						.onAppear {
+							if viewModel.posts.count >= 3 && viewModel.posts[viewModel.posts.count / 2].id == item.id {
+								viewModel.updateAnchorDate(to: DBUX.DatedNostrEventUID(date: item.event.created, obj: item.event.uid))
+							}
+						}
 				}
 
 				if viewModel.posts.last?.id == item.id {
