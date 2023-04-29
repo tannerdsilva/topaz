@@ -19,6 +19,7 @@ internal actor Holder<T>: AsyncSequence {
 	private var lastFlush: timeval? = nil
 	private var waiters: [UnsafeContinuation<[T]?, Never>] = []
 	private var periodicFlushTask: Task<Void, Never>? = nil
+	private var isFinished: Bool = false
 
 	init(holdInterval: TimeInterval) {
 		self.holdInterval = holdInterval
@@ -79,8 +80,20 @@ internal actor Holder<T>: AsyncSequence {
 			waiters.removeAll()
 		}
 	}
-
+	
+	func finish() {
+		isFinished = true
+		for waiter in waiters {
+			waiter.resume(returning: nil)
+		}
+		waiters.removeAll()
+	}
+	
 	private func waitForNext() async -> [T]? {
+		if isFinished {
+			return nil
+		}
+		
 		if hasTimeThresholdPassed() {
 			let currentElements = elements
 			elements.removeAll()
@@ -89,7 +102,11 @@ internal actor Holder<T>: AsyncSequence {
 			return currentElements
 		} else {
 			return await withUnsafeContinuation { continuation in
-				waiters.append(continuation)
+				if isFinished {
+					continuation.resume(returning: nil)
+				} else {
+					waiters.append(continuation)
+				}
 			}
 		}
 	}

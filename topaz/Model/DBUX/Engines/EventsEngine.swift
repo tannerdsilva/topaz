@@ -332,9 +332,9 @@ extension DBUX.EventsEngine {
 			case forward
 			case backward
 		}
-		func readEvents(from marker: DBUX.DatedNostrEventUID?, limit: UInt16 = 25, direction: ReadDirection = .backward, tx someTrans: QuickLMDB.Transaction, filter shouldInclude: (nostr.Event.UID) throws -> Bool) throws -> Set<nostr.Event> {
+		func readEvents(from marker: DBUX.DatedNostrEventUID?, limit: UInt16 = 25, direction: UI.TimelineViewModel.ScrollDirection, usersOut:inout Set<nostr.Key>, tx someTrans: QuickLMDB.Transaction, filter shouldInclude: (nostr.Event.UID) throws -> Bool) throws -> [nostr.Event] {
 			let allDBCursor = try self.allDB.cursor(tx: someTrans)
-			var returnValues = Set<nostr.Event>()
+			var returnValues: [nostr.Event] = []
 			var currentEntry: (key: MDB_val, value: MDB_val)
 			
 			if let hasMarker = marker {
@@ -355,17 +355,16 @@ extension DBUX.EventsEngine {
 				repeat {
 					let getUID = DBUX.DatedNostrEventUID(currentEntry.key)!.uid
 					if try shouldInclude(getUID) == true {
-						let getString = String(currentEntry.value)!
-						print(getString)
 						let parsed = try! decoder.decode(nostr.Event.self, from: Data(currentEntry.value)!)
-						returnValues.update(with: parsed)
+						returnValues.append(parsed)
+						usersOut.update(with:parsed.pubkey)
 					}
 					
 					switch direction {
-					case .forward:
-						currentEntry = try allDBCursor.getEntry(.next)
-					case .backward:
+					case .up:
 						currentEntry = try allDBCursor.getEntry(.previous)
+					case .down:
+						currentEntry = try allDBCursor.getEntry(.next)
 					}
 				} while returnValues.count < limit
 			} catch LMDBError.notFound {

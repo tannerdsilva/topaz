@@ -166,32 +166,39 @@ struct UpperProfileView: View {
 						 BannerBackgroundWithGradientView(dbux: dbux, pubkey: pubkey, profile: profile)
 						 // VStack with frame inside safe area
 						 VStack(alignment: .trailing) {
-							 HStack {
-								 NavigationLink(destination: UserExperienceSettingsView()) { // Replace with the destination view for your settings
-									 Image(systemName: "gear")
-										 .font(.system(size: 18)) // Adjust the font size to make the button smaller
-										 .foregroundColor(.white)
-										 .padding(10) // Adjust padding to match the size of the RoundedRectangle
-										 .background(RoundedRectangle(cornerRadius: 25) // RoundedRectangle with a corner radius matching half of the frame height
-											 .fill(Color.black.opacity(0.25))) // Fill the RoundedRectangle with a semi-transparent primary color
-										 .frame(width: 50, height: 50) // Set the frame size of the RoundedRectangle
-
+							 if (dbux.keypair.pubkey == pubkey) {
+								 HStack {
+									 NavigationLink(destination: UI.UserExperienceSettingsScreen()) { // Replace with the destination view for your settings
+										 Image(systemName: "gear")
+											 .font(.system(size: 18)) // Adjust the font size to make the button smaller
+											 .foregroundColor(.white)
+											 .padding(10) // Adjust padding to match the size of the RoundedRectangle
+											 .background(RoundedRectangle(cornerRadius: 25) // RoundedRectangle with a corner radius matching half of the frame height
+												.fill(Color.black.opacity(0.25))) // Fill the RoundedRectangle with a semi-transparent primary color
+											 .frame(width: 50, height: 50) // Set the frame size of the RoundedRectangle
+										 
+									 }
+									 Spacer()
+									 NavigationLink(destination: UI.Profile.ProfileMetadataEditView(dbux:dbux, profile: profile, pubkey: pubkey.description)) {
+										 Text("Edit")
+											 .font(.system(size: 14))
+											 .foregroundColor(.white)
+											 .padding(.horizontal, 12)
+											 .padding(.vertical, 6)
+											 .background(Color.blue)
+											 .cornerRadius(4)
+									 }
 								 }
-								 Spacer()
-								 NavigationLink(destination: UI.Profile.ProfileMetadataEditView(dbux:dbux, profile: profile, pubkey: pubkey.description)) {
-									 Text("Edit")
-										 .font(.system(size: 14))
-										 .foregroundColor(.white)
-										 .padding(.horizontal, 12)
-										 .padding(.vertical, 6)
-										 .background(Color.blue)
-										 .cornerRadius(4)
-								 }
+								 .padding(.top, innerGeometry.safeAreaInsets.top)
+								 .padding(.horizontal, 13)
+								 .frame(width: geometry.size.width, alignment: .trailing)
+							 } else {
+								 Text("Follow")
+									 .font(.system(size: 14))
+									 .padding(.horizontal, 12)
+									 .padding(.vertical, 6)
+									 .cornerRadius(4)
 							 }
-							 .padding(.top, innerGeometry.safeAreaInsets.top)
-							 .padding(.horizontal, 13)
-							 .frame(width: geometry.size.width, alignment: .trailing)
-							 
 							 Spacer()
 							 HStack(alignment: .center) {
 								 ProfilePictureView(dbux:dbux, pictureURL: URL(string: profile.picture ?? ""))

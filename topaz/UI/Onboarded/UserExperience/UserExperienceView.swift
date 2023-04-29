@@ -64,7 +64,7 @@ struct HomeView: View {
 		NavigationStack {
 			CustomTitleBar(dbux:dbux)
 			Spacer()
-			UI.TimelineView(viewModel:UI.TimelineViewModel(dbux:dbux), dbux:dbux)
+			UI.TimelineView(viewModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor))
 		}
 		
 	}
@@ -106,6 +106,54 @@ struct DisplayNameText: View {
 		Text(text)
 			.font(.system(size: 18, weight: .bold, design: .rounded))
 			.foregroundColor(.primary)
+	}
+}
+
+struct ActionBarView: View {
+	@State private var isLiked = false
+	@State private var walletAction = false
+
+	var body: some View {
+		HStack {
+			Button(action: {
+				print("Reply tapped")
+			}) {
+				Image(systemName: "arrowshape.turn.up.left")
+			}
+			.buttonStyle(PlainButtonStyle())
+			Spacer()
+			Button(action: {
+				print("Repost tapped")
+			}) {
+				Image(systemName: "arrow.2.squarepath")
+			}
+			.buttonStyle(PlainButtonStyle())
+			Spacer()
+			Button(action: {
+				isLiked.toggle()
+				print("Like tapped")
+			}) {
+				Image(systemName: isLiked ? "heart.fill" : "heart")
+			}
+			.buttonStyle(PlainButtonStyle())
+			Spacer()
+			Button(action: {
+				walletAction.toggle()
+				print("Wallet tapped")
+			}) {
+				Image(systemName: "dollarsign.circle")
+			}
+			.buttonStyle(PlainButtonStyle())
+			Spacer()
+			Button(action: {
+				print("Share tapped")
+			}) {
+				Image(systemName: "square.and.arrow.up")
+			}
+			.buttonStyle(PlainButtonStyle())
+		}
+		.padding()
+		.font(.system(size: 20))
 	}
 }
 
@@ -162,34 +210,7 @@ struct EventViewCell: View {
 			UI.Events.UserFacingTextContentView(content: event.content)
 			
 			HStack {
-				Text(dateFormatter.string(from: event.created.exportDate()))
-					.font(.caption)
-					.foregroundColor(.gray)
-
-				Spacer()
-
-				// Validation status indicator
-				switch event.validate() {
-				case .success(let validationResult):
-					if validationResult == .ok {
-						Image(systemName: "checkmark.circle.fill")
-							.foregroundColor(.green)
-							.font(.system(size: 18))
-					} else {
-						Image(systemName: "exclamationmark.circle.fill")
-							.foregroundColor(.red)
-							.font(.system(size: 18))
-					}
-				case .failure(_):
-					Image(systemName: "questionmark.circle.fill")
-						.foregroundColor(.yellow)
-						.font(.system(size: 18))
-				}
-				
-				Spacer()
-
-				Spacer()
-				Text("Tags: \(event.tags.count)").font(.caption).foregroundColor(.gray)
+				ActionBarView()
 			}
 		}
 		.padding()

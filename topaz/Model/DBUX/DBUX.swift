@@ -29,6 +29,8 @@ public class DBUX:Based {
 	let eventsEngine:EventsEngine
 	
 	let imageCache:ImageCache
+	
+	var mainTask:Task<Void, Never>? = nil
 
 	init(app:ApplicationModel, base:URL, keypair:nostr.KeyPair, appDispatcher:Dispatcher<Topaz.Notification>) throws {
 		self.application = app
@@ -66,103 +68,106 @@ public class DBUX:Based {
 			try self.eventsEngine.relaysEngine.add(subscriptions:[homeSubs], to:curRelay, tx:relaysTX)
 		}
 		try relaysTX.commit()
-//		Task.detached { [weak self, disp = dispatcher, appDisp = appDispatcher, pubkey = self.keypair.pubkey] in
-//			await disp.addListener(forEventType:DBUX.Notification.applicationBecameFrontmost) { [weak self] _, _ in
-//				Task.detached { [weak self] in
-//					if let getItAll = await self?.eventsEngine.relaysEngine.getConnectionsAndStates() {
-//						let getDisconnected = getItAll.1.values.filter({ $0 == .disconnected })
-//						if getDisconnected.count > 0 {
-//							await withTaskGroup(of:Void.self) { tg in
-//								for curRelay in getItAll.0 {
-//									tg.addTask { [cr = curRelay] in
-//										try? await cr.value.connect()
-//									}
-//								}
-//							}
-//						}
-//					}
-//				}
-//			}
-//
-//			await disp.addListener(forEventType:DBUX.Notification.currentUserProfileUpdated) { [appDisp = appDisp, pubkey = pubkey] _, newProf in
-//				guard let getProf = newProf as? nostr.Profile else {
-//					return
-//				}
-//				Task.detached { [appDisp = appDisp, newProf = getProf] in
-//					await appDisp.fireEvent(Topaz.Notification.userProfileInfoUpdated, associatedObject:Topaz.Account(key:pubkey, profile:newProf))
-//				}
-//			}
-//		}
-//
-//
-//		Task.detached { [weak self, hol = self.eventsEngine.relaysEngine.holder] in
-//			guard let self = self else {
-//				return
-//			}
-//			let decoder = JSONDecoder()
-//			for try await curEvs in hol {
-//				var profileDates = [nostr.Key:DBUX.Date]()
-//				var buildProfiles = [nostr.Key:nostr.Profile]()
-//				var profileUpdateDates = [nostr.Key:DBUX.Date]()
-//
-//				var timelineEvents = Set<nostr.Event>()
-//
-//				for (subID, curEv) in curEvs {
-//					switch curEv.kind {
-//					case .metadata:
-//						do {
-//							let asData = Data(curEv.content.utf8)
-//							let decoded = try decoder.decode(nostr.Profile.self, from:asData)
-//							self.logger.info("successfully decoded profile", metadata:["pubkey":"\(curEv.pubkey)"])
-//							profileDates[curEv.pubkey] = curEv.created
-//							buildProfiles[curEv.pubkey] = decoded
-//							profileUpdateDates[curEv.pubkey] = curEv.created
-//						} catch {
-//							self.logger.error("failed to decode profile.")
-//						}
-//					case .contacts:
-//						do {
-//							let asData = Data(curEv.content.utf8)
-//							let relays = Set(try decoder.decode([String:[String:Bool]].self, from:asData).keys)
-//							var following = Set<nostr.Key>()
-//							for curTag in curEv.tags {
-//								if case curTag.kind = nostr.Event.Tag.Kind.pubkey, let getPubKey = curTag.info.first, let asKey = nostr.Key(getPubKey) {
-//									following.update(with:asKey)
-//								}
-//							}
-//							let relaysTX = try self.eventsEngine.transact(readOnly:false)
-//							try self.eventsEngine.relaysEngine.setRelays(relays, pubkey:curEv.pubkey, asOf:curEv.created, tx:relaysTX)
-//							try self.eventsEngine.followsEngine.set(pubkey:curEv.pubkey, follows:following, tx:relaysTX)
-//							if curEv.pubkey == self.keypair.pubkey {
-//								let homeSubs = Self.generateMainSubscription(pubkey:self.keypair.pubkey, following:myFollows)
-//								for curRelay in myRelays {
-//									try self.eventsEngine.relaysEngine.add(subscriptions:[homeSubs], to:curRelay, tx:relaysTX)
-//								}
-//							}
-//							try relaysTX.commit()
-//							self.logger.info("updated contact information.", metadata:["pubkey":"\(curEv.pubkey)"])
-//						} catch let error {}
-//
-//					case .text_note:
-//						timelineEvents.update(with:curEv)
-//						self.logger.debug("got event.", metadata:["kind":"\(curEv.kind)"])
-//					default: break
-//					}
-//				}
-//
-//				await withThrowingTaskGroup(of:Void.self, body: { [pe = self.eventsEngine.profilesEngine, newEvsSet = timelineEvents, tle = self.eventsEngine, bp = buildProfiles, pd = profileDates] tg in
-//
-////					 write the events to the timeline
-//					tg.addTask { [newEvsSet, tle, pe, bp, pd] in
-//						let tltx = try tle.transact(readOnly:false)
-//						try tle.timelineEngine.writeEvents(newEvsSet, tx:tltx)
-//						try pe.setPublicKeys(bp, asOf:pd, tx:tltx)
-//						try tltx.commit()
-//					}
-//
-//				})
-//			}
-//		}
+
+		mainTask = Task.detached { [weak self, hol = self.eventsEngine.relaysEngine.holder, disp = dispatcher, appDisp = appDispatcher, pubkey = self.keypair.pubkey] in
+			await disp.addListener(forEventType:DBUX.Notification.applicationBecameFrontmost) { [weak self] _, _ in
+				Task.detached { [weak self] in
+					if let getItAll = await self?.eventsEngine.relaysEngine.getConnectionsAndStates() {
+						let getDisconnected = getItAll.1.values.filter({ $0 == .disconnected })
+						if getDisconnected.count > 0 {
+							await withTaskGroup(of:Void.self) { tg in
+								for curRelay in getItAll.0 {
+									tg.addTask { [cr = curRelay] in
+										try? await cr.value.connect()
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			await disp.addListener(forEventType:DBUX.Notification.currentUserProfileUpdated) { [appDisp = appDisp, pubkey = pubkey] _, newProf in
+				guard let getProf = newProf as? nostr.Profile else {
+					return
+				}
+				Task.detached { [appDisp = appDisp, newProf = getProf] in
+					await appDisp.fireEvent(Topaz.Notification.userProfileInfoUpdated, associatedObject:Topaz.Account(key:pubkey, profile:newProf))
+				}
+			}
+			try? await withTaskCancellationHandler(operation: {
+				let decoder = JSONDecoder()
+				for try await curEvs in hol {
+					var profileDates = [nostr.Key:DBUX.Date]()
+					var buildProfiles = [nostr.Key:nostr.Profile]()
+					var profileUpdateDates = [nostr.Key:DBUX.Date]()
+
+					var timelineEvents = Set<nostr.Event>()
+
+					for (subID, curEv) in curEvs {
+						guard let self = self else { return }
+						switch curEv.kind {
+						case .metadata:
+							do {
+								let asData = Data(curEv.content.utf8)
+								let decoded = try decoder.decode(nostr.Profile.self, from:asData)
+								self.logger.info("successfully decoded profile", metadata:["pubkey":"\(curEv.pubkey)"])
+								profileDates[curEv.pubkey] = curEv.created
+								buildProfiles[curEv.pubkey] = decoded
+								profileUpdateDates[curEv.pubkey] = curEv.created
+							} catch {
+								self.logger.error("failed to decode profile.")
+							}
+						case .contacts:
+							do {
+								let asData = Data(curEv.content.utf8)
+								let relays = Set(try decoder.decode([String:[String:Bool]].self, from:asData).keys)
+								var following = Set<nostr.Key>()
+								for curTag in curEv.tags {
+									if case curTag.kind = nostr.Event.Tag.Kind.pubkey, let getPubKey = curTag.info.first, let asKey = nostr.Key(getPubKey) {
+										following.update(with:asKey)
+									}
+								}
+								let relaysTX = try self.eventsEngine.transact(readOnly:false)
+								try self.eventsEngine.relaysEngine.setRelays(relays, pubkey:curEv.pubkey, asOf:curEv.created, tx:relaysTX)
+								try self.eventsEngine.followsEngine.set(pubkey:curEv.pubkey, follows:following, tx:relaysTX)
+								if curEv.pubkey == self.keypair.pubkey {
+									let homeSubs = Self.generateMainSubscription(pubkey:self.keypair.pubkey, following:myFollows)
+									for curRelay in myRelays {
+										try self.eventsEngine.relaysEngine.add(subscriptions:[homeSubs], to:curRelay, tx:relaysTX)
+									}
+								}
+								try relaysTX.commit()
+								self.logger.info("updated contact information.", metadata:["pubkey":"\(curEv.pubkey)"])
+							} catch let error {}
+
+						case .text_note:
+							timelineEvents.update(with:curEv)
+							self.logger.debug("got event.", metadata:["kind":"\(curEv.kind)"])
+						default: break
+						}
+					}
+
+					if let hasEE = self?.eventsEngine {
+						await withThrowingTaskGroup(of:Void.self, body: { [pe = hasEE.profilesEngine, newEvsSet = timelineEvents, tle = hasEE, bp = buildProfiles, pd = profileDates] tg in
+
+		//					 write the events to the timeline
+							tg.addTask { [newEvsSet, tle, pe, bp, pd] in
+								let tltx = try tle.transact(readOnly:false)
+								try tle.timelineEngine.writeEvents(newEvsSet, tx:tltx)
+								try pe.setPublicKeys(bp, asOf:pd, tx:tltx)
+								try tltx.commit()
+							}
+
+						})
+					}
+				}
+			}, onCancel: {
+				Task.detached(operation: { [hol] in
+					await hol.finish()
+				})
+			})
+		}
 	}
 	
 	@MainActor func addFollow(_ key:nostr.Key) throws {
@@ -234,12 +239,13 @@ public class DBUX:Based {
 	}
 	
 
-	func getHomeTimelineState(anchor:DBUX.DatedNostrEventUID?, direction:DBUX.EventsEngine.TimelineEngine.ReadDirection) throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {
+	func getHomeTimelineState(anchor:DBUX.DatedNostrEventUID?, direction:UI.TimelineViewModel.ScrollDirection) throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {
 		let tltx = try eventsEngine.transact(readOnly:true)
-		let events = try eventsEngine.timelineEngine.readEvents(from:anchor, direction:direction, tx:tltx, filter: { nostrID in
+		var buildUsers = Set<nostr.Key>()
+		let events = try eventsEngine.timelineEngine.readEvents(from:anchor, direction: direction, usersOut:&buildUsers, tx:tltx, filter: { nostrID in
 			return true
 		})
-		let profiles = try self.eventsEngine.profilesEngine.getPublicKeys(publicKeys:Set(events.compactMap({ $0.pubkey })), tx: tltx)
+		let profiles = try self.eventsEngine.profilesEngine.getPublicKeys(publicKeys:buildUsers, tx: tltx)
 		try tltx.commit()
 		return (events.sorted(by: { $0.created < $1.created }), profiles)
 	}
@@ -286,9 +292,8 @@ public class DBUX:Based {
 		return [contactsFilter, blocklistFilter, dmsFilter, ourDMsFilter, homeFilter]
 	}
 	
-	
 	deinit {
-		print("this is deinit")
+		mainTask!.cancel()
 	}
 }
 

@@ -113,72 +113,64 @@ extension DBUX {
 			try subTrans.commit()
 			try env.sync()
 			
-			self.digestTask = Task.detached { [weak self, sc = stateC, newEnv = env, logThing = newLogger, eventC = eventC, pk = self.pubkey, rhCS = self.relayHash_currentSubscriptions] in
-				await withThrowingTaskGroup(of:Void.self, body: { [weak self, sc = sc, newEnv = newEnv, ec = eventC] tg in
+			self.digestTask = Task.detached { [weak self, sc = stateC, newEnv = env, logThing = newLogger, eventC = eventC, pk = self.pubkey, rhCS = self.relayHash_currentSubscriptions, holder = self.holder] in
+				await withThrowingTaskGroup(of:Void.self, body: { [weak self, sc = sc, newEnv = newEnv, ec = eventC, holder = holder] tg in
 					// status
 					tg.addTask { [weak self, sc = sc, newEnv = newEnv] in
-						for await (curChanger, newState) in sc {
-//							guard let self = self else { return }
-							let relayHash = try RelayHash(curChanger.url)
-							let newTrans = try Transaction(newEnv, readOnly:false)
-							if case .connected = newState {
-								// need to send all subscriptions to relay
-								do {
-									var ourContactsFilter = nostr.Filter()
-									ourContactsFilter.kinds = [.metadata, .contacts]
-									ourContactsFilter.authors = [pk.description]
+						try await withTaskCancellationHandler(operation: {
+							for await (curChanger, newState) in sc {
+	//							guard let self = self else { return }
+								let relayHash = try RelayHash(curChanger.url)
+								let newTrans = try Transaction(newEnv, readOnly:false)
+								if case .connected = newState {
+									// need to send all subscriptions to relay
+									do {
+										var ourContactsFilter = nostr.Filter()
+										ourContactsFilter.kinds = [.metadata, .contacts]
+										ourContactsFilter.authors = [pk.description]
 
-									let makeSub = nostr.Subscribe.init(sub_id:"-ux-self-", filters: [ourContactsFilter])
-									try await curChanger.send(.subscribe(makeSub))
-									let getSubs = try rhCS.getEntry(type:[nostr.Subscribe].self, forKey:relayHash, tx:newTrans)!
-									for curSub in getSubs {
-										do {
-											try await curChanger.send(.subscribe(curSub))
-										} catch let error {
-											logThing.critical("there was a problem writing the message to the relay", metadata:["error":"\(error)"])
+										let makeSub = nostr.Subscribe.init(sub_id:"-ux-self-", filters: [ourContactsFilter])
+										try await curChanger.send(.subscribe(makeSub))
+										let getSubs = try rhCS.getEntry(type:[nostr.Subscribe].self, forKey:relayHash, tx:newTrans)!
+										for curSub in getSubs {
+											do {
+												try await curChanger.send(.subscribe(curSub))
+											} catch let error {
+												logThing.critical("there was a problem writing the message to the relay", metadata:["error":"\(error)"])
+											}
 										}
-									}
-								} catch {}
+									} catch {}
+								}
+								self?.relayConnectionStatusUpdated(relay:curChanger.url, state:newState)
+								logThing.trace("successfully updated relay connection state \(newState)", metadata:["url":"\(curChanger.url)"])
+								try newTrans.commit()
 							}
-							self?.relayConnectionStatusUpdated(relay:curChanger.url, state:newState)
-							logThing.trace("successfully updated relay connection state \(newState)", metadata:["url":"\(curChanger.url)"])
-							try newTrans.commit()
-						}
+						}, onCancel: {
+							sc.finish()
+						})
 					}
 
 					// events
-					tg.addTask { [weak self, ec = ec] in
-						for await curEvent in ec {
-							guard let self = self else { return }
-							switch curEvent.1 {
-							case let .event(subID, myEvent):
-								logThing.trace("got event.", metadata:["kind":"\(myEvent.kind.rawValue)", "pubkey":"\(myEvent.pubkey)"])
-								await self.holder.append(element: (subID, myEvent))
-								break;
-							case .endOfStoredEvents(let subID):
-								logThing.trace("end of events", metadata:["sub_id":"\(subID)"])
-								break;
-							default:
-								break;
+					tg.addTask { [hol = holder, ec = ec] in
+						await withTaskCancellationHandler(operation: {
+							for await curEvent in ec {
+								switch curEvent.1 {
+								case let .event(subID, myEvent):
+									logThing.trace("got event.", metadata:["kind":"\(myEvent.kind.rawValue)", "pubkey":"\(myEvent.pubkey)"])
+									await hol.append(element: (subID, myEvent))
+									break;
+								case .endOfStoredEvents(let subID):
+									logThing.trace("end of events", metadata:["sub_id":"\(subID)"])
+									break;
+								default:
+									break;
+								}
 							}
-						}
+						}, onCancel: {
+							ec.finish()
+						})
 					}
 				})
-			}
-
-			Task.detached { [weak self] in
-				guard let self = self else { return }
-				await self.dispatcher.addListener(forEventType:DBUX.Notification.applicationMovedToBackground) { [weak self] event, _ in
-					Task.detached { [weak self] in
-						guard let self = self else { return }
-						do {
-							try self.env.sync()
-							self.logger.debug("successfully synced lmdb environment.")
-						} catch let error {
-							self.logger.error("failed to sync lmdb environment.", metadata:["error":"\(error)"])
-						}
-					}
-				}
 			}
 		}
 		
@@ -315,8 +307,7 @@ extension DBUX {
 		}
 		
 		deinit {
-			eventChannel.finish()
-			stateChannel.finish()
+			self.digestTask?.cancel()
 		}
 	}
 }

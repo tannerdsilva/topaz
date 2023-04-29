@@ -119,7 +119,7 @@ extension UI {
 					
 			}
 			.frame(maxWidth: .infinity).background(Color(.systemBackground)).sheet(isPresented:$showAccountPicker, onDismiss: { showAccountPicker = false }, content: {
-				UI.Account.PickerScren(dbux:dbux)
+				UI.Account.PickerScreen(dbux:dbux)
 			})
 		}
 	}
