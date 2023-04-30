@@ -176,7 +176,7 @@ extension UI {
 		private var postUIDs: Set<nostr.Event.UID> = []
 		let dbux:DBUX
 		@Published private(set) var anchorDate: DBUX.DatedNostrEventUID?
-		private let batchSize: Int
+		private let batchSize: UInt16
 		private var showReplies:Bool = false {
 			willSet {
 				Task.detached { [nv = newValue] in
@@ -189,7 +189,7 @@ extension UI {
 			anchorDate = newAnchorDate
 		}
 		
-		init(dbux: DBUX, anchorDate: DBUX.DatedNostrEventUID? = nil, batchSize: Int = 20) {
+		init(dbux: DBUX, anchorDate: DBUX.DatedNostrEventUID? = nil, batchSize: UInt16 = 48) {
 			self.dbux = dbux
 			self.anchorDate = anchorDate
 			self.batchSize = batchSize
@@ -216,28 +216,36 @@ extension UI {
 		func loadPosts(direction: ScrollDirection) async throws {
 			let newPosts = try await loadPostsFromDatabase(anchorDate: anchorDate, direction: direction, limit: batchSize, showReplies: true)
 			let filteredPosts = newPosts.filter { !postUIDs.contains($0.event.uid) }
-   
+
 			postUIDs.formUnion(filteredPosts.map { $0.event.uid })
-			
+
+			// Use a temporary variable to store the updated posts
+			var updatedPosts: [TimelineModel] = []
+
 			if direction == .up {
-				posts = sortPosts(filteredPosts + posts)
+				updatedPosts = sortPosts(filteredPosts + posts)
 			} else {
-				posts = sortPosts(posts + filteredPosts)
+				updatedPosts = sortPosts(posts + filteredPosts)
 			}
-			
+
 			// Trimming excess posts if needed
-			if posts.count > batchSize * 2 {
+			if updatedPosts.count > batchSize * 2 {
 				if direction == .up {
-					posts.removeLast(posts.count - batchSize * 2)
+					updatedPosts.removeLast(updatedPosts.count - Int(batchSize) * 2)
 				} else {
-					posts.removeFirst(posts.count - batchSize * 2)
+					updatedPosts.removeFirst(updatedPosts.count - Int(batchSize) * 2)
 				}
 			}
+
+			Task.detached { @MainActor [weak self, upd = updatedPosts] in
+				self?.posts = upd
+			}
 		}
+
 		
-		private func loadPostsFromDatabase(anchorDate: DBUX.DatedNostrEventUID?, direction: ScrollDirection, limit: Int, showReplies: Bool) async throws -> [TimelineModel] {
+		private func loadPostsFromDatabase(anchorDate: DBUX.DatedNostrEventUID?, direction: ScrollDirection, limit: UInt16, showReplies: Bool) async throws -> [TimelineModel] {
 			do {
-				let (events, profiles) = try dbux.getHomeTimelineState(anchor: anchorDate, direction: direction)
+				let (events, profiles) = try dbux.getHomeTimelineState(anchor: anchorDate, direction: direction, limit:limit)
 				return events.map { event in
 					let profile = profiles[event.pubkey]
 					return TimelineModel(event: event, profile: profile)
@@ -299,7 +307,7 @@ extension UI {
 				if filteredPosts.last?.id == item.id {
 					onAppearLoadingIndicator(direction: .down)
 				}
-			}
+			}.id(filteredPosts.count)
 		}
 		
 		@ViewBuilder

@@ -239,7 +239,7 @@ public class DBUX:Based {
 	}
 	
 
-	func getHomeTimelineState(anchor:DBUX.DatedNostrEventUID?, direction:UI.TimelineViewModel.ScrollDirection) throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {
+	func getHomeTimelineState(anchor:DBUX.DatedNostrEventUID?, direction:UI.TimelineViewModel.ScrollDirection, limit:UInt16) throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {
 		let tltx = try eventsEngine.transact(readOnly:true)
 		var buildUsers = Set<nostr.Key>()
 		let events = try eventsEngine.timelineEngine.readEvents(from:anchor, direction: direction, usersOut:&buildUsers, tx:tltx, filter: { nostrID in

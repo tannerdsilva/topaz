@@ -332,7 +332,7 @@ extension DBUX.EventsEngine {
 			case forward
 			case backward
 		}
-		func readEvents(from marker: DBUX.DatedNostrEventUID?, limit: UInt16 = 25, direction: UI.TimelineViewModel.ScrollDirection, usersOut:inout Set<nostr.Key>, tx someTrans: QuickLMDB.Transaction, filter shouldInclude: (nostr.Event.UID) throws -> Bool) throws -> [nostr.Event] {
+		func readEvents(from marker: DBUX.DatedNostrEventUID?, limit: UInt16 = 48, direction: UI.TimelineViewModel.ScrollDirection, usersOut:inout Set<nostr.Key>, tx someTrans: QuickLMDB.Transaction, filter shouldInclude: (nostr.Event.UID) throws -> Bool) throws -> [nostr.Event] {
 			let allDBCursor = try self.allDB.cursor(tx: someTrans)
 			var returnValues: [nostr.Event] = []
 			var currentEntry: (key: MDB_val, value: MDB_val)
