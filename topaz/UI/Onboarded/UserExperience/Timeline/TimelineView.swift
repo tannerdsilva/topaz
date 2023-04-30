@@ -168,22 +168,17 @@ extension UI {
 
 	@MainActor
 	class TimelineViewModel: ObservableObject {
-		@Published var posts: [TimelineModel] = [] {
+		@MainActor @Published var posts: [TimelineModel] = [] {
 			didSet {
-//				let getDownDate
+				
 			}
 		}
-		private var postUIDs: Set<nostr.Event.UID> = []
+		@MainActor private var postUIDs: Set<nostr.Event.UID> = []
 		let dbux:DBUX
 		@Published private(set) var anchorDate: DBUX.DatedNostrEventUID?
 		private let batchSize: UInt16
-		private var showReplies:Bool = false {
-			willSet {
-				Task.detached { [nv = newValue] in
-					
-				}
-			}
-		}
+		private var showReplies:Bool = false
+		private var postTrimmingTask:Task<Void, Swift.Error>? = nil
 		
 		func updateAnchorDate(to newAnchorDate: DBUX.DatedNostrEventUID) {
 			anchorDate = newAnchorDate
@@ -218,7 +213,7 @@ extension UI {
 			let filteredPosts = newPosts.filter { !postUIDs.contains($0.event.uid) }
 
 			postUIDs.formUnion(filteredPosts.map { $0.event.uid })
-
+			print("LOADED \(newPosts.count) NEW EVENTS BRO: \(newPosts.compactMap({ $0.event.uid.description }).sorted(by: { $0 < $1 }))")
 			// Use a temporary variable to store the updated posts
 			var updatedPosts: [TimelineModel] = []
 
@@ -227,25 +222,24 @@ extension UI {
 			} else {
 				updatedPosts = sortPosts(posts + filteredPosts)
 			}
-
-			// Trimming excess posts if needed
-			if updatedPosts.count > batchSize * 2 {
+			
+			if updatedPosts.count > self.batchSize * 2 {
 				if direction == .up {
-					updatedPosts.removeLast(updatedPosts.count - Int(batchSize) * 2)
+					updatedPosts.removeLast(self.posts.count - Int(self.batchSize / 2))
 				} else {
-					updatedPosts.removeFirst(updatedPosts.count - Int(batchSize) * 2)
+					updatedPosts.removeFirst(self.posts.count - Int(self.batchSize / 2))
 				}
 			}
-
-			Task.detached { @MainActor [weak self, upd = updatedPosts] in
-				self?.posts = upd
-			}
+			
+			// Trimming excess posts if needed
+			self.posts = updatedPosts
 		}
 
 		
 		private func loadPostsFromDatabase(anchorDate: DBUX.DatedNostrEventUID?, direction: ScrollDirection, limit: UInt16, showReplies: Bool) async throws -> [TimelineModel] {
 			do {
-				let (events, profiles) = try dbux.getHomeTimelineState(anchor: anchorDate, direction: direction, limit:limit)
+				let (events, profiles) = try await dbux.getHomeTimelineState(anchor: anchorDate, direction: direction, limit:limit)
+				print("LOADED \(events.count) events form databsae")
 				return events.map { event in
 					let profile = profiles[event.pubkey]
 					return TimelineModel(event: event, profile: profile)
@@ -294,7 +288,7 @@ extension UI {
 			
 			ForEach(filteredPosts) { item in
 				if filteredPosts.first?.id == item.id {
-					onAppearLoadingIndicator(direction: .up)
+					onAppearLoadingIndicator(direction: .up).id("LOADING_TOP_IND")
 				}
 
 				NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
@@ -305,7 +299,7 @@ extension UI {
 				}
 
 				if filteredPosts.last?.id == item.id {
-					onAppearLoadingIndicator(direction: .down)
+					onAppearLoadingIndicator(direction: .down).id("LOADING_BOTTOM_IND")
 				}
 			}.id(filteredPosts.count)
 		}

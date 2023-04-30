@@ -239,15 +239,21 @@ public class DBUX:Based {
 	}
 	
 
-	func getHomeTimelineState(anchor:DBUX.DatedNostrEventUID?, direction:UI.TimelineViewModel.ScrollDirection, limit:UInt16) throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {
-		let tltx = try eventsEngine.transact(readOnly:true)
-		var buildUsers = Set<nostr.Key>()
-		let events = try eventsEngine.timelineEngine.readEvents(from:anchor, direction: direction, usersOut:&buildUsers, tx:tltx, filter: { nostrID in
-			return true
+	func getHomeTimelineState(anchor:DBUX.DatedNostrEventUID?, direction:UI.TimelineViewModel.ScrollDirection, limit:UInt16) async throws -> ([nostr.Event], [nostr.Key:nostr.Profile]) {
+		try await withUnsafeThrowingContinuation( { (unsafeCont:UnsafeContinuation<([nostr.Event], [nostr.Key:nostr.Profile]), Swift.Error>) in
+			do {
+				let tltx = try eventsEngine.transact(readOnly:true)
+				var buildUsers = Set<nostr.Key>()
+				let events = try eventsEngine.timelineEngine.readEvents(from:anchor, direction: direction, usersOut:&buildUsers, tx:tltx, filter: { nostrID in
+					return true
+				})
+				let profiles = try self.eventsEngine.profilesEngine.getPublicKeys(publicKeys:buildUsers, tx: tltx)
+				try tltx.commit()
+				unsafeCont.resume(returning:(events.sorted(by: { $0.created < $1.created }), profiles))
+			} catch let error {
+				unsafeCont.resume(throwing:error)
+			}
 		})
-		let profiles = try self.eventsEngine.profilesEngine.getPublicKeys(publicKeys:buildUsers, tx: tltx)
-		try tltx.commit()
-		return (events.sorted(by: { $0.created < $1.created }), profiles)
 	}
 
 	func buildMainUserFilters() throws -> [nostr.Filter] {
