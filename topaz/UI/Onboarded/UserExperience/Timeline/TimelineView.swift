@@ -168,7 +168,11 @@ extension UI {
 
 	@MainActor
 	class TimelineViewModel: ObservableObject {
-		@Published var posts: [TimelineModel] = []
+		@Published var posts: [TimelineModel] = [] {
+			didSet {
+//				let getDownDate
+			}
+		}
 		private var postUIDs: Set<nostr.Event.UID> = []
 		let dbux:DBUX
 		@Published private(set) var anchorDate: DBUX.DatedNostrEventUID?
@@ -278,21 +282,21 @@ extension UI {
 		
 		@ViewBuilder
 		var timelineView: some View {
-			ForEach(postsBasedOnToggle()) { item in
-				if viewModel.posts.first?.id == item.id {
+			let filteredPosts = postsBasedOnToggle()
+			
+			ForEach(filteredPosts) { item in
+				if filteredPosts.first?.id == item.id {
 					onAppearLoadingIndicator(direction: .up)
 				}
 
 				NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
 					EventViewCell(dbux: viewModel.dbux, event: item.event, profile: item.profile)
 						.onAppear {
-							if viewModel.posts.count >= 3 && viewModel.posts[viewModel.posts.count / 2].id == item.id {
-								viewModel.updateAnchorDate(to: DBUX.DatedNostrEventUID(date: item.event.created, obj: item.event.uid))
-							}
+							viewModel.updateAnchorDate(to: DBUX.DatedNostrEventUID(date: item.event.created, obj: item.event.uid))
 						}
 				}
 
-				if viewModel.posts.last?.id == item.id {
+				if filteredPosts.last?.id == item.id {
 					onAppearLoadingIndicator(direction: .down)
 				}
 			}

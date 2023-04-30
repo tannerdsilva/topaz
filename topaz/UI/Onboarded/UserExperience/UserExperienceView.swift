@@ -152,7 +152,6 @@ struct ActionBarView: View {
 			}
 			.buttonStyle(PlainButtonStyle())
 		}
-		.padding()
 		.font(.system(size: 20))
 	}
 }

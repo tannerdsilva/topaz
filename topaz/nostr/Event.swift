@@ -93,6 +93,7 @@ extension nostr {
 			case channel_create = 8
 			case channel_meta = 9
 			case chat = 42
+			case group_dm = 2467
 			case list = 40000 // (?)
 			case zap = 9735
 			case zap_request = 9734
@@ -615,9 +616,7 @@ extension nostr.Event {
 		return interpret_event_refs(blocks:self.blocks(), tags:self.tags.compactMap({ $0.toArray() }))
 	}
 	func isReply() -> Bool {
-		return self.getEventReferences().contains { evref in
-			return evref.is_reply != nil
-		}
+		return self.getReferencedIDs("e").count > 0
 	}
 }
 

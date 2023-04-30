@@ -362,9 +362,9 @@ extension DBUX.EventsEngine {
 					
 					switch direction {
 					case .up:
-						currentEntry = try allDBCursor.getEntry(.previous)
-					case .down:
 						currentEntry = try allDBCursor.getEntry(.next)
+					case .down:
+						currentEntry = try allDBCursor.getEntry(.previous)
 					}
 				} while returnValues.count < limit
 			} catch LMDBError.notFound {
