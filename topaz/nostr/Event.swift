@@ -602,7 +602,7 @@ extension nostr.Event {
 	func firstErefMention(privkey:String?) -> nostr.Mention? {
 		return first_eref_mention(ev:self, privkey:privkey)
 	}
-	func blocks(_ privkey:String?) -> [Block] {
+	func blocks() -> [Block] {
 		return parse_mentions(content:content, tags:self.tags)
 	}
 	func getContent(privkey:String) -> String {
@@ -611,8 +611,13 @@ extension nostr.Event {
 		}
 		return content
 	}
-	func getEventReferences(privkey:String) -> [EventReference] {
-		return interpret_event_refs(blocks:self.blocks(privkey), tags:self.tags.compactMap({ $0.toArray() }))
+	func getEventReferences() -> [EventReference] {
+		return interpret_event_refs(blocks:self.blocks(), tags:self.tags.compactMap({ $0.toArray() }))
+	}
+	func isReply() -> Bool {
+		return self.getEventReferences().contains { evref in
+			return evref.is_reply != nil
+		}
 	}
 }
 
@@ -886,7 +891,7 @@ func aes_operation(operation: CCOperation, data: [UInt8], iv: [UInt8], shared_se
 
 
 func first_eref_mention(ev:nostr.Event, privkey: String?) -> nostr.Mention? {
-	let blocks = ev.blocks(privkey).filter { block in
+	let blocks = ev.blocks().filter { block in
 		guard case .mention(let mention) = block else {
 			return false
 		}
@@ -943,7 +948,7 @@ func interpret_event_refs(blocks:[nostr.Event.Block], tags:[[String]]) -> [Event
 
 
 func event_is_reply(_ ev:nostr.Event, privkey: String?) -> Bool {
-	return ev.getEventReferences(privkey:privkey!).contains { evref in
+	return ev.getEventReferences().contains { evref in
 		return evref.is_reply != nil
 	}
 }

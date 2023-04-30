@@ -173,6 +173,13 @@ extension UI {
 		let dbux:DBUX
 		@Published private(set) var anchorDate: DBUX.DatedNostrEventUID?
 		private let batchSize: Int
+		private var showReplies:Bool = false {
+			willSet {
+				Task.detached { [nv = newValue] in
+					
+				}
+			}
+		}
 		
 		func updateAnchorDate(to newAnchorDate: DBUX.DatedNostrEventUID) {
 			anchorDate = newAnchorDate
@@ -182,8 +189,8 @@ extension UI {
 			self.dbux = dbux
 			self.anchorDate = anchorDate
 			self.batchSize = batchSize
-			Task {
-				try await loadPosts(direction: .down)
+			Task { [weak self] in
+				try await self?.loadPosts(direction: .down)
 			}
 		}
 		
@@ -202,10 +209,10 @@ extension UI {
 			return posts.sorted { $0.event.created > $1.event.created }
 		}
 		
-		private func loadPosts(direction: ScrollDirection) async throws {
-			let newPosts = try await loadPostsFromDatabase(anchorDate: anchorDate, direction: direction, limit: batchSize)
+		func loadPosts(direction: ScrollDirection) async throws {
+			let newPosts = try await loadPostsFromDatabase(anchorDate: anchorDate, direction: direction, limit: batchSize, showReplies: true)
 			let filteredPosts = newPosts.filter { !postUIDs.contains($0.event.uid) }
-			
+   
 			postUIDs.formUnion(filteredPosts.map { $0.event.uid })
 			
 			if direction == .up {
@@ -224,7 +231,7 @@ extension UI {
 			}
 		}
 		
-		private func loadPostsFromDatabase(anchorDate: DBUX.DatedNostrEventUID?, direction: ScrollDirection, limit: Int) async throws -> [TimelineModel] {
+		private func loadPostsFromDatabase(anchorDate: DBUX.DatedNostrEventUID?, direction: ScrollDirection, limit: Int, showReplies: Bool) async throws -> [TimelineModel] {
 			do {
 				let (events, profiles) = try dbux.getHomeTimelineState(anchor: anchorDate, direction: direction)
 				return events.map { event in
@@ -241,7 +248,7 @@ extension UI {
 	
 	struct TimelineView: View {
 		@ObservedObject var viewModel: TimelineViewModel
-
+		@Binding var showReplies: Bool
 		var body: some View {
 			ScrollView {
 				LazyVStack {
@@ -265,9 +272,13 @@ extension UI {
 				.padding()
 		}
 		
+		func postsBasedOnToggle() -> [UI.TimelineModel] {
+			return showReplies ? viewModel.posts : viewModel.posts.filter({ !$0.event.isReply() })
+		}
+		
 		@ViewBuilder
 		var timelineView: some View {
-			ForEach(viewModel.posts) { item in
+			ForEach(postsBasedOnToggle()) { item in
 				if viewModel.posts.first?.id == item.id {
 					onAppearLoadingIndicator(direction: .up)
 				}

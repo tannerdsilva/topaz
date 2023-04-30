@@ -13,7 +13,6 @@ struct UserExperienceView: View {
 	let dbux:DBUX
 	@ObservedObject var context:DBUX.ContextEngine
 	@State var showingAccountPicker:Bool = false
-	
 	init(dbux:DBUX) {
 		self.dbux = dbux
 		self.context = dbux.contextEngine
@@ -60,11 +59,12 @@ struct UserExperienceView: View {
 
 struct HomeView: View {
 	let dbux:DBUX
+	@State var showReplies:Bool = false
 	var body: some View {
 		NavigationStack {
-			CustomTitleBar(dbux:dbux)
+			CustomTitleBar(dbux:dbux, showReplies:$showReplies)
 			Spacer()
-			UI.TimelineView(viewModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor))
+			UI.TimelineView(viewModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor), showReplies: $showReplies)
 		}
 		
 	}
@@ -220,7 +220,7 @@ struct EventViewCell: View {
 
 struct CustomTitleBar: View {
 	let dbux:DBUX
-	@State var showReplies:Bool = false
+	@Binding var showReplies:Bool
 	@State var showingCompose = false
 	var body: some View {
 		HStack {
