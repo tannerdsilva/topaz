@@ -96,3 +96,33 @@ extension nostr.Filter {
 		return nostr.Filter(until: until)
 	}
 }
+
+extension nostr.Filter: Equatable {
+	static func == (lhs:nostr.Filter, rhs:nostr.Filter) -> Bool {
+		return lhs.ids == rhs.ids &&
+			lhs.kinds == rhs.kinds &&
+			lhs.referenced_ids == rhs.referenced_ids &&
+			lhs.pubkeys == rhs.pubkeys &&
+			lhs.since == rhs.since &&
+			lhs.until == rhs.until &&
+			lhs.limit == rhs.limit &&
+			lhs.authors == rhs.authors &&
+			lhs.hashtag == rhs.hashtag &&
+			lhs.parameter == rhs.parameter
+	}
+}
+
+extension nostr.Filter: Hashable {
+	func hash(into hasher: inout Hasher) {
+		hasher.combine(ids)
+		hasher.combine(kinds)
+		hasher.combine(referenced_ids)
+		hasher.combine(pubkeys)
+		hasher.combine(since)
+		hasher.combine(until)
+		hasher.combine(limit)
+		hasher.combine(authors)
+		hasher.combine(hashtag)
+		hasher.combine(parameter)
+	}
+}

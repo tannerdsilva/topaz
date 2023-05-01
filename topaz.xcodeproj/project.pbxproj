@@ -15,6 +15,9 @@
 		AE0C437329EC7B88000EC738 /* UIEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0C437229EC7B88000EC738 /* UIEvents.swift */; };
 		AE0C437529EC7BDF000EC738 /* NavBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0C437429EC7BDF000EC738 /* NavBar.swift */; };
 		AE0F152C29C4E176009E3297 /* Stream.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0F152B29C4E176009E3297 /* Stream.swift */; };
+		AE1A210829FF2F7E00A964D4 /* UIImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A210729FF2F7E00A964D4 /* UIImage.swift */; };
+		AE1A210A29FFFD5000A964D4 /* CustomBackButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A210929FFFD5000A964D4 /* CustomBackButton.swift */; };
+		AE1A210C2A000A0000A964D4 /* DragToDismiss.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A210B2A000A0000A964D4 /* DragToDismiss.swift */; };
 		AE1A59C229B7A20600D21AA0 /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A59C129B7A20600D21AA0 /* Event.swift */; };
 		AE1A59C429B7A3E400D21AA0 /* nostr.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A59C329B7A3E400D21AA0 /* nostr.swift */; };
 		AE1A59C629B7B0EA00D21AA0 /* Invoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A59C529B7B0EA00D21AA0 /* Invoice.swift */; };
@@ -105,7 +108,6 @@
 		AEEAF2B029CA1A0B002B3C37 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEEAF2AF29CA1A0B002B3C37 /* TimelineView.swift */; };
 		AEF298E529D4BE1600E50654 /* Holder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF298E429D4BE1600E50654 /* Holder.swift */; };
 		AEF298E729D4BE2800E50654 /* HTTPTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF298E629D4BE2800E50654 /* HTTPTool.swift */; };
-		AEF298EB29D4CCE600E50654 /* ImageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF298EA29D4CCE600E50654 /* ImageModel.swift */; };
 		AEF298ED29D4CDF900E50654 /* ProfileDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF298EC29D4CDF900E50654 /* ProfileDetailView.swift */; };
 		AEF4180429EDF97200F02181 /* UIProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF4180329EDF97200F02181 /* UIProfile.swift */; };
 		AEF7DA9229FADDC40036124F /* ImageEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF7DA9129FADDC40036124F /* ImageEngine.swift */; };
@@ -147,6 +149,9 @@
 		AE0C437229EC7B88000EC738 /* UIEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIEvents.swift; sourceTree = "<group>"; };
 		AE0C437429EC7BDF000EC738 /* NavBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavBar.swift; sourceTree = "<group>"; };
 		AE0F152B29C4E176009E3297 /* Stream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stream.swift; sourceTree = "<group>"; };
+		AE1A210729FF2F7E00A964D4 /* UIImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIImage.swift; sourceTree = "<group>"; };
+		AE1A210929FFFD5000A964D4 /* CustomBackButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomBackButton.swift; sourceTree = "<group>"; };
+		AE1A210B2A000A0000A964D4 /* DragToDismiss.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DragToDismiss.swift; sourceTree = "<group>"; };
 		AE1A59C129B7A20600D21AA0 /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
 		AE1A59C329B7A3E400D21AA0 /* nostr.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = nostr.swift; sourceTree = "<group>"; };
 		AE1A59C529B7B0EA00D21AA0 /* Invoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Invoice.swift; sourceTree = "<group>"; };
@@ -233,7 +238,6 @@
 		AEEAF2AF29CA1A0B002B3C37 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		AEF298E429D4BE1600E50654 /* Holder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Holder.swift; sourceTree = "<group>"; };
 		AEF298E629D4BE2800E50654 /* HTTPTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPTool.swift; sourceTree = "<group>"; };
-		AEF298EA29D4CCE600E50654 /* ImageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageModel.swift; sourceTree = "<group>"; };
 		AEF298EC29D4CDF900E50654 /* ProfileDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileDetailView.swift; sourceTree = "<group>"; };
 		AEF4180329EDF97200F02181 /* UIProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIProfile.swift; sourceTree = "<group>"; };
 		AEF7DA9129FADDC40036124F /* ImageEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageEngine.swift; sourceTree = "<group>"; };
@@ -418,6 +422,7 @@
 				AE598F3629E5F48100D4CB8F /* DBUX.Date.swift */,
 				AE598F7429E8A74E00D4CB8F /* MDB_comparable.swift */,
 				AEFEF91F29F8359200CFBD1E /* CGSize.swift */,
+				AE1A210729FF2F7E00A964D4 /* UIImage.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -529,6 +534,8 @@
 				AE0C436D29EC705A000EC738 /* UI.swift */,
 				AEFEF91D29F833A200CFBD1E /* AbstractView.swift */,
 				AEF7DA9329FAF4500036124F /* CachedAsyncView.swift */,
+				AE1A210929FFFD5000A964D4 /* CustomBackButton.swift */,
+				AE1A210B2A000A0000A964D4 /* DragToDismiss.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -552,7 +559,6 @@
 				AEB39B7F29B5C2E700F3C92E /* UserEnvironment.swift */,
 				AE421C7229BD095B009CB737 /* EventReference.swift */,
 				AE717AC129C014F7002D6A52 /* HomeModel.swift */,
-				AEF298EA29D4CCE600E50654 /* ImageModel.swift */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -739,6 +745,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE1A210829FF2F7E00A964D4 /* UIImage.swift in Sources */,
 				AE1A59CF29B7C02D00D21AA0 /* Scheduler.swift in Sources */,
 				AE1A59D329B7E85200D21AA0 /* Filter.swift in Sources */,
 				AE1A59D129B7D2E300D21AA0 /* Subscribe.swift in Sources */,
@@ -759,6 +766,7 @@
 				AEB39B8429B5C3F300F3C92E /* RelayConnection.swift in Sources */,
 				AE598F8329E92CA100D4CB8F /* ViewModels.swift in Sources */,
 				AE2C0EF029BA725A00C0B87C /* Zap.swift in Sources */,
+				AE1A210C2A000A0000A964D4 /* DragToDismiss.swift in Sources */,
 				AEB39B7529B5403900F3C92E /* npub.swift in Sources */,
 				AEB39B7829B5406A00F3C92E /* Keys.swift in Sources */,
 				AE598F7E29E91E3800D4CB8F /* ProfilesEngine.swift in Sources */,
@@ -813,6 +821,7 @@
 				AED9D12F29BA9730004AE0AE /* LocalizationHelp.swift in Sources */,
 				AE421C6D29BC433B009CB737 /* PostBlock.swift in Sources */,
 				AE598F8729E9E4D400D4CB8F /* Dispatcher.swift in Sources */,
+				AE1A210A29FFFD5000A964D4 /* CustomBackButton.swift in Sources */,
 				AE8F05B729CD44CB00D59FEC /* Warnings.swift in Sources */,
 				AE2C0EEB29BA6E8700C0B87C /* Profile.swift in Sources */,
 				AEFEF91E29F833A200CFBD1E /* AbstractView.swift in Sources */,
@@ -834,7 +843,6 @@
 				AEF7DA9929FBA3A40036124F /* OpenAISettings.swift in Sources */,
 				AE39020B29B912D600F9D40C /* Delta.swift in Sources */,
 				AE717AC229C014F7002D6A52 /* HomeModel.swift in Sources */,
-				AEF298EB29D4CCE600E50654 /* ImageModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1014,7 +1022,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.6.8;
+				MARKETING_VERSION = 0.6.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1055,7 +1063,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.6.8;
+				MARKETING_VERSION = 0.6.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;

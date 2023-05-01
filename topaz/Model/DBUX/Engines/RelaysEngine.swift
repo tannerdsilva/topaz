@@ -131,12 +131,13 @@ extension DBUX {
 
 										let makeSub = nostr.Subscribe.init(sub_id:"-ux-self-", filters: [ourContactsFilter])
 										try await curChanger.send(.subscribe(makeSub))
-										let getSubs = try rhCS.getEntry(type:[nostr.Subscribe].self, forKey:relayHash, tx:newTrans)!
-										for curSub in getSubs {
-											do {
-												try await curChanger.send(.subscribe(curSub))
-											} catch let error {
-												logThing.critical("there was a problem writing the message to the relay", metadata:["error":"\(error)"])
+										if let getSubs = try rhCS.getEntry(type:[nostr.Subscribe].self, forKey:relayHash, tx:newTrans) {
+											for curSub in getSubs {
+												do {
+													try await curChanger.send(.subscribe(curSub))
+												} catch let error {
+													logThing.critical("there was a problem writing the message to the relay", metadata:["error":"\(error)"])
+												}
 											}
 										}
 									} catch {}
@@ -274,26 +275,33 @@ extension DBUX {
 					self.userRelayConnectionStates.removeValue(forKey: curRelay)
 				}
 			}
-			
-			
 		}
 
-		func add(subscriptions:[nostr.Subscribe], to relayURL:String, tx subTrans:QuickLMDB.Transaction) throws {
+		func addOrUpdate(subscriptions:[nostr.Subscribe], to relayURL:String, tx subTrans:QuickLMDB.Transaction) throws {
 			let newTransaction = try Transaction(self.env, readOnly:false, parent:subTrans)
 			let relayHash = try RelayHash(relayURL)
 			let relaySubscriptionsCursor = try self.relayHash_currentSubscriptions.cursor(tx:newTransaction)
+			// the modified subs that need to be written
+			var updateSubs = Set<nostr.Subscribe>()
 			// load the existing subscriptions
-			var currentSubscriptions:Array<nostr.Subscribe>
+			var currentSubscriptions:[String:nostr.Subscribe]
 			do {
-				currentSubscriptions = Array<nostr.Subscribe>(try relaySubscriptionsCursor.getEntry(.set, key:relayHash).value)!
+				currentSubscriptions = Dictionary<String, nostr.Subscribe>(try relaySubscriptionsCursor.getEntry(.set, key:relayHash).value)!
 			} catch _ {
-				currentSubscriptions = []
+				currentSubscriptions = [:]
 			}
-			currentSubscriptions.append(contentsOf:subscriptions)
+			for curSub in subscriptions {
+				if let hasExistingSub = currentSubscriptions[curSub.sub_id] {
+					if hasExistingSub == curSub {
+						updateSubs.update(with:curSub)
+					}
+				}
+				currentSubscriptions[curSub.sub_id] = curSub
+			}
 			try relaySubscriptionsCursor.setEntry(value:currentSubscriptions, forKey:relayHash)
 			
 			// check if this relay is connected, and if it is, send the subscriptions to the relay
-			Task.detached { @MainActor [weak self, rlurl = relayURL, subs = subscriptions] in
+			Task.detached { @MainActor [weak self, rlurl = relayURL, subs = updateSubs] in
 				guard let self = self else { return }
 				guard let getConnectionState = self.userRelayConnectionStates[rlurl] else { return }
 				guard case .connected = getConnectionState, let getConnection = self.userRelayConnections[rlurl] else { return }

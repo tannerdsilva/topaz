@@ -76,11 +76,23 @@ struct Topaz:App, Based {
 		if isDirectory {
 			try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true, attributes: nil)
 			let dataMdbPath = path.appendingPathComponent("data.mdb")
-			let increaseSize = size_t(dataMdbPath.getFileSize()) + size_t(type.deltaSize)
+			let increaseSize:size_t
+			switch type.deltaSize {
+			case let .fixed(assSize):
+				increaseSize = assSize
+			case let .relativeGrowth(assSize):
+				increaseSize = size_t(dataMdbPath.getFileSize()) + assSize
+			}
 			let makeEnv = try QuickLMDB.Environment(path: path.path, flags: type.env_flags, mapSize: increaseSize, maxDBs: type.maxDBs)
 			return try type.init(base: path, env: makeEnv, publicKey: publicKey, dispatcher: dispatcher)
 		} else {
-			let increaseSize = size_t(path.getFileSize()) + size_t(type.deltaSize)
+			let increaseSize:size_t
+			switch type.deltaSize {
+			case let .fixed(assSize):
+				increaseSize = assSize
+			case let .relativeGrowth(assSize):
+				increaseSize = size_t(path.getFileSize()) + assSize
+			}
 			let makeEnv = try QuickLMDB.Environment(path: path.path, flags: type.env_flags, mapSize: increaseSize, maxDBs: type.maxDBs)
 			return try type.init(base: path, env: makeEnv, publicKey: publicKey, dispatcher: dispatcher)
 		}

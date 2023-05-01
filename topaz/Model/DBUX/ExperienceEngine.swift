@@ -14,10 +14,15 @@ import class QuickLMDB.Transaction
 protocol Based {
 	var base:URL { get }
 }
+enum SizeMode {
+	case fixed(size_t)
+	case relativeGrowth(size_t)
+}
 protocol ExperienceEngine: Based {
+	
 	associatedtype NotificationType: Hashable
 	static var name: String { get }
-	static var deltaSize: size_t { get }
+	static var deltaSize: SizeMode { get }
 	static var maxDBs: MDB_dbi { get }
 	static var env_flags: QuickLMDB.Environment.Flags { get }
 	var dispatcher: Dispatcher<NotificationType> { get }
@@ -28,7 +33,6 @@ protocol ExperienceEngine: Based {
 
 protocol SharedExperienceEngine {
 	associatedtype NotificationType: Hashable
-	static var env_flags: QuickLMDB.Environment.Flags { get }
 	var dispatcher: Dispatcher<NotificationType> { get }
 	var env: QuickLMDB.Environment { get }
 	var pubkey: nostr.Key { get }

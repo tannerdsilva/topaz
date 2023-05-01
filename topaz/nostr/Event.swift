@@ -308,17 +308,17 @@ extension nostr {
 		}
 
 		@usableFromInline init(from decoder:Decoder) throws {
-			let container = try! decoder.container(keyedBy: CodingKeys.self)
-			self.uid = try! container.decode(UID.self, forKey: .uid)
-			let getSig = try! container.decode(String.self, forKey: .sig)
+			let container = try decoder.container(keyedBy: CodingKeys.self)
+			self.uid = try container.decode(UID.self, forKey: .uid)
+			let getSig = try container.decode(String.self, forKey: .sig)
 			self.sig = getSig
-			self.tags = try! container.decode([Tag].self, forKey: .tags)
-			self.pubkey = try! container.decode(Key.self, forKey: .pubkey)
-			let getTI = try! container.decode(Int.self, forKey: .created)
+			self.tags = try container.decode([Tag].self, forKey: .tags)
+			self.pubkey = try container.decode(Key.self, forKey: .pubkey)
+			let getTI = try container.decode(Int.self, forKey: .created)
 			let getCreateDate = Date(timeIntervalSince1970:TimeInterval(getTI))
 			self.created = DBUX.Date(getCreateDate)
 			self.kind = Kind(rawValue:try! container.decode(Int.self, forKey: .kind))!
-			self.content = try! container.decode(String.self, forKey: .content)
+			self.content = try container.decode(String.self, forKey: .content)
 		}
 
 		@usableFromInline func encode(to encoder:Encoder) throws {

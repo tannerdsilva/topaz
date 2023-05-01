@@ -215,7 +215,7 @@ extension DBUX {
 	struct EventsEngine:ExperienceEngine {
 		typealias NotificationType = DBUX.Notification
 		static let name = "events-engine.mdb"
-		static let deltaSize = size_t(419430400)
+		static let deltaSize = SizeMode.relativeGrowth(size_t(419430400))
 		static let maxDBs:MDB_dbi = 32
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let dispatcher: Dispatcher<DBUX.Notification>

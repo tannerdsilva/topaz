@@ -14,9 +14,10 @@ import AsyncAlgorithms
 
 extension DBUX {
 	class ContextEngine:ObservableObject, ExperienceEngine {
+		
 		typealias NotificationType = DBUX.Notification
 		static let name = "context-engine.mdb"
-		static let deltaSize = size_t(5.12e+8)
+		static let deltaSize = SizeMode.fixed(100000000)
 		static let maxDBs:MDB_dbi = 1
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let dispatcher:Dispatcher<NotificationType>

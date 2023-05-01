@@ -204,6 +204,23 @@ extension UI {
 			}
 		}
 		
+		private func trimPosts(direction:ScrollDirection) {
+			if postTrimmingTask != nil {
+				postTrimmingTask?.cancel()
+			}
+			postTrimmingTask = Task.detached(priority:.background) { @MainActor [weak self] in
+				guard Task.isCancelled == false, let self = self else { return }
+				if self.posts.count > self.batchSize * 4 {
+					if direction == .up {
+						self.posts.removeLast(self.posts.count)
+					} else {
+						self.posts.removeFirst(self.posts.count)
+					}
+				}
+				self.postTrimmingTask = nil
+			}
+		}
+
 		private func sortPosts(_ posts: [TimelineModel]) -> [TimelineModel] {
 			return posts.sorted { $0.event.created > $1.event.created }
 		}
@@ -223,16 +240,9 @@ extension UI {
 				updatedPosts = sortPosts(posts + filteredPosts)
 			}
 			
-			if updatedPosts.count > self.batchSize * 2 {
-				if direction == .up {
-					updatedPosts.removeLast(self.posts.count - Int(self.batchSize / 2))
-				} else {
-					updatedPosts.removeFirst(self.posts.count - Int(self.batchSize / 2))
-				}
-			}
-			
 			// Trimming excess posts if needed
 			self.posts = updatedPosts
+			await self.trimPosts(direction:direction)
 		}
 
 		
@@ -255,18 +265,27 @@ extension UI {
 	struct TimelineView: View {
 		@ObservedObject var viewModel: TimelineViewModel
 		@Binding var showReplies: Bool
+		
 		var body: some View {
-			ScrollView {
-				LazyVStack {
-					if viewModel.posts.isEmpty {
-						noEventsView
-					} else {
-						timelineView
+			ScrollViewReader { scrollViewProxy in
+				ScrollView {
+					LazyVStack {
+						if viewModel.posts.isEmpty {
+							noEventsView
+						} else {
+							timelineView
+						}
 					}
 				}
-			}
-			.onAppear {
-				viewModel.onScroll(direction: .down)
+				.onAppear {
+					viewModel.onScroll(direction: .down)
+				}
+				// Scroll to the anchor date item when the list is updated
+				.onChange(of: viewModel.posts.count) { _ in
+					if let anchorDateUID = viewModel.anchorDate {
+						scrollViewProxy.scrollTo(anchorDateUID, anchor: .center)
+					}
+				}
 			}
 		}
 		

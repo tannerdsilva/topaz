@@ -9,14 +9,19 @@ import Foundation
 import SwiftUI
 
 struct ProfileDetailView: View {
+	@Environment(\.presentationMode) var presentationMode
 	let dbux:DBUX
 	let pubkey:nostr.Key
+	let profile:nostr.Profile
+
 	@ObservedObject var profileEngine:DBUX.ProfilesEngine // Load the user profile data here
 
 	var body: some View {
-		NavigationStack {
-			UpperProfileView(dbux:dbux, pubkey:pubkey, profile: profileEngine.currentUserProfile)
-		}
+		UpperProfileView(dbux:dbux, pubkey:pubkey, profile:profile).navigationBarBackButtonHidden(true).toolbar {
+			ToolbarItem(placement: .navigationBarLeading) {
+				CustomBackButton()
+			}
+		}.modifier(DragToDismiss())
 	}
 }
 

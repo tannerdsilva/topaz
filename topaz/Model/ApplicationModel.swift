@@ -32,7 +32,7 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 	typealias NotificationType = Topaz.Notification
 	
 	static let name = "topaz-base.mdb"
-	static let deltaSize = size_t(250000000)
+	static let deltaSize = SizeMode.fixed(size_t(100000000))
 	static let maxDBs:MDB_dbi = 1
 	static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir]
 	let env:QuickLMDB.Environment
@@ -79,7 +79,7 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 			} else {
 				do {
 					try self.app_metadata.setEntry(value:newValue!, forKey:Metadatas.tosAcknowledged.rawValue, tx:nil)
-					self.logger.info("committed transaction to update TOS acknowledgement.", metadata:["acknowledged": "\(isTOSAcknowledged)"])
+					self.logger.info("committed transaction to update TOS acknowledgement.", metadata:["acknowledged": "\(String(describing: isTOSAcknowledged))"])
 				} catch let error {
 					self.logger.critical("could not commit database transaction.", metadata:["error": "\(error)"])
 				}
@@ -183,12 +183,13 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 
 extension ApplicationModel {
 	class UserStore:ObservableObject, ExperienceEngine {
+		
 		let dispatcher:Dispatcher<NotificationType>
 		
 		typealias NotificationType = Topaz.Notification
 		
 		static let name = "topaz-users.mdb"
-		static let deltaSize = size_t(250000000)
+		static let deltaSize = SizeMode.fixed(size_t(250000000))
 		static let maxDBs:MDB_dbi = 2
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let pubkey:nostr.Key

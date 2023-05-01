@@ -65,7 +65,7 @@ public class DBUX:Based {
 		}
 		let homeSubs = Self.generateMainSubscription(pubkey:self.keypair.pubkey, following:myFollows)
 		for curRelay in myRelays {
-			try self.eventsEngine.relaysEngine.add(subscriptions:[homeSubs], to:curRelay, tx:relaysTX)
+			try self.eventsEngine.relaysEngine.addOrUpdate(subscriptions:[homeSubs], to:curRelay, tx:relaysTX)
 		}
 		try relaysTX.commit()
 
@@ -134,7 +134,7 @@ public class DBUX:Based {
 								if curEv.pubkey == self.keypair.pubkey {
 									let homeSubs = Self.generateMainSubscription(pubkey:self.keypair.pubkey, following:myFollows)
 									for curRelay in myRelays {
-										try self.eventsEngine.relaysEngine.add(subscriptions:[homeSubs], to:curRelay, tx:relaysTX)
+										try self.eventsEngine.relaysEngine.addOrUpdate(subscriptions:[homeSubs], to:curRelay, tx:relaysTX)
 									}
 								}
 								try relaysTX.commit()

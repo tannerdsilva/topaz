@@ -8,6 +8,20 @@
 import Foundation
 
 
+extension nostr.Subscribe: Equatable {
+	static func == (lhs:Self, rhs: Self) -> Bool {
+		return lhs.sub_id == rhs.sub_id &&
+			lhs.filters == rhs.filters
+	}
+}
+
+extension nostr.Subscribe: Hashable {
+	func hash(into hasher: inout Hasher) {
+		hasher.combine(sub_id)
+		hasher.combine(filters)
+	}
+}
+
 extension nostr {
 	/// a subscription request to the server
 	struct Subscribe:Codable {

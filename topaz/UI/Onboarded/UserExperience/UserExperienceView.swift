@@ -12,10 +12,13 @@ struct UserExperienceView: View {
 	
 	let dbux:DBUX
 	@ObservedObject var context:DBUX.ContextEngine
+	@ObservedObject var profileEngine:DBUX.ProfilesEngine
+	
 	@State var showingAccountPicker:Bool = false
 	init(dbux:DBUX) {
 		self.dbux = dbux
 		self.context = dbux.contextEngine
+		self.profileEngine = dbux.eventsEngine.profilesEngine
 	}
     var body: some View {
 		GeometryReader { geometry in
@@ -30,7 +33,9 @@ struct UserExperienceView: View {
 				case .search:
 					SearchView().frame(width: geometry.size.width)
 				case .profile:
-					ProfileDetailView(dbux:dbux, pubkey: dbux.keypair.pubkey, profileEngine: dbux.eventsEngine.profilesEngine).frame(width: geometry.size.width)
+					NavigationStack {
+						ProfileDetailView(dbux:dbux, pubkey: dbux.keypair.pubkey, profile:profileEngine.currentUserProfile, profileEngine: dbux.eventsEngine.profilesEngine).frame(width: geometry.size.width)
+					}
 				}
 				Spacer()
 				UI.NavBar(dbux: dbux, appData:dbux.application, viewMode: $context.viewMode, badgeStatus: $context.badgeStatus, showAccountPicker: $showingAccountPicker)
@@ -91,13 +96,13 @@ struct SearchView: View {
 	}
 }
 
-struct PV: View {
-	let dbux:DBUX
-	
-	var body: some View {
-		ProfileDetailView(dbux:dbux, pubkey:dbux.keypair.pubkey, profileEngine:dbux.eventsEngine.profilesEngine)
-	}
-}
+//struct PV: View {
+//	let dbux:DBUX
+//
+//	var body: some View {
+//		ProfileDetailView(dbux:dbux, pubkey:dbux.keypair.pubkey, profileEngine:dbux.eventsEngine.profilesEngine)
+//	}
+//}
 
 struct DisplayNameText: View {
 	let text: String
@@ -169,43 +174,51 @@ struct EventViewCell: View {
 		return formatter
 	}
 
+	@ViewBuilder var profileHStack:some View {
+		HStack {
+			if let profilePicture = profile?.picture, let url = URL(string: profilePicture) {
+				CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
+					image
+						.resizable()
+						.aspectRatio(contentMode: .fill)
+				} placeholder: {
+					ProgressView()
+				}
+				.frame(width: 50, height: 50)
+				.cornerRadius(25)
+			} else {
+				Image(systemName: "person.crop.circle.fill")
+					.resizable()
+					.frame(width: 50, height: 50)
+					.foregroundColor(.gray)
+			}
+			
+			VStack(alignment: .leading, spacing: 2) {
+				HStack(spacing: 4) {
+					DisplayNameText(text: profile?.display_name ?? profile?.name ?? "Unknown")
+					
+					if profile?.nip05 != nil {
+						Image(systemName: "checkmark.circle.fill")
+							.foregroundColor(.blue)
+							.font(.system(size: 18))
+					}
+				}
+				
+				Text("@\(profile?.name ?? "unknown")")
+					.font(.subheadline)
+					.foregroundColor(.gray)
+			}
+		}
+	}
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
-			HStack {
-				if let profilePicture = profile?.picture, let url = URL(string: profilePicture) {
-					CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
-						image
-							.resizable()
-							.aspectRatio(contentMode: .fill)
-					} placeholder: {
-						ProgressView()
-					}
-					.frame(width: 50, height: 50)
-					.cornerRadius(25)
-				} else {
-					Image(systemName: "person.crop.circle.fill")
-						.resizable()
-						.frame(width: 50, height: 50)
-						.foregroundColor(.gray)
+			if (profile != nil) {
+				NavigationLink(destination:ProfileDetailView(dbux: dbux, pubkey:event.pubkey, profile: profile!, profileEngine:dbux.eventsEngine.profilesEngine)) {
+					profileHStack
 				}
-
-				VStack(alignment: .leading, spacing: 2) {
-					HStack(spacing: 4) {
-						DisplayNameText(text: profile?.display_name ?? profile?.name ?? "Unknown")
-						
-						if profile?.nip05 != nil {
-							Image(systemName: "checkmark.circle.fill")
-								.foregroundColor(.blue)
-								.font(.system(size: 18))
-						}
-					}
-					
-					Text("@\(profile?.name ?? "unknown")")
-						.font(.subheadline)
-						.foregroundColor(.gray)
-				}
+			} else {
+				profileHStack
 			}
-
 			UI.Events.UserFacingTextContentView(content: event.content)
 			
 			HStack {
