@@ -70,7 +70,7 @@ struct HomeView: View {
 		VStack {
 			CustomTitleBar(dbux:dbux)
 			Spacer()
-			UI.TimelineView(dbux:dbux, viewModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor, showReplies: true))
+			UI.TimelineView(dbux:dbux, postsOnlyModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor, showReplies: false), withRepliesModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor, showReplies: true))
 		}
 	}
 }

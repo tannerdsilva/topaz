@@ -18,6 +18,9 @@
 		AE1A210829FF2F7E00A964D4 /* UIImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A210729FF2F7E00A964D4 /* UIImage.swift */; };
 		AE1A210A29FFFD5000A964D4 /* CustomBackButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A210929FFFD5000A964D4 /* CustomBackButton.swift */; };
 		AE1A210C2A000A0000A964D4 /* DragToDismiss.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A210B2A000A0000A964D4 /* DragToDismiss.swift */; };
+		AE1A210E2A002A5100A964D4 /* FollowUnfollowButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A210D2A002A5100A964D4 /* FollowUnfollowButton.swift */; };
+		AE1A21102A003CB900A964D4 /* RelativeDateDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A210F2A003CB900A964D4 /* RelativeDateDisplay.swift */; };
+		AE1A21122A00B9BA00A964D4 /* Database.Statistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A21112A00B9BA00A964D4 /* Database.Statistics.swift */; };
 		AE1A59C229B7A20600D21AA0 /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A59C129B7A20600D21AA0 /* Event.swift */; };
 		AE1A59C429B7A3E400D21AA0 /* nostr.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A59C329B7A3E400D21AA0 /* nostr.swift */; };
 		AE1A59C629B7B0EA00D21AA0 /* Invoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1A59C529B7B0EA00D21AA0 /* Invoice.swift */; };
@@ -152,6 +155,9 @@
 		AE1A210729FF2F7E00A964D4 /* UIImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIImage.swift; sourceTree = "<group>"; };
 		AE1A210929FFFD5000A964D4 /* CustomBackButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomBackButton.swift; sourceTree = "<group>"; };
 		AE1A210B2A000A0000A964D4 /* DragToDismiss.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DragToDismiss.swift; sourceTree = "<group>"; };
+		AE1A210D2A002A5100A964D4 /* FollowUnfollowButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowUnfollowButton.swift; sourceTree = "<group>"; };
+		AE1A210F2A003CB900A964D4 /* RelativeDateDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelativeDateDisplay.swift; sourceTree = "<group>"; };
+		AE1A21112A00B9BA00A964D4 /* Database.Statistics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Database.Statistics.swift; sourceTree = "<group>"; };
 		AE1A59C129B7A20600D21AA0 /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
 		AE1A59C329B7A3E400D21AA0 /* nostr.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = nostr.swift; sourceTree = "<group>"; };
 		AE1A59C529B7B0EA00D21AA0 /* Invoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Invoice.swift; sourceTree = "<group>"; };
@@ -330,6 +336,7 @@
 				AE0C436829EC49FA000EC738 /* CustomToggleSwitch.swift */,
 				AE0C437429EC7BDF000EC738 /* NavBar.swift */,
 				AEDF45D529F1A12E00028BF7 /* CryptoSignatureText.swift */,
+				AE1A210F2A003CB900A964D4 /* RelativeDateDisplay.swift */,
 			);
 			path = UserExperience;
 			sourceTree = "<group>";
@@ -423,6 +430,7 @@
 				AE598F7429E8A74E00D4CB8F /* MDB_comparable.swift */,
 				AEFEF91F29F8359200CFBD1E /* CGSize.swift */,
 				AE1A210729FF2F7E00A964D4 /* UIImage.swift */,
+				AE1A21112A00B9BA00A964D4 /* Database.Statistics.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -577,6 +585,7 @@
 				AEDF45DD29F2D67600028BF7 /* FollowsYouView.swift */,
 				AEDF45DF29F2DB4300028BF7 /* EditWalletsView.swift */,
 				AE8ED1C729F310BC00826301 /* CommonRelaysView.swift */,
+				AE1A210D2A002A5100A964D4 /* FollowUnfollowButton.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -758,6 +767,7 @@
 				AE0C437529EC7BDF000EC738 /* NavBar.swift in Sources */,
 				AEE3BCFF29EEEFB2005A94EF /* PublicKeyView.swift in Sources */,
 				AE1A59CA29B7B26200D21AA0 /* ReferenceID.swift in Sources */,
+				AE1A21122A00B9BA00A964D4 /* Database.Statistics.swift in Sources */,
 				AE598F3729E5F48100D4CB8F /* DBUX.Date.swift in Sources */,
 				AEEAF2AE29CA19D2002B3C37 /* TextEvent.swift in Sources */,
 				AEE3BD0129EEF252005A94EF /* WalletAddressView.swift in Sources */,
@@ -784,6 +794,7 @@
 				AE598F3529E5C77600D4CB8F /* QuickLMDB.Environment.swift in Sources */,
 				AE8ED1C829F310BC00826301 /* CommonRelaysView.swift in Sources */,
 				AE598F7929E8CEE800D4CB8F /* KeyPair.swift in Sources */,
+				AE1A210E2A002A5100A964D4 /* FollowUnfollowButton.swift in Sources */,
 				AE7FE83929BBB7F80060DCE3 /* Parser.swift in Sources */,
 				AEDF45D629F1A12E00028BF7 /* CryptoSignatureText.swift in Sources */,
 				AE0C437029EC7583000EC738 /* UIRelays.swift in Sources */,
@@ -816,6 +827,7 @@
 				AEB39B6E29B52D5900F3C92E /* Topaz.swift in Sources */,
 				AE421C7A29BE30DE009CB737 /* Foundation.Date.swift in Sources */,
 				AEDF45DE29F2D67600028BF7 /* FollowsYouView.swift in Sources */,
+				AE1A21102A003CB900A964D4 /* RelativeDateDisplay.swift in Sources */,
 				AEFEF92429F875A600CFBD1E /* TermsOfServiceView.swift in Sources */,
 				AEE3BD0529EEF9A7005A94EF /* UserFacingTextContentView.swift in Sources */,
 				AED9D12F29BA9730004AE0AE /* LocalizationHelp.swift in Sources */,
@@ -1022,7 +1034,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.6.9;
+				MARKETING_VERSION = 0.6.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1063,7 +1075,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.6.9;
+				MARKETING_VERSION = 0.6.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;

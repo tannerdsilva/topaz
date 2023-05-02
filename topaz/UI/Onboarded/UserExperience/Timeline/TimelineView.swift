@@ -223,7 +223,10 @@ extension UI {
 		}
 		
 		func loadPosts(direction: ScrollDirection) async throws {
-			let newPosts = try await loadPostsFromDatabase(anchorDate: anchorDate, direction: direction, limit: batchSize, showReplies: true)
+			var newPosts = try await loadPostsFromDatabase(anchorDate: anchorDate, direction: direction, limit: batchSize, showReplies: true)
+			if showReplies == false {
+				newPosts = newPosts.filter { $0.event.isReply() == false }
+			}
 			let filteredPosts = newPosts.filter { !postUIDs.contains($0.event.uid) }
 
 			postUIDs.formUnion(filteredPosts.map { $0.event.uid })
@@ -259,33 +262,24 @@ extension UI {
 	
 	struct TimelineView: View {
 		let dbux:DBUX
-		@ObservedObject var viewModel: TimelineViewModel
+		@ObservedObject var postsOnlyModel: TimelineViewModel
+		@ObservedObject var withRepliesModel: TimelineViewModel
 		@ObservedObject var context:DBUX.ContextEngine
 		
-		init(dbux:DBUX, viewModel:TimelineViewModel) {
+		init(dbux:DBUX, postsOnlyModel:TimelineViewModel, withRepliesModel:TimelineViewModel) {
 			self.dbux = dbux
-			self.viewModel = viewModel
+			self.postsOnlyModel = postsOnlyModel
+			self.withRepliesModel = withRepliesModel
 			self.context = dbux.contextEngine
 		}
 		
 		var body: some View {
 			ScrollViewReader { scrollViewProxy in
 				ScrollView {
-					LazyVStack {
-						if viewModel.posts.isEmpty {
-							noEventsView
-						} else {
-							timelineView
-						}
-					}
-				}
-				.onAppear {
-					viewModel.onScroll(direction: .down)
-				}
-				// Scroll to the anchor date item when the list is updated
-				.onChange(of: viewModel.posts.count) { _ in
-					if let anchorDateUID = viewModel.anchorDate {
-						scrollViewProxy.scrollTo(anchorDateUID, anchor: .center)
+					if (context.timelineRepliesToggleEnabled) {
+						self.postsOnlyTimeline
+					} else {
+						self.withRepliesTimeine
 					}
 				}
 			}
@@ -299,37 +293,57 @@ extension UI {
 				.padding()
 		}
 		
-		func postsBasedOnToggle() -> [UI.TimelineModel] {
-			return context.timelineRepliesToggleEnabled ? viewModel.posts : viewModel.posts.filter({ !$0.event.isReply() })
+		@ViewBuilder
+		var postsOnlyTimeline: some View {
+			LazyVStack {
+				
+				ForEach(postsOnlyModel.posts) { item in
+					if postsOnlyModel.posts.first?.id == item.id {
+						onAppearLoadingIndicator(model:postsOnlyModel, direction: .up).id("LOADING_TOP_IND")
+					}
+					
+					NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
+						EventViewCell(dbux:self.dbux, event: item.event, profile: item.profile)
+							.onAppear {
+								postsOnlyModel.updateAnchorDate(to: DBUX.DatedNostrEventUID(date: item.event.created, obj: item.event.uid))
+							}
+					}
+					
+					if postsOnlyModel.posts.last?.id == item.id {
+						onAppearLoadingIndicator(model:postsOnlyModel, direction: .down).id("LOADING_BOTTOM_IND")
+					}
+				}.id("__TL_PO_\(dbux.keypair.pubkey.description)")
+			}
+		}
+	
+		@ViewBuilder
+		var withRepliesTimeine: some View {
+
+			LazyVStack {
+				ForEach(withRepliesModel.posts) { item in
+					if withRepliesModel.posts.first?.id == item.id {
+						onAppearLoadingIndicator(model:withRepliesModel, direction: .up).id("LOADING_TOP_IND")
+					}
+					
+					NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
+						EventViewCell(dbux: dbux, event: item.event, profile: item.profile)
+							.onAppear {
+								withRepliesModel.updateAnchorDate(to: DBUX.DatedNostrEventUID(date: item.event.created, obj: item.event.uid))
+							}
+					}
+					
+					if withRepliesModel.posts.last?.id == item.id {
+						onAppearLoadingIndicator(model:withRepliesModel, direction: .down).id("LOADING_BOTTOM_IND")
+					}
+				}.id("__TL_WR_\(dbux.keypair.pubkey.description)")
+			}
 		}
 		
 		@ViewBuilder
-		var timelineView: some View {
-			let filteredPosts = postsBasedOnToggle()
-			
-			ForEach(filteredPosts) { item in
-				if filteredPosts.first?.id == item.id {
-					onAppearLoadingIndicator(direction: .up).id("LOADING_TOP_IND")
-				}
-
-				NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
-					EventViewCell(dbux: viewModel.dbux, event: item.event, profile: item.profile)
-						.onAppear {
-							viewModel.updateAnchorDate(to: DBUX.DatedNostrEventUID(date: item.event.created, obj: item.event.uid))
-						}
-				}
-
-				if filteredPosts.last?.id == item.id {
-					onAppearLoadingIndicator(direction: .down).id("LOADING_BOTTOM_IND")
-				}
-			}.id(filteredPosts.count)
-		}
-		
-		@ViewBuilder
-		func onAppearLoadingIndicator(direction: TimelineViewModel.ScrollDirection) -> some View {
+		func onAppearLoadingIndicator(model:TimelineViewModel, direction: TimelineViewModel.ScrollDirection) -> some View {
 			ProgressView()
 				.onAppear {
-					viewModel.onScroll(direction: direction)
+					model.onScroll(direction: direction)
 				}
 		}
 	}
