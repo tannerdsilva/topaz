@@ -8,20 +8,31 @@
 import Foundation
 import SwiftUI
 
+struct HeaderOffsetKey: PreferenceKey {
+	static var defaultValue: CGFloat = 0
+	static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+		value = nextValue()
+	}
+}
 struct ProfileDetailView: View {
 	@Environment(\.presentationMode) var presentationMode
 	let dbux:DBUX
 	let pubkey:nostr.Key
 	let profile:nostr.Profile
+	let showBack:Bool
 
 	@ObservedObject var profileEngine:DBUX.ProfilesEngine // Load the user profile data here
 
 	var body: some View {
-		UpperProfileView(dbux:dbux, pubkey:pubkey, profile:profile).navigationBarBackButtonHidden(true).toolbar {
-			ToolbarItem(placement: .navigationBarLeading) {
-				CustomBackButton()
-			}
-		}.modifier(DragToDismiss())
+		if showBack {
+			UpperProfileView(dbux:dbux, pubkey:pubkey, profile:profile).navigationBarBackButtonHidden(true).toolbar {
+				ToolbarItem(placement: .navigationBarLeading) {
+					CustomBackButton()
+				}
+			}.modifier(DragToDismiss(threshold:0.3))
+		} else {
+			UpperProfileView(dbux:dbux, pubkey:pubkey, profile:profile).navigationBarBackButtonHidden(true)
+		}
 	}
 }
 
@@ -162,10 +173,12 @@ struct UpperProfileView: View {
 	let pubkey:nostr.Key
 	let profile: nostr.Profile
 	@State var showSheet = false
-
+	@State private var headerOffset: CGFloat = 0
 	var body: some View {
 		 GeometryReader { geometry in
 			 VStack(alignment: .leading) {
+				 
+				 // big mega z stack
 				 ZStack(alignment: .bottom) {
 					 GeometryReader { innerGeometry in
 						 BannerBackgroundWithGradientView(dbux: dbux, pubkey: pubkey, profile: profile)
@@ -197,12 +210,6 @@ struct UpperProfileView: View {
 								 .padding(.top, innerGeometry.safeAreaInsets.top)
 								 .padding(.horizontal, 13)
 								 .frame(width: geometry.size.width, alignment: .trailing)
-							 } else {
-								 Text("Follow")
-									 .font(.system(size: 14))
-									 .padding(.horizontal, 12)
-									 .padding(.vertical, 6)
-									 .cornerRadius(4)
 							 }
 							 Spacer()
 							 HStack(alignment: .center) {
@@ -228,10 +235,13 @@ struct UpperProfileView: View {
 							 .padding(.horizontal, 16)
 						 }
 						 .padding(.top, geometry.safeAreaInsets.top)
-					 }
+					 }.background(GeometryReader { proxy in
+						 Color.clear.preference(key: HeaderOffsetKey.self, value: proxy.frame(in: .named("scroll")).minY)
+					})
 				 }
-				 .edgesIgnoringSafeArea(.top)
-				 .frame(width: geometry.size.width, height: 220)
+				.offset(y: max(-headerOffset, 0))
+				.edgesIgnoringSafeArea(.top)
+				.frame(width: geometry.size.width, height: 220)
 
 				 ProfileInfoView(profile:profile)
 				 Spacer()

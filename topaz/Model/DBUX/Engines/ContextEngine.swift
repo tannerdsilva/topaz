@@ -17,7 +17,7 @@ extension DBUX {
 		
 		typealias NotificationType = DBUX.Notification
 		static let name = "context-engine.mdb"
-		static let deltaSize = SizeMode.fixed(100000000)
+		static let deltaSize = SizeMode.fixed(size_t(1e+6))
 		static let maxDBs:MDB_dbi = 1
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let dispatcher:Dispatcher<NotificationType>

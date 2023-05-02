@@ -148,13 +148,12 @@ public class DBUX:Based {
 						}
 					}
 
-					if let hasEE = self?.eventsEngine {
-						await withThrowingTaskGroup(of:Void.self, body: { [pe = hasEE.profilesEngine, newEvsSet = timelineEvents, tle = hasEE, bp = buildProfiles, pd = profileDates] tg in
-
-		//					 write the events to the timeline
-							tg.addTask { [newEvsSet, tle, pe, bp, pd] in
+					if let hasEE = self?.eventsEngine, let hasCE = self?.contextEngine {
+						await withThrowingTaskGroup(of:Void.self, body: { [pe = hasEE.profilesEngine, newEvsSet = timelineEvents, tle = hasEE, bp = buildProfiles, pd = profileDates, ctx = hasCE] tg in
+							tg.addTask { [newEvsSet, tle, pe, bp, pd, ctx] in
+								let ta = try ctx.getTimelineAnchor()
 								let tltx = try tle.transact(readOnly:false)
-								try tle.timelineEngine.writeEvents(newEvsSet, tx:tltx)
+								try tle.timelineEngine.writeEvents(newEvsSet, target:ta ?? DatedNostrEventUID(date: Date(), obj: nostr.Event.UID.nullUID()))
 								try pe.setPublicKeys(bp, asOf:pd, tx:tltx)
 								try tltx.commit()
 							}
@@ -244,7 +243,7 @@ public class DBUX:Based {
 			do {
 				let tltx = try eventsEngine.transact(readOnly:true)
 				var buildUsers = Set<nostr.Key>()
-				let events = try eventsEngine.timelineEngine.readEvents(from:anchor, direction: direction, usersOut:&buildUsers, tx:tltx, filter: { nostrID in
+				let events = try eventsEngine.timelineEngine.readEvents(from:anchor, direction: direction, usersOut:&buildUsers, filter: { nostrID in
 					return true
 				})
 				let profiles = try self.eventsEngine.profilesEngine.getPublicKeys(publicKeys:buildUsers, tx: tltx)

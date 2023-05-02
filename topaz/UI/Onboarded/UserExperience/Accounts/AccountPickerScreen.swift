@@ -10,14 +10,14 @@ import SwiftUI
 
 extension UI.Account {
 	struct PickerScreen: View {
-		let dbux: DBUX
+		let app: ApplicationModel
 		@ObservedObject private var userStore: ApplicationModel.UserStore
 		@State var showOnboarding: Bool = false
 		@Environment(\.presentationMode) var presentationMode
 
-		init(dbux: DBUX) {
-			self.dbux = dbux
-			self.userStore = dbux.application.userStore
+		init(app: ApplicationModel) {
+			self.app = app
+			self.userStore = app.userStore
 		}
 
 		var body: some View {
@@ -37,8 +37,7 @@ extension UI.Account {
 							Spacer()
 						}.onTapGesture {
 							withAnimation {
-								try? dbux.application.setCurrentlyLoggedInUser(account.key)
-								presentationMode.wrappedValue.dismiss()
+								try? app.setCurrentlyLoggedInUser(account.key)
 							}
 						}
 					} else {
@@ -58,7 +57,7 @@ extension UI.Account {
 				.navigationTitle("Account Picker")
 				.navigationBarTitleDisplayMode(.large)
 				.sheet(isPresented: $showOnboarding, onDismiss: { showOnboarding = false }, content: {
-					UI.OnboardingView(appData: dbux.application)
+					UI.OnboardingView(appData:app)
 				})
 			}
 		}

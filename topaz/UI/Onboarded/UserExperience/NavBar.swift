@@ -113,14 +113,12 @@ extension UI {
 					.frame(maxWidth: .infinity, maxHeight: .infinity)
 
 				NavButton(dbux:dbux, myView: .profile, icon: "person.fill", index: 4, selectedTab: $viewMode, accentColor: .cyan, showBadge: $badgeStatus.profileBadge, profileIndicate:dbux.eventsEngine.profilesEngine.currentUserProfile, longPressAction: {
-					showAccountPicker = true
+					try? dbux.application.logOutOfCurrentUser()
 				}) // Pass the profile image here
 					.frame(maxWidth: .infinity, maxHeight: .infinity)
 					
 			}
-			.frame(maxWidth: .infinity).background(Color(.systemBackground)).sheet(isPresented:$showAccountPicker, onDismiss: { showAccountPicker = false }, content: {
-				UI.Account.PickerScreen(dbux:dbux)
-			})
+			.frame(maxWidth: .infinity).background(Color(.systemBackground))
 		}
 	}
 }

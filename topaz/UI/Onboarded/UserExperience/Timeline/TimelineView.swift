@@ -165,29 +165,26 @@ extension UI {
 			return formatter
 		}
 	}
-
+	
 	@MainActor
 	class TimelineViewModel: ObservableObject {
-		@MainActor @Published var posts: [TimelineModel] = [] {
-			didSet {
-				
-			}
-		}
+		@MainActor @Published var posts: [TimelineModel] = []
 		@MainActor private var postUIDs: Set<nostr.Event.UID> = []
 		let dbux:DBUX
 		@Published private(set) var anchorDate: DBUX.DatedNostrEventUID?
 		private let batchSize: UInt16
-		private var showReplies:Bool = false
+		private let showReplies:Bool
 		private var postTrimmingTask:Task<Void, Swift.Error>? = nil
 		
 		func updateAnchorDate(to newAnchorDate: DBUX.DatedNostrEventUID) {
 			anchorDate = newAnchorDate
 		}
 		
-		init(dbux: DBUX, anchorDate: DBUX.DatedNostrEventUID? = nil, batchSize: UInt16 = 48) {
+		init(dbux: DBUX, anchorDate: DBUX.DatedNostrEventUID? = nil, batchSize: UInt16 = 48, showReplies:Bool) {
 			self.dbux = dbux
 			self.anchorDate = anchorDate
 			self.batchSize = batchSize
+			self.showReplies = showReplies
 			Task { [weak self] in
 				try await self?.loadPosts(direction: .down)
 			}
@@ -210,7 +207,7 @@ extension UI {
 			}
 			postTrimmingTask = Task.detached(priority:.background) { @MainActor [weak self] in
 				guard Task.isCancelled == false, let self = self else { return }
-				if self.posts.count > self.batchSize * 4 {
+				if self.posts.count > self.batchSize * 3 {
 					if direction == .up {
 						self.posts.removeLast(self.posts.count)
 					} else {
@@ -230,7 +227,6 @@ extension UI {
 			let filteredPosts = newPosts.filter { !postUIDs.contains($0.event.uid) }
 
 			postUIDs.formUnion(filteredPosts.map { $0.event.uid })
-			print("LOADED \(newPosts.count) NEW EVENTS BRO: \(newPosts.compactMap({ $0.event.uid.description }).sorted(by: { $0 < $1 }))")
 			// Use a temporary variable to store the updated posts
 			var updatedPosts: [TimelineModel] = []
 
@@ -242,14 +238,13 @@ extension UI {
 			
 			// Trimming excess posts if needed
 			self.posts = updatedPosts
-			await self.trimPosts(direction:direction)
+			self.trimPosts(direction:direction)
 		}
 
 		
 		private func loadPostsFromDatabase(anchorDate: DBUX.DatedNostrEventUID?, direction: ScrollDirection, limit: UInt16, showReplies: Bool) async throws -> [TimelineModel] {
 			do {
 				let (events, profiles) = try await dbux.getHomeTimelineState(anchor: anchorDate, direction: direction, limit:limit)
-				print("LOADED \(events.count) events form databsae")
 				return events.map { event in
 					let profile = profiles[event.pubkey]
 					return TimelineModel(event: event, profile: profile)
@@ -263,8 +258,15 @@ extension UI {
 
 	
 	struct TimelineView: View {
+		let dbux:DBUX
 		@ObservedObject var viewModel: TimelineViewModel
-		@Binding var showReplies: Bool
+		@ObservedObject var context:DBUX.ContextEngine
+		
+		init(dbux:DBUX, viewModel:TimelineViewModel) {
+			self.dbux = dbux
+			self.viewModel = viewModel
+			self.context = dbux.contextEngine
+		}
 		
 		var body: some View {
 			ScrollViewReader { scrollViewProxy in
@@ -298,7 +300,7 @@ extension UI {
 		}
 		
 		func postsBasedOnToggle() -> [UI.TimelineModel] {
-			return showReplies ? viewModel.posts : viewModel.posts.filter({ !$0.event.isReply() })
+			return context.timelineRepliesToggleEnabled ? viewModel.posts : viewModel.posts.filter({ !$0.event.isReply() })
 		}
 		
 		@ViewBuilder

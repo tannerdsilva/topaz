@@ -12,17 +12,16 @@ struct ContentView: View {
 	
     var body: some View {
 //		if let hasCurrentUX = appData.currentUX {
-			if (appData.state == .onboarded) {
-				UserExperienceView(dbux:appData.currentUX!)
+			if (appData.state == .operating) {
+				if let hasUX = appData.currentUX {
+					UserExperienceView(dbux:hasUX)
+				} else {
+					UI.Account.PickerScreen(app:appData)
+				}
+				
 			} else {
 				UI.OnboardingView(appData:appData)
 			}
 //		}
-    }
-}
-
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-		ContentView(appData:Topaz().localData)
     }
 }

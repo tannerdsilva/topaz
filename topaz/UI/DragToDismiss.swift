@@ -8,9 +8,14 @@
 import Foundation
 import SwiftUI
 
+class SwipeToDismissState: ObservableObject {
+	@Published var isActive: Bool = false
+}
+
 struct DragToDismiss: ViewModifier {
 	@Environment(\.presentationMode) var presentationMode
 	@GestureState private var dragState = DragState.inactive
+	var threshold: CGFloat
 
 	enum DragState {
 		case inactive
@@ -36,18 +41,20 @@ struct DragToDismiss: ViewModifier {
 	}
 	
 	func body(content: Content) -> some View {
-		content
-			.offset(x: self.dragState.translation.width)
-			.gesture(
-				DragGesture()
-					.updating($dragState) { drag, state, transaction in
-						state = .dragging(translation: drag.translation)
-					}
-					.onEnded { value in
-						if value.translation.width > UIScreen.main.bounds.width * 0.3 {
-							self.presentationMode.wrappedValue.dismiss()
+		GeometryReader { geometry in
+			content
+				.gesture(
+					DragGesture()
+						.updating($dragState) { drag, state, transaction in
+							state = .dragging(translation: drag.translation)
 						}
-					}
-			)
+						.onEnded { value in
+							let width = geometry.size.width
+							if value.translation.width > width * threshold {
+								self.presentationMode.wrappedValue.dismiss()
+							}
+						}
+				)
+		}
 	}
 }

@@ -19,7 +19,6 @@ enum SizeMode {
 	case relativeGrowth(size_t)
 }
 protocol ExperienceEngine: Based {
-	
 	associatedtype NotificationType: Hashable
 	static var name: String { get }
 	static var deltaSize: SizeMode { get }

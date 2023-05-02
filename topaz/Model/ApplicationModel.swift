@@ -42,7 +42,7 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 	// various states the app can be in
 	enum State:UInt8, MDB_convertible {
 		case welcomeFlow = 0
-		case onboarded = 1
+		case operating = 1
 	}
 	
 	private enum Databases:String {
@@ -146,19 +146,25 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
 		// verify that the public key exists
 		let getKeypair = try self.userStore.keypair(pubkey:publicKey)
-		self.objectWillChange.send()
-		let asUX = try! DBUX(app:self, base:Topaz.findApplicationBase(), keypair:getKeypair, appDispatcher: dispatcher)
+		let asUX = try DBUX(app:self, base:Topaz.findApplicationBase(), keypair:getKeypair, appDispatcher: dispatcher)
 		currentUX = asUX
 		try self.app_metadata.setEntry(value:publicKey, forKey:Metadatas.currentUser.rawValue, tx:newTrans)
+		try newTrans.commit()
+	}
+	
+	@MainActor func logOutOfCurrentUser(tx someTrans:QuickLMDB.Transaction? = nil) throws {
+		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false, parent:someTrans)
+		try self.app_metadata.deleteEntry(key:Metadatas.currentUser.rawValue, tx:newTrans)
+		currentUX = nil
 		try newTrans.commit()
 	}
 	
 	/// installs a user in the application and ensures that the state of the app is updated
 	@MainActor func installUser(publicKey:nostr.Key, privateKey:nostr.Key, profile:nostr.Profile = nostr.Profile()) throws {
 		let newTrans = try QuickLMDB.Transaction(self.env, readOnly:false)
-		try self.app_metadata.setEntry(value:ApplicationModel.State.onboarded, forKey:Metadatas.appState.rawValue, tx:newTrans)
+		try self.app_metadata.setEntry(value:ApplicationModel.State.operating, forKey:Metadatas.appState.rawValue, tx:newTrans)
 		self.objectWillChange.send()
-		_state = Published(wrappedValue:.onboarded)
+		_state = Published(wrappedValue:.operating)
 		try! self.userStore.addUser(publicKey, privateKey:privateKey, profile:profile)
 		try! setCurrentlyLoggedInUser(publicKey, tx:newTrans)
 		try! newTrans.commit()

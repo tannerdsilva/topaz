@@ -25,7 +25,9 @@ struct UserExperienceView: View {
 			VStack {
 				switch context.viewMode {
 				case .home:
-					HomeView(dbux: dbux).frame(width: geometry.size.width)
+					NavigationStack {
+						HomeView(dbux: dbux).frame(width: geometry.size.width)
+					}
 				case .notifications:
 					MentionsView().frame(width: geometry.size.width)
 				case .dms:
@@ -34,7 +36,7 @@ struct UserExperienceView: View {
 					SearchView().frame(width: geometry.size.width)
 				case .profile:
 					NavigationStack {
-						ProfileDetailView(dbux:dbux, pubkey: dbux.keypair.pubkey, profile:profileEngine.currentUserProfile, profileEngine: dbux.eventsEngine.profilesEngine).frame(width: geometry.size.width)
+						ProfileDetailView(dbux:dbux, pubkey: dbux.keypair.pubkey, profile:profileEngine.currentUserProfile, showBack: false, profileEngine: dbux.eventsEngine.profilesEngine).frame(width: geometry.size.width)
 					}
 				}
 				Spacer()
@@ -64,14 +66,12 @@ struct UserExperienceView: View {
 
 struct HomeView: View {
 	let dbux:DBUX
-	@State var showReplies:Bool = false
 	var body: some View {
-		NavigationStack {
-			CustomTitleBar(dbux:dbux, showReplies:$showReplies)
+		VStack {
+			CustomTitleBar(dbux:dbux)
 			Spacer()
-			UI.TimelineView(viewModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor), showReplies: $showReplies)
+			UI.TimelineView(dbux:dbux, viewModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor, showReplies: true))
 		}
-		
 	}
 }
 
@@ -177,15 +177,18 @@ struct EventViewCell: View {
 	@ViewBuilder var profileHStack:some View {
 		HStack {
 			if let profilePicture = profile?.picture, let url = URL(string: profilePicture) {
-				CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
-					image
-						.resizable()
-						.aspectRatio(contentMode: .fill)
-				} placeholder: {
-					ProgressView()
+				NavigationLink(destination:ProfileDetailView(dbux: dbux, pubkey:event.pubkey, profile: profile!, showBack:true, profileEngine:dbux.eventsEngine.profilesEngine)) {
+					CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
+						image
+							.resizable()
+							.aspectRatio(contentMode: .fill)
+					} placeholder: {
+						ProgressView()
+					}
+					.frame(width: 50, height: 50)
+					.cornerRadius(25)
 				}
-				.frame(width: 50, height: 50)
-				.cornerRadius(25)
+				
 			} else {
 				Image(systemName: "person.crop.circle.fill")
 					.resizable()
@@ -208,17 +211,14 @@ struct EventViewCell: View {
 					.font(.subheadline)
 					.foregroundColor(.gray)
 			}
+			Spacer()
+			RelativeDateDisplay(date: event.created)
 		}
 	}
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
-			if (profile != nil) {
-				NavigationLink(destination:ProfileDetailView(dbux: dbux, pubkey:event.pubkey, profile: profile!, profileEngine:dbux.eventsEngine.profilesEngine)) {
-					profileHStack
-				}
-			} else {
-				profileHStack
-			}
+			profileHStack
+			
 			UI.Events.UserFacingTextContentView(content: event.content)
 			
 			HStack {
@@ -232,14 +232,19 @@ struct EventViewCell: View {
 
 struct CustomTitleBar: View {
 	let dbux:DBUX
-	@Binding var showReplies:Bool
+	@ObservedObject var contextEngine:DBUX.ContextEngine
 	@State var showingCompose = false
+	
+	init(dbux:DBUX) {
+		self.dbux = dbux
+		contextEngine = dbux.contextEngine
+	}
 	var body: some View {
 		HStack {
 			UI.Relays.ConnectionStatusWidget(dbux:dbux, relays: dbux.eventsEngine.relaysEngine)
 			Spacer().frame(width:5)
 			UI.Relays.SyncStatusWidget(dbux:dbux, relays:dbux.eventsEngine.relaysEngine)
-			UI.CustomToggle(isOn:$showReplies, symbolOn:"arrowshape.turn.up.backward.fill", symbolOff:"person.fill").frame(width:60)
+			UI.CustomToggle(isOn:$contextEngine.timelineRepliesToggleEnabled, symbolOn:"arrowshape.turn.up.backward.fill", symbolOff:"person.fill").frame(width:60)
 			Spacer()
 			Button("Compose", action: {
 				showingCompose = true
