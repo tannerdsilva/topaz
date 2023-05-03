@@ -69,7 +69,7 @@ internal actor Holder<T>: AsyncSequence {
 	}
 
 	private func flushElementsIfNeeded() {
-		if hasTimeThresholdPassed() && !waiters.isEmpty {
+		if hasTimeThresholdPassed() && !waiters.isEmpty && !elements.isEmpty {
 			let currentElements = elements
 			elements.removeAll()
 			lastFlush = timeval()

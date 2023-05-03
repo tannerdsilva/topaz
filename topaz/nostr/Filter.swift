@@ -55,8 +55,16 @@ extension nostr {
 			kinds = try container.decodeIfPresent([nostr.Event.Kind].self, forKey: .kinds)
 			referenced_ids = try container.decodeIfPresent([String].self, forKey: .referenced_ids)
 			pubkeys = try container.decodeIfPresent([String].self, forKey: .pubkeys)
-			since = try container.decodeIfPresent(Date.self, forKey: .since)
-			until = try container.decodeIfPresent(Date.self, forKey: .until)
+			if let sinceTI = try container.decodeIfPresent(Int.self, forKey: .since) {
+				since = Date(timeIntervalSince1970:Double(sinceTI))
+			} else {
+				since = nil
+			}
+			if let untilTI = try container.decodeIfPresent(Int.self, forKey: .until) {
+				until = Date(timeIntervalSince1970:Double(untilTI))
+			} else {
+				until = nil
+			}
 			limit = try container.decodeIfPresent(UInt32.self, forKey: .limit)
 			authors = try container.decodeIfPresent([String].self, forKey: .authors)
 			hashtag = try container.decodeIfPresent([String].self, forKey: .hashtag)

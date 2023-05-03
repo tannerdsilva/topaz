@@ -1034,7 +1034,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.6.10;
+				MARKETING_VERSION = 0.6.11;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1075,7 +1075,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.6.10;
+				MARKETING_VERSION = 0.6.11;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1229,7 +1229,7 @@
 			repositoryURL = "https://github.com/tannerdsilva/QuickLMDB";
 			requirement = {
 				kind = revision;
-				revision = 85e2b552e7a325df04938395b9dd8b92dc643e2f;
+				revision = 6454f034d5e03fbd9bb4b6b1fe1635a8471bf0e8;
 			};
 		};
 		AEB899B029B4F89A004361B8 /* XCRemoteSwiftPackageReference "async-http-client" */ = {

@@ -70,7 +70,7 @@ struct HomeView: View {
 		VStack {
 			CustomTitleBar(dbux:dbux)
 			Spacer()
-			UI.TimelineView(dbux:dbux, postsOnlyModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor, showReplies: false), withRepliesModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor, showReplies: true))
+			UI.TimelineView(dbux:dbux, postsOnlyModel:UI.TimelineViewModel(dbux:dbux, showReplies: false), withRepliesModel:UI.TimelineViewModel(dbux:dbux, showReplies: true))
 		}
 	}
 }
@@ -255,7 +255,7 @@ struct CustomTitleBar: View {
 		.frame(height: 44) // Set the height of the title bar
 		.background(Color(.systemBackground))
 		.sheet(isPresented:$showingCompose) {
-			UI.Events.NewPostView(dbux:dbux, isShowingSheet: $showingCompose)
+			UI.Events.NewPostView(dbux:dbux, profile: dbux.eventsEngine.profilesEngine.currentUserProfile, publicKey:dbux.keypair.pubkey, isShowingSheet: $showingCompose)
 		}
 	}
 }

@@ -72,40 +72,68 @@ extension UI.Events {
 			return baseFontSize * widthFactor
 		}
 
-		private func renderRichText() -> Result<AttributedString, Swift.Error> {
+		private func renderRichText() -> Result<(AttributedString, URL?), Swift.Error> {
 			do {
 				var attributedString = AttributedString(content)
-				let urlRegex = try Regex("((https|http)://)((\\w|-)+)(([.]|[/])((\\w|-)+))+")
+				let urlRegex = try Regex("(https?://[\\w-]+(\\.[\\w-]+)+([\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])?)")
 				let hashtagPattern = try Regex("#[\\p{L}0-9_]*")
+				let imageExtensions = ["jpg", "jpeg", "png", "gif"]
+				
+				var imageURL: URL?
 				
 				for curHTTPMatch in content.matches(of:urlRegex) {
-					let asAttributedRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString)!
-					attributedString[asAttributedRange].foregroundColor = .blue
-					attributedString[asAttributedRange].underlineStyle = .thick
+					let urlString = String(content[curHTTPMatch.range])
+					let urlExtension = urlString.split(separator: ".").last?.lowercased()
+					
+					if imageExtensions.contains(urlExtension ?? "") {
+						imageURL = URL(string: urlString)
+						if let asRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString) {
+							attributedString.replaceSubrange(asRange, with: AttributedString(""))
+						}
+					} else {
+						let asAttributedRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString)!
+						attributedString[asAttributedRange].foregroundColor = .blue
+						attributedString[asAttributedRange].underlineStyle = .thick
+					}
 				}
+				
 				for curHashTagMatch in content.matches(of:hashtagPattern) {
-					let asAttributedRange = Range<AttributedString.Index>(curHashTagMatch.range, in: attributedString)!
-					attributedString[asAttributedRange].foregroundColor = .purple
+					if let asAttributedRange = Range<AttributedString.Index>(curHashTagMatch.range, in: attributedString) {
+						attributedString[asAttributedRange].foregroundColor = .purple
+					}
 				}
-				return .success(attributedString)
+				
+				
+				return .success((attributedString, imageURL))
 			} catch let error {
 				return .failure(error)
 			}
 		}
+
 		
 		var body: some View {
-			Group {
-				switch renderRichText() {
-				case .success(let richText):
-					Text(richText)
-						.font(.body)
-						.foregroundColor(.primary)
-						.multilineTextAlignment(.leading)
-				case .failure:
-					Text(content) // Fallback to plain text if rich text rendering fails
+				VStack(alignment: .leading) {
+					Group {
+						switch renderRichText() {
+						case .success(let (richText, imageURL)):
+							Text(richText)
+								.font(.body)
+								.foregroundColor(.primary)
+								.multilineTextAlignment(.leading)
+							
+							if let imageURL = imageURL {
+								AsyncImage(url: imageURL) { image in
+									image.resizable().aspectRatio(contentMode: .fit)
+								} placeholder: {
+									ProgressView()
+								}
+							}
+						case .failure:
+							Text(content) // Fallback to plain text if rich text rendering fails
+						}
+					}
 				}
 			}
-		}
 	}
 }
 

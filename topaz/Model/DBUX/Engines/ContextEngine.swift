@@ -87,7 +87,7 @@ extension DBUX {
 			try newTrans.commit()
 		}
 
-		@Published var timelineAnchor:DBUX.DatedNostrEventUID? {
+		@MainActor @Published var timelineAnchor:DBUX.DatedNostrEventUID? {
 			willSet {
 				if let hasVal = newValue {
 					try! self.userContext.setEntry(value:hasVal, forKey:Contexts.timelineAnchor, tx:nil)
