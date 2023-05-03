@@ -376,9 +376,11 @@ extension UI {
 							if let hasLastEventDate = lastEvent {
 								if hasLastEventDate < curEv.1.created {
 									buildEvents.update(with:curEv.1)
+									buildKeys.update(with:curEv.1.pubkey)
 								}
 							} else {
 								buildEvents.update(with:curEv.1)
+								buildKeys.update(with:curEv.1.pubkey)
 							}
 						}
 					}
