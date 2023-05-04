@@ -129,7 +129,7 @@ struct UpperProfileView: View {
 		var body: some View {
 			VStack(alignment: .leading, spacing: 8) {
 				if let about = profile.about {
-					UI.Events.UserFacingTextContentView(content: about)
+					Text(about)
 						.padding(.horizontal, 16)
 				}
 

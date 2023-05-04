@@ -411,7 +411,7 @@ extension UI {
 		@ObservedObject var postsOnlyModel: TimelineViewModel
 		@ObservedObject var withRepliesModel: TimelineViewModel
 		@ObservedObject var context:DBUX.ContextEngine
-		
+		@State var selectedEvent:nostr.Event? = nil
 		@State var isShowing = false
 		
 		init(dbux:DBUX, postsOnlyModel:TimelineViewModel, withRepliesModel:TimelineViewModel) {
@@ -448,13 +448,19 @@ extension UI {
 							//								onAppearLoadingIndicator(model: postsOnlyModel, direction: .up, item: item).id("LOADING_TOP_IND")
 							//							}
 							
-							NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
-								EventViewCell(dbux: self.dbux, event: item.event, profile: item.profile).onAppear {
+//							NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
+							EventViewCell(dbux: self.dbux, event: item.event, profile: item.profile, selectedEvent:$selectedEvent).onAppear {
 									postsOnlyModel.beganShowing(item.event)
 								}.onDisappear {
 									postsOnlyModel.stoppedShowing(item.event)
+								}.onTapGesture {
+									if self.selectedEvent != item.event {
+										self.selectedEvent = item.event
+									} else {
+										self.selectedEvent = nil
+									}
 								}
-							}
+//							}
 							
 							//							if postsOnlyModel.posts.last?.id == item.id {
 							//								onAppearLoadingIndicator(model: postsOnlyModel, direction: .down, item: item).id("LOADING_BOTTOM_IND")
@@ -480,13 +486,19 @@ extension UI {
 							//								onAppearLoadingIndicator(model: withRepliesModel, direction: .up, item: item).id("LOADING_TOP_IND")
 							//							}
 							
-							NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
-								EventViewCell(dbux: dbux, event: item.event, profile: item.profile).onAppear {
+//							NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
+							EventViewCell(dbux: dbux, event: item.event, profile: item.profile, selectedEvent:$selectedEvent).onAppear {
 									withRepliesModel.beganShowing(item.event)
 								}.onDisappear {
 									withRepliesModel.stoppedShowing(item.event)
-								}
-							}
+								}.onTapGesture {
+									if self.selectedEvent != item.event {
+										self.selectedEvent = item.event
+									} else {
+										self.selectedEvent = nil
+									}
+								}.background(.clear)
+//							}
 							
 							//							if withRepliesModel.posts.last?.id == item.id {
 							//								onAppearLoadingIndicator(model: withRepliesModel, direction: .down, item: item).id("LOADING_BOTTOM_IND")

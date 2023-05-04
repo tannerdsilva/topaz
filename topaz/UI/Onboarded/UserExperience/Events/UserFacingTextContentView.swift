@@ -49,7 +49,7 @@ extension UI.Events {
 	}
 
 	struct UserFacingTextContentView: View {
-		let content: String
+		let event: nostr.Event
 		enum Segment: Hashable {
 			case text(String)
 			case url(String)
@@ -74,36 +74,44 @@ extension UI.Events {
 
 		private func renderRichText() -> Result<(AttributedString, URL?), Swift.Error> {
 			do {
+				var content = event.content
 				var attributedString = AttributedString(content)
 				let urlRegex = try Regex("(https?://[\\w-]+(\\.[\\w-]+)+([\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])?)")
-				let hashtagPattern = try Regex("#[\\p{L}0-9_]*")
+				let tagPlaceholderPattern = try Regex("#\\[(\\d+)\\]")
 				let imageExtensions = ["jpg", "jpeg", "png", "gif"]
-				
+
 				var imageURL: URL?
-				
+
+				// First, process tag placeholders
+				for (index, tag) in event.tags.enumerated() {
+					let placeholder = "#[\(index)]"
+					while let range = content.range(of: placeholder) {
+						let nsRange = NSRange(range, in: content)
+						if let asRange = Range<AttributedString.Index>(nsRange, in: attributedString) {
+							attributedString.replaceSubrange(asRange, with: AttributedString("#\(tag.info.first)"))
+						}
+						content = content.replacingCharacters(in: range, with: "#\(tag.info.first)")
+					}
+				}
+
+				// Next, process URLs
 				for curHTTPMatch in content.matches(of:urlRegex) {
 					let urlString = String(content[curHTTPMatch.range])
 					let urlExtension = urlString.split(separator: ".").last?.lowercased()
-					
+
 					if imageExtensions.contains(urlExtension ?? "") {
 						imageURL = URL(string: urlString)
 						if let asRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString) {
 							attributedString.replaceSubrange(asRange, with: AttributedString(""))
 						}
 					} else {
-						let asAttributedRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString)!
-						attributedString[asAttributedRange].foregroundColor = .blue
-						attributedString[asAttributedRange].underlineStyle = .thick
+						if let asAttributedRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString) {
+							attributedString[asAttributedRange].foregroundColor = .blue
+							attributedString[asAttributedRange].underlineStyle = .thick
+						}
 					}
 				}
-				
-				for curHashTagMatch in content.matches(of:hashtagPattern) {
-					if let asAttributedRange = Range<AttributedString.Index>(curHashTagMatch.range, in: attributedString) {
-						attributedString[asAttributedRange].foregroundColor = .purple
-					}
-				}
-				
-				
+
 				return .success((attributedString, imageURL))
 			} catch let error {
 				return .failure(error)
@@ -129,7 +137,7 @@ extension UI.Events {
 								}
 							}
 						case .failure:
-							Text(content) // Fallback to plain text if rich text rendering fails
+							Text(event.content) // Fallback to plain text if rich text rendering fails
 						}
 					}
 				}

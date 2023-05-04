@@ -125,14 +125,14 @@ struct ActionBarView: View {
 			}) {
 				Image(systemName: "arrowshape.turn.up.left")
 			}
-			.buttonStyle(PlainButtonStyle())
+			.foregroundColor(.blue)
 			Spacer()
 			Button(action: {
 				print("Repost tapped")
 			}) {
 				Image(systemName: "arrow.2.squarepath")
 			}
-			.buttonStyle(PlainButtonStyle())
+			.foregroundColor(.blue)
 			Spacer()
 			Button(action: {
 				isLiked.toggle()
@@ -140,7 +140,7 @@ struct ActionBarView: View {
 			}) {
 				Image(systemName: isLiked ? "heart.fill" : "heart")
 			}
-			.buttonStyle(PlainButtonStyle())
+			.foregroundColor(.blue)
 			Spacer()
 			Button(action: {
 				walletAction.toggle()
@@ -148,16 +148,20 @@ struct ActionBarView: View {
 			}) {
 				Image(systemName: "dollarsign.circle")
 			}
-			.buttonStyle(PlainButtonStyle())
+			.foregroundColor(.blue)
 			Spacer()
 			Button(action: {
 				print("Share tapped")
 			}) {
 				Image(systemName: "square.and.arrow.up")
 			}
-			.buttonStyle(PlainButtonStyle())
+			.foregroundColor(.blue)
 		}
 		.font(.system(size: 20))
+				.padding(.horizontal, 8)
+				.padding(.vertical, 4)
+//				.background(BubbleShape().fill(Color.gray.opacity(0.15)))
+				.shadow(radius: 8)
 	}
 }
 
@@ -166,7 +170,8 @@ struct EventViewCell: View {
 	let dbux:DBUX
 	let event: nostr.Event
 	let profile: nostr.Profile?
-
+	@Binding var selectedEvent:nostr.Event?
+	@Environment(\.colorScheme) var colorScheme
 	var dateFormatter: DateFormatter {
 		let formatter = DateFormatter()
 		formatter.dateStyle = .medium
@@ -216,18 +221,36 @@ struct EventViewCell: View {
 		}
 	}
 	var body: some View {
-		VStack(alignment: .leading, spacing: 8) {
-			profileHStack
-			
-			UI.Events.UserFacingTextContentView(content: event.content)
-			
-			HStack {
-				ActionBarView()
+		   VStack(alignment: .leading, spacing: 8) {
+			   profileHStack
+
+			   UI.Events.UserFacingTextContentView(event: event)
+
+			   if self.selectedEvent == event {
+				   HStack {
+					   ActionBarView()
+				   }
+			   }
+		   }
+		   .padding()
+		   .background(selectedEvent == event ? highlightColor : Color.clear)
+			.onTapGesture {
+			   withAnimation {
+				   self.selectedEvent = self.selectedEvent == event ? nil : event
+			   }
+		   }
+	   }
+	
+	var highlightColor: Color {
+			switch colorScheme {
+			case .dark:
+				return Color.white.opacity(0.15)
+			case .light:
+				return Color.black.opacity(0.15)
+			@unknown default:
+				return Color.black.opacity(0.15)
 			}
 		}
-		.padding()
-		.background(Color(.systemBackground))
-	}
 }
 
 struct CustomTitleBar: View {
