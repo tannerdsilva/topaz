@@ -167,6 +167,7 @@
 		AE1A59CD29B7C02D00D21AA0 /* Scheduler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Scheduler.swift; sourceTree = "<group>"; };
 		AE1A59D029B7D2E300D21AA0 /* Subscribe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subscribe.swift; sourceTree = "<group>"; };
 		AE1A59D229B7E85200D21AA0 /* Filter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Filter.swift; sourceTree = "<group>"; };
+		AE1D71CE2A03FBEB00A01218 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AE26C07429B4F77600B85600 /* topaz.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = topaz.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE26C07B29B4F77700B85600 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AE26C07D29B4F77700B85600 /* topaz.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = topaz.entitlements; sourceTree = "<group>"; };
@@ -373,6 +374,7 @@
 		AE26C07629B4F77600B85600 /* topaz */ = {
 			isa = PBXGroup;
 			children = (
+				AE1D71CE2A03FBEB00A01218 /* Info.plist */,
 				AE421C7829BE3050009CB737 /* Extensions */,
 				AEB39B7229B5401F00F3C92E /* App */,
 				AEB39B7129B5400000F3C92E /* nostr */,
@@ -1018,6 +1020,7 @@
 				DEVELOPMENT_TEAM = 32J6BB6VUS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = topaz/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = topaz;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -1034,7 +1037,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.6.12;
+				MARKETING_VERSION = 0.6.14;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1059,6 +1062,7 @@
 				DEVELOPMENT_TEAM = 32J6BB6VUS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = topaz/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = topaz;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -1075,7 +1079,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.6.12;
+				MARKETING_VERSION = 0.6.14;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
