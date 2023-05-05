@@ -261,32 +261,29 @@ public class DBUX:Based {
 		let myFriends = try self.eventsEngine.followsEngine.getFollows(pubkey:self.keypair.pubkey, tx:newTransaction)
 		try newTransaction.commit()
 		
-		let friendString = myFriends.compactMap({ $0.description })
-		
 		// build the contacts filter
 		var metadataFilter = nostr.Filter()
-		metadataFilter.authors = Array(friendString)
+		metadataFilter.authors = myFriends
 		metadataFilter.kinds = [.metadata]
 		
 		var contactsFilter = nostr.Filter()
-		contactsFilter.authors = Array(friendString)
+		contactsFilter.authors = myFriends
 		contactsFilter.kinds = [.contacts]
 		
 		var homeFilter = nostr.Filter()
 		homeFilter.kinds = [.text_note]
-		homeFilter.authors = Array(friendString)
+		homeFilter.authors = myFriends
 		
 		// build "blocklist" filter
 		var blocklistFilter = nostr.Filter()
 		blocklistFilter.kinds = [.list_categorized]
 		blocklistFilter.parameter = ["mute"]
-		blocklistFilter.authors = [self.keypair.pubkey.description]
-
+		blocklistFilter.authors = Set([self.keypair.pubkey])
 
 		// build "our" dms filter
 		var ourDMsFilter = nostr.Filter()
 		ourDMsFilter.kinds = [.dm]
-		ourDMsFilter.authors = [self.keypair.pubkey.description]
+		ourDMsFilter.authors = Set([self.keypair.pubkey])
 
 		// // create "notifications" filter
 		// var notificationsFilter = nostr.Filter()
@@ -652,16 +649,16 @@ extension DBUX {
 	static func generateMainSubscription(pubkey:nostr.Key, following:Set<nostr.Key>) -> nostr.Subscribe {
 		// build the contacts filter
 		var metadataFilter = nostr.Filter()
-		metadataFilter.authors = Array(following.compactMap { $0.description })
+		metadataFilter.authors = following
 		metadataFilter.kinds = [.metadata]
 		
 		var contactsFilter = nostr.Filter()
-		contactsFilter.authors = Array(following.compactMap { $0.description })
+		contactsFilter.authors = following
 		contactsFilter.kinds = [.contacts]
 		
 		var homeFilter = nostr.Filter()
 		homeFilter.kinds = [.text_note]
-		homeFilter.authors = Array(following.compactMap { $0.description })
+		homeFilter.authors = following
 		return nostr.Subscribe(sub_id: "_ux_home_\(pubkey.description.prefix(10))", filters: [metadataFilter, contactsFilter, homeFilter])
 	}
 }

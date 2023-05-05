@@ -28,7 +28,7 @@ extension nostr {
 		/// The subscription ID
 		let sub_id:String
 		/// The filters to apply to the subscription
-		let filters:[Filter]
+		let filters:Set<Filter>
 	}
 
 	enum Subscription:Codable {
@@ -58,7 +58,7 @@ extension nostr {
 					while container.isAtEnd == false {
 						filters.append(try container.decode(Filter.self))
 					}
-					self = .subscribe(Subscribe(sub_id: sub_id, filters:filters))
+					self = .subscribe(Subscribe(sub_id: sub_id, filters:Set(filters)))
 				case "CLOSE":
 					let sub_id = try container.decode(String.self)
 					self = .unsubscribe(sub_id)

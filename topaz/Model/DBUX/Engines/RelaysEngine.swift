@@ -38,15 +38,17 @@ extension DBUX {
 		@MainActor @Published public private(set) var userRelayConnections = [String:RelayConnection]()
 		// stores the relay connection states for the current user
 		@MainActor @Published public private(set) var userRelayConnectionStates = [String:RelayConnection.State]()
-
 		@MainActor public func getConnectionsAndStates() -> ([String:RelayConnection], [String:RelayConnection.State]) {
 			return (self.userRelayConnections, self.userRelayConnectionStates)
 		}
+		@MainActor @Published public private(set) var relaySyncStates = [String:[String:Bool]]()
 		
 		private let eventChannel:AsyncChannel<RelayConnection.EventCapture>
 		private let stateChannel:AsyncChannel<RelayConnection.StateChangeEvent>
+		private let subscriptionsChannel:AsyncChannel<RelayConnection.SubscriptionChangeEvent>
+		
 		private var digestTask:Task<Void, Never>? = nil
-
+		
 		let pubkey_relays_asof:Database
 		let pubkey_relayHash:Database
 		let relayHash_pubKey:Database
@@ -69,13 +71,15 @@ extension DBUX {
 			self.pubkey_relayHash = try env.openDatabase(named:Databases.pubkey_relayHash.rawValue, flags:[.create, .dupSort], tx:subTrans)
 			self.relayHash_pubKey = try env.openDatabase(named:Databases.relayHash_pubKey.rawValue, flags:[.create, .dupSort], tx:subTrans)
 			self.relayHash_relayString = try env.openDatabase(named:Databases.relayHash_relayString.rawValue, flags:[.create], tx:subTrans)
-
+			
 			self.relayHash_pendingEvents = try env.openDatabase(named:Databases.relayHash_pendingEvents.rawValue, flags:[.create], tx:subTrans)
 			self.relayHash_currentSubscriptions = try env.openDatabase(named:Databases.relayHash_currentSubscriptions.rawValue, flags:[.create], tx:subTrans)
 			let eventC = AsyncChannel<RelayConnection.EventCapture>()
 			let stateC = AsyncChannel<RelayConnection.StateChangeEvent>()
+			let subC = AsyncChannel<RelayConnection.SubscriptionChangeEvent>()
 			self.eventChannel = eventC
 			self.stateChannel = stateC
+			self.subscriptionsChannel = subC
 			try self.relayHash_currentSubscriptions.deleteAllEntries(tx:subTrans)
 			let getRelays:Set<String>
 			do {
@@ -104,7 +108,7 @@ extension DBUX {
 			var buildConnections = [String:RelayConnection]()
 			var buildStates = [String:RelayConnection.State]()
 			for curRelay in getRelays {
-				let newConnection = RelayConnection(url:curRelay, stateChannel:stateC, eventChannel:eventC)
+				let newConnection = RelayConnection(url:curRelay, stateChannel:stateC, eventChannel:eventC, subscriptionChannel: subC)
 				buildConnections[curRelay] = newConnection
 				buildStates[curRelay] = .disconnected
 			}
@@ -113,8 +117,8 @@ extension DBUX {
 			try subTrans.commit()
 			try env.sync()
 			
-			self.digestTask = Task.detached { [weak self, sc = stateC, newEnv = env, logThing = newLogger, eventC = eventC, pk = self.pubkey, rhCS = self.relayHash_currentSubscriptions, holder = self.holder] in
-				await withThrowingTaskGroup(of:Void.self, body: { [weak self, sc = sc, newEnv = newEnv, ec = eventC, holder = holder] tg in
+			self.digestTask = Task.detached { [weak self, sc = stateC, newEnv = env, logThing = newLogger, eventC = eventC, pk = self.pubkey, rhCS = self.relayHash_currentSubscriptions, holder = self.holder, subC = subC] in
+				await withThrowingTaskGroup(of:Void.self, body: { [weak self, sc = sc, newEnv = newEnv, ec = eventC, holder = holder, subc = subC] tg in
 					// status
 					tg.addTask { [weak self, sc = sc, newEnv = newEnv] in
 						try await withTaskCancellationHandler(operation: {
@@ -127,7 +131,7 @@ extension DBUX {
 									do {
 										var ourContactsFilter = nostr.Filter()
 										ourContactsFilter.kinds = [.metadata, .contacts]
-										ourContactsFilter.authors = [pk.description]
+										ourContactsFilter.authors = [pk]
 
 										let makeSub = nostr.Subscribe.init(sub_id:"-ux-self-", filters: [ourContactsFilter])
 										try await curChanger.send(.subscribe(makeSub))
@@ -169,6 +173,29 @@ extension DBUX {
 							}
 						}, onCancel: {
 							ec.finish()
+						})
+					}
+					
+					// sync info
+					tg.addTask { [weak self, sc = subc] in
+						await withTaskCancellationHandler(operation: {
+							for await curEvent in sc {
+								logThing.info("relay info updated: '\(curEvent.0.url)'.", metadata:["all":"\(curEvent.1.count)", "eose":"\(curEvent.2.count)"])
+								var buildEvent = [String:Bool]()
+								for curSub in curEvent.1 {
+									if curEvent.2.contains(curSub) {
+										buildEvent[curSub] = true
+									} else {
+										buildEvent[curSub] = false
+									}
+								}
+								Task.detached { @MainActor [weak self, url = curEvent.0.url, be = buildEvent] in
+									await self?.relaySyncStates[url] = be
+								}
+								
+							}
+						}, onCancel: {
+							sc.finish()
 						})
 					}
 				})
@@ -267,7 +294,7 @@ extension DBUX {
 				let existingConnections = Set(self.userRelayConnections.keys)
 				let connectionsDelta = Delta(start:existingConnections, end:newConnections)
 				for curRelay in connectionsDelta.exclusiveEnd {
-					self.userRelayConnections[curRelay] = RelayConnection(url:curRelay, stateChannel:self.stateChannel, eventChannel:self.eventChannel)
+					self.userRelayConnections[curRelay] = RelayConnection(url:curRelay, stateChannel:self.stateChannel, eventChannel:self.eventChannel, subscriptionChannel:self.subscriptionsChannel)
 					self.userRelayConnectionStates[curRelay] = RelayConnection.State.disconnected
 				}
 				for curRelay in connectionsDelta.exclusiveStart {

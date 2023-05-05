@@ -99,17 +99,17 @@ extension UI.Events {
 					let urlString = String(content[curHTTPMatch.range])
 					let urlExtension = urlString.split(separator: ".").last?.lowercased()
 
-					if imageExtensions.contains(urlExtension ?? "") {
-						imageURL = URL(string: urlString)
-						if let asRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString) {
-							attributedString.replaceSubrange(asRange, with: AttributedString(""))
-						}
-					} else {
-						if let asAttributedRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString) {
-							attributedString[asAttributedRange].foregroundColor = .blue
-							attributedString[asAttributedRange].underlineStyle = .thick
-						}
-					}
+//					if imageExtensions.contains(urlExtension ?? "") {
+//						imageURL = URL(string: urlString)
+//						if let asRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString) {
+//							attributedString.replaceSubrange(asRange, with: AttributedString(""))
+//						}
+//					} else {
+//						if let asAttributedRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString) {
+//							attributedString[asAttributedRange].foregroundColor = .blue
+//							attributedString[asAttributedRange].underlineStyle = .thick
+//						}
+//					}
 				}
 
 				return .success((attributedString, imageURL))

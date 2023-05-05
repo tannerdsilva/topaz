@@ -93,7 +93,6 @@ extension nostr {
 			case channel_create = 8
 			case channel_meta = 9
 			case chat = 42
-			case group_dm = 2467
 			case list = 40000 // (?)
 			case zap = 9735
 			case zap_request = 9734

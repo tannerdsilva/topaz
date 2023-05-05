@@ -57,9 +57,8 @@ extension UI.Relays {
 	}
 	
 	struct SyncStatusWidget: View {
-		
-		let dbux:DBUX
-		@ObservedObject var relays:DBUX.RelaysEngine
+		let dbux: DBUX
+		@ObservedObject var relays: DBUX.RelaysEngine
 		@State private var isTextVisible = false
 		@State var showModal = false
 		
@@ -67,16 +66,24 @@ extension UI.Relays {
 			GeometryReader { geometry in
 				let circleSize: CGFloat = 6
 				let spacing: CGFloat = 4
-				let succ = relays.userRelayConnectionStates.sorted(by: { $0.key < $1.key }).compactMap({ $0.value })
-				let connCount = succ.filter { $0 == .connected }
-				
+
+				// Get the relaySyncStates and calculate the progress
+				let relaySyncStates = relays.relaySyncStates
+				let totalCount = relaySyncStates.values.reduce(0) { sum, dict in
+					sum + dict.count
+				}
+				let trueCount = relaySyncStates.values.reduce(0) { sum, dict in
+					sum + dict.values.filter { $0 }.count
+				}
+				let progress = totalCount > 0 ? Double(trueCount) / Double(totalCount) : 0
+
 				VStack {
-						ProgressRingShape(progress: Double(connCount.count) / Double(succ.count))
-							.stroke(Color.cyan, lineWidth: 4)
-							.frame(width: 22, height: 22)
+					ProgressRingShape(progress: progress)
+						.stroke(Color.cyan, lineWidth: 4)
+						.frame(width: 22, height: 22)
 
 					if isTextVisible {
-						Text("\(connCount.count)/\(succ.count)")
+						Text("\(trueCount)/\(totalCount)")
 							.font(.system(size: 12))
 							.foregroundColor(.white)
 							.transition(.opacity)
@@ -102,6 +109,7 @@ extension UI.Relays {
 			}
 		}
 	}
+
 }
 
 extension UI.Relays {
