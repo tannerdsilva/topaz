@@ -72,15 +72,14 @@ extension UI.Events {
 			return baseFontSize * widthFactor
 		}
 
-		private func renderRichText() -> Result<(AttributedString, URL?), Swift.Error> {
+		private func renderRichText() -> Result<(AttributedString, [URL]), Swift.Error> {
 			do {
 				var content = event.content
 				var attributedString = AttributedString(content)
 				let urlRegex = try Regex("(https?://[\\w-]+(\\.[\\w-]+)+([\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])?)")
-				let tagPlaceholderPattern = try Regex("#\\[(\\d+)\\]")
 				let imageExtensions = ["jpg", "jpeg", "png", "gif"]
 
-				var imageURL: URL?
+				var imageURLs: [URL] = []
 
 				// First, process tag placeholders
 				for (index, tag) in event.tags.enumerated() {
@@ -88,35 +87,41 @@ extension UI.Events {
 					while let range = content.range(of: placeholder) {
 						let nsRange = NSRange(range, in: content)
 						if let asRange = Range<AttributedString.Index>(nsRange, in: attributedString) {
-							attributedString.replaceSubrange(asRange, with: AttributedString("#\(tag.info.first)"))
+							let replacement = AttributedString("@\(tag.info.first)")
+							attributedString.replaceSubrange(asRange, with: replacement)
 						}
-						content = content.replacingCharacters(in: range, with: "#\(tag.info.first)")
+						content.replaceSubrange(range, with: "@\(tag.info.first)")
 					}
 				}
 
 				// Next, process URLs
-				for curHTTPMatch in content.matches(of:urlRegex) {
+				for curHTTPMatch in content.matches(of: urlRegex) {
 					let urlString = String(content[curHTTPMatch.range])
 					let urlExtension = urlString.split(separator: ".").last?.lowercased()
 
-//					if imageExtensions.contains(urlExtension ?? "") {
-//						imageURL = URL(string: urlString)
-//						if let asRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString) {
-//							attributedString.replaceSubrange(asRange, with: AttributedString(""))
-//						}
-//					} else {
-//						if let asAttributedRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString) {
-//							attributedString[asAttributedRange].foregroundColor = .blue
-//							attributedString[asAttributedRange].underlineStyle = .thick
-//						}
-//					}
+					let nsRange = NSRange(curHTTPMatch.range, in: content)
+					if let asRange = Range<AttributedString.Index>(nsRange, in: attributedString) {
+						if imageExtensions.contains(urlExtension ?? "") {
+							if let imageURL = URL(string: urlString) {
+								imageURLs.append(imageURL)
+								attributedString.replaceSubrange(asRange, with: AttributedString(""))
+							}
+						} else {
+							attributedString[asRange].foregroundColor = .blue
+							attributedString[asRange].underlineStyle = .thick
+						}
+					} else {
+						print("Error: Invalid range for URL \(urlString)")
+					}
 				}
 
-				return .success((attributedString, imageURL))
+				return .success((attributedString, imageURLs))
 			} catch let error {
 				return .failure(error)
 			}
 		}
+
+
 
 		
 		var body: some View {
@@ -129,8 +134,8 @@ extension UI.Events {
 								.foregroundColor(.primary)
 								.multilineTextAlignment(.leading)
 							
-							if let imageURL = imageURL {
-								AsyncImage(url: imageURL) { image in
+							if let imageURL = imageURL.first {
+								UnstoredAsyncImage(url: imageURL) { image in
 									image.resizable().aspectRatio(contentMode: .fit)
 								} placeholder: {
 									ProgressView()

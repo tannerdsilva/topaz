@@ -15,49 +15,51 @@ extension UI.Events {
 		let publicKey: nostr.Key
 		@Binding var isShowingSheet: Bool
 		@State private var postContent = ""
-
+		
 		var body: some View {
-			NavigationView {
-				VStack {
-					HStack {
-						// Profile picture
-						if let profilePicture = profile?.picture, let url = URL(string: profilePicture) {
-							CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
-								image
-									.resizable()
-									.aspectRatio(contentMode: .fill)
-							} placeholder: {
-								ProgressView()
-							}
-							.frame(width: 40, height: 40)
-							.clipShape(Circle())
-						} else {
-							Image(systemName: "person.crop.circle.fill")
-								.resizable()
-								.frame(width: 40, height: 40)
-								.foregroundColor(.gray)
-						}
-						Text("Compose a New Post")
-							.font(.title)
-							.padding()
+			VStack {
+				HStack() {
+					VStack(alignment: .center) {
+						Button("Cancel", action: {
+							isShowingSheet.toggle()
+						})
 					}
-					.padding(.top)
-
-					TextEditor(text: $postContent)
-						.padding()
-						.overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray, lineWidth: 1))
-						.padding(.horizontal)
-
 					Spacer()
+					VStack(alignment: .center) {
+						if (self.postContent.count > 0) {
+							SendButton {
+								do {
+									try dbux.sendTextNoteContentToAllRelays(postContent)
+									isShowingSheet.toggle()
+								} catch {}
+							}.border(.pink)
+						}
+					}.padding().frame(height:45).border(.purple)
 				}
-				.navigationBarItems(trailing: SendButton {
-					do {
-						try dbux.sendTextNoteContentToAllRelays(postContent)
-						isShowingSheet.toggle()
-					} catch {}
-				})
-				.background(Color(UIColor.systemGroupedBackground))
-				.edgesIgnoringSafeArea(.bottom)
+				HStack(alignment:.top) {
+					// Profile picture
+					if let profilePicture = profile?.picture, let url = URL(string: profilePicture) {
+						CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
+							image
+								.resizable()
+								.aspectRatio(contentMode: .fill)
+						} placeholder: {
+							ProgressView()
+						}
+						.frame(width: 40, height: 40)
+						.clipShape(Circle())
+					} else {
+						Image(systemName: "person.crop.circle.fill")
+							.resizable()
+							.frame(width: 40, height: 40)
+							.foregroundColor(.gray)
+					}
+					VStack {
+						TextEditor(text: $postContent)
+							.padding()
+							.padding(.horizontal)
+					}.border(.cyan)
+				}.border(.yellow)
 			}
 		}
 	}

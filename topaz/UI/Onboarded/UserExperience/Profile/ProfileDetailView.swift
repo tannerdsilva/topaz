@@ -77,39 +77,94 @@ struct UpperProfileView: View {
 		}
 	}
 	
-	struct DisplayNameView: View {
+	struct ProfileFullNameView: View {
 		var displayName: String?
 		var userName: String?
-		var isVerified: Bool
-
-		init(displayName: String?, userName: String?, isVerified: Bool = false) {
-			self.displayName = displayName
-			self.userName = userName
-			self.isVerified = isVerified
-		}
+		var displayEmojis: Bool
+		var isVerified: Bool = false
+		var isPrimary: Bool
 
 		var body: some View {
-			VStack(alignment: .leading, spacing: 2) {
-				HStack(spacing: 4) {
-					Text(displayName ?? userName ?? "Unknown")
-						.font(.headline)
-						.fontWeight(.semibold)
+			HStack(spacing: 4) {
+				let name = displayName ?? userName ?? "Unknown"
+				Text(displayEmojis ? name : name.noEmoji)
+					.font(isPrimary ? .headline : .subheadline)
+					.foregroundColor(isPrimary ? Color.primary : .gray.opacity(0.6))
+					.fontWeight(isPrimary ? .semibold : .regular)
 
-					if isVerified {
-						Image(systemName: "checkmark.circle.fill")
-							.foregroundColor(.blue)
-							.font(.system(size: 18))
-					}
-				}
-
-				if let name = userName {
-					Text("@\(name)")
-						.font(.subheadline)
-						.foregroundColor(.gray)
+				if isVerified && isPrimary {
+					Image(systemName: "checkmark.circle.fill")
+						.foregroundColor(.blue)
+						.font(.system(size: 18))
 				}
 			}
 		}
 	}
+
+	struct ProfileUsernameView: View {
+		var userName: String?
+		var isVerified: Bool = false
+		var isPrimary: Bool
+
+		var body: some View {
+			HStack(spacing: 2) {
+				Image(systemName: "at")
+					.foregroundColor(isPrimary ? .gray : .gray.opacity(0.6))
+					.font(.system(size: isPrimary ? 12 : 8))
+					.opacity(0.5)
+
+				let cleanUserName = (userName ?? "Unknown").noEmoji
+				Text(cleanUserName)
+					.font(isPrimary ? .headline : .subheadline)
+					.foregroundColor(isPrimary ? Color.primary : .gray.opacity(0.6))
+					.fontWeight(isPrimary ? .semibold : .regular)
+
+				if isVerified && isPrimary {
+					Image(systemName: "checkmark.circle.fill")
+						.foregroundColor(.blue)
+						.font(.system(size: 18))
+				}
+			}
+		}
+	}
+
+
+	struct DisplayNameView: View {
+		let dbux: DBUX
+		var displayName: String?
+		var userName: String?
+		var isVerified: Bool
+		@ObservedObject var contextEngine: DBUX.ContextEngine
+		
+		init(dbux: DBUX, displayName: String?, userName: String?, isVerified: Bool = false) {
+			self.dbux = dbux
+			contextEngine = dbux.contextEngine
+			self.displayName = displayName
+			self.userName = userName
+			self.isVerified = isVerified
+		}
+		
+		var body: some View {
+			VStack(alignment: .leading, spacing: 2) {
+						let appearanceSettings = contextEngine.userPreferences.appearanceSettings
+						let namePriority = appearanceSettings.namePriorityPreference
+						let displayEmojis = appearanceSettings.displayEmojisInNames
+
+						if namePriority == .fullNamePreferred {
+							ProfileFullNameView(displayName: displayName, userName: userName, displayEmojis: displayEmojis, isVerified: isVerified, isPrimary: true)
+							if let username = userName {
+								ProfileUsernameView(userName: username, isPrimary: false)
+							}
+						} else {
+							ProfileUsernameView(userName: userName ?? "Unknown", isVerified: isVerified, isPrimary: true)
+							if let fullname = displayName {
+								ProfileFullNameView(displayName: fullname, displayEmojis: displayEmojis, isPrimary: false)
+							}
+						}
+					}
+			}
+	}
+
 	
 	struct ProfileInfoView: View {
 		let profile: nostr.Profile
@@ -186,7 +241,7 @@ struct UpperProfileView: View {
 						 VStack(alignment: .trailing) {
 							 if (dbux.keypair.pubkey == pubkey) {
 								 HStack {
-									 NavigationLink(destination: UI.UserExperienceSettingsScreen()) { // Replace with the destination view for your settings
+									 NavigationLink(destination: UI.UserExperienceSettingsScreen(dbux:dbux)) { // Replace with the destination view for your settings
 										 Image(systemName: "gear")
 											 .font(.system(size: 18)) // Adjust the font size to make the button smaller
 											 .foregroundColor(.white)
@@ -216,7 +271,7 @@ struct UpperProfileView: View {
 								 ProfilePictureView(dbux:dbux, pictureURL: URL(string: profile.picture ?? ""))
 									 .padding(.trailing, 8)
 								 
-								 DisplayNameView(displayName: profile.display_name, userName: profile.name, isVerified: profile.nip05 != nil)
+								 DisplayNameView(dbux:dbux, displayName: profile.display_name, userName: profile.name, isVerified: profile.nip05 != nil)
 								 
 								 HStack {
 									 Spacer()

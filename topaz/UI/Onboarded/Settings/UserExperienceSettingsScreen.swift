@@ -9,6 +9,7 @@ import SwiftUI
 
 extension UI {
 	struct UserExperienceSettingsScreen: View {
+		let dbux:DBUX
 		struct SettingsRow: View {
 			var icon: String
 			var title: String
@@ -34,7 +35,9 @@ extension UI {
 					NavigationLink(destination: UI.NotificationsSettingsView()) {
 						SettingsRow(icon: "bell", title: "Notifications")
 					}
-					SettingsRow(icon: "paintbrush", title: "Appearance")
+					NavigationLink(destination:UI.UserPreferences.AppearanceScreen(dbux:dbux)) {
+						SettingsRow(icon: "paintbrush", title: "Appearance")
+					}
 					NavigationLink(destination: UI.OpenAISettingsView()) {
 						SettingsRow(icon: "brain", title: "OpenAI")
 					}

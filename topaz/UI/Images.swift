@@ -8,6 +8,74 @@
 import Foundation
 import SwiftUI
 
+struct UnstoredAsyncImage<Content: View, Placeholder: View>: View {
+	@ObservedObject var viewModel: CustomAsyncImageViewModel
+	private let url: URL
+	private let placeholder: () -> Placeholder
+	private let content: (Image) -> Content
+
+	init(url: URL, @ViewBuilder content: @escaping (_ image: Image) -> Content, @ViewBuilder placeholder: @escaping () -> Placeholder) {
+		self.url = url
+		self.placeholder = placeholder
+		self.content = content
+		self.viewModel = ImageRequestActor.globalRequestor.getViewModel(url: url)
+	}
+
+   var body: some View {
+	   Group {
+		   if let image = viewModel.image {
+			   content(image)
+		   } else {
+			   placeholder()
+		   }
+	   }
+	   .task(id: url) { @MainActor in
+
+		   await viewModel.loadImage()
+	   }
+   }
+}
+
+class ImageRequestActor {
+	static let globalRequestor = ImageRequestActor()
+	private var ongoingRequests: [URL: CustomAsyncImageViewModel] = [:]
+
+	@MainActor func getViewModel(url: URL) -> CustomAsyncImageViewModel {
+		if let existingViewModel = ongoingRequests[url] {
+			return existingViewModel
+		} else {
+			let viewModel = CustomAsyncImageViewModel(url: url)
+			ongoingRequests[url] = viewModel
+			return viewModel
+		}
+	}
+}
+
+
+class CustomAsyncImageViewModel: ObservableObject {
+	@Published var image: Image? = nil
+	private let url: URL
+	private static let imageRequestActor = ImageRequestActor()
+	
+	init(url: URL) {
+		self.url = url
+	}
+	
+	func loadImage() async {
+		if image == nil {
+			do {
+				let imageData = try await HTTP.getContent(url: url)
+				if let uiImage = UIImage(data: imageData.0) {
+					image = Image(uiImage: uiImage)
+				}
+			} catch {
+				print("Error loading image: \(error)")
+			}
+		}
+	}
+}
+
+
 struct CachedAsyncImage<Content: View, Placeholder: View>: View {
 	@StateObject private var viewModel: CachedAsyncImageViewModel
 	private let content: (_ image: Image) -> Content
@@ -53,7 +121,7 @@ final class CachedAsyncImageViewModel: ObservableObject {
 		guard image == nil else { return }
 		do {
 			let getImage = try await imageCache.loadImage(from: url, using: loadContentTypeAndImageData)
-			Task.detached { @MainActor [weak self, gi = getImage] in
+		Task.detached { @MainActor [weak self, gi = getImage] in
 				guard let self = self else { return }
 				self.image = gi
 			}

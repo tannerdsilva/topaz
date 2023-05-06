@@ -170,8 +170,11 @@ struct EventViewCell: View {
 	let dbux:DBUX
 	let event: nostr.Event
 	let profile: nostr.Profile?
+	let showActions:Bool
 	@Binding var selectedEvent:nostr.Event?
+	
 	@Environment(\.colorScheme) var colorScheme
+	
 	var dateFormatter: DateFormatter {
 		let formatter = DateFormatter()
 		formatter.dateStyle = .medium
@@ -202,44 +205,53 @@ struct EventViewCell: View {
 			}
 			
 			VStack(alignment: .leading, spacing: 2) {
-				HStack(spacing: 4) {
-					DisplayNameText(text: profile?.display_name ?? profile?.name ?? "Unknown")
-					
-					if profile?.nip05 != nil {
-						Image(systemName: "checkmark.circle.fill")
-							.foregroundColor(.blue)
-							.font(.system(size: 18))
-					}
-				}
-				
-				Text("@\(profile?.name ?? "unknown")")
-					.font(.subheadline)
-					.foregroundColor(.gray)
+				UpperProfileView.DisplayNameView(dbux:dbux, displayName:profile?.display_name, userName:profile?.name, isVerified:profile?.nip05 != nil)
 			}
 			Spacer()
 			RelativeDateDisplay(date: event.created)
 		}
 	}
-	var body: some View {
-		   VStack(alignment: .leading, spacing: 8) {
-			   profileHStack
+	var withHiddenActionButton: some View {
+	   VStack(alignment: .leading, spacing: 8) {
+		   profileHStack
 
-			   UI.Events.UserFacingTextContentView(event: event)
+		   UI.Events.UserFacingTextContentView(event: event)
 
-			   if self.selectedEvent == event {
-				   HStack {
-					   ActionBarView()
-				   }
-			   }
-		   }
-		   .padding()
-		   .background(selectedEvent == event ? highlightColor : Color.clear)
-			.onTapGesture {
-			   withAnimation {
-				   self.selectedEvent = self.selectedEvent == event ? nil : event
+		   if self.selectedEvent == event {
+			   HStack {
+				   ActionBarView()
 			   }
 		   }
 	   }
+	   .padding()
+	   .background(selectedEvent == event ? highlightColor : Color.clear)
+		.onTapGesture {
+		   withAnimation {
+			   self.selectedEvent = self.selectedEvent == event ? nil : event
+		   }
+	   }
+   }
+	
+	var withAlwaysShownActionButtons: some View {
+		VStack(alignment: .leading, spacing: 8) {
+			profileHStack
+
+			UI.Events.UserFacingTextContentView(event: event)
+
+			HStack {
+				ActionBarView()
+			}
+		}
+		.padding()
+	}
+	
+	var body:some View {
+		if self.showActions {
+			withAlwaysShownActionButtons
+		} else {
+			withHiddenActionButton
+		}
+	}
 	
 	var highlightColor: Color {
 			switch colorScheme {

@@ -449,7 +449,7 @@ extension UI {
 							//							}
 							
 //							NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
-							EventViewCell(dbux: self.dbux, event: item.event, profile: item.profile, selectedEvent:$selectedEvent).onAppear {
+							EventViewCell(dbux: self.dbux, event: item.event, profile: item.profile, showActions:context.userPreferences.appearanceSettings.alwaysShowEventActions, selectedEvent:$selectedEvent).onAppear {
 									postsOnlyModel.beganShowing(item.event)
 								}.onDisappear {
 									postsOnlyModel.stoppedShowing(item.event)
@@ -487,7 +487,7 @@ extension UI {
 							//							}
 							
 //							NavigationLink(destination: EventDetailView(event: item.event, profile: item.profile)) {
-							EventViewCell(dbux: dbux, event: item.event, profile: item.profile, selectedEvent:$selectedEvent).onAppear {
+							EventViewCell(dbux: dbux, event: item.event, profile: item.profile, showActions: context.userPreferences.appearanceSettings.alwaysShowEventActions, selectedEvent:$selectedEvent).onAppear {
 									withRepliesModel.beganShowing(item.event)
 								}.onDisappear {
 									withRepliesModel.stoppedShowing(item.event)

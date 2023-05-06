@@ -15,6 +15,21 @@ import AsyncAlgorithms
 extension DBUX {
 	class ContextEngine:ObservableObject, ExperienceEngine {
 		
+		// all of the configurable preferences that a user may specify
+		struct UserPreferences:Codable {
+			struct Appearance:Codable {
+				enum NamePriorityPreference:UInt8, Codable {
+					case fullNamePreferred = 0
+					case usernamePreferred = 1
+				}
+				var alwaysShowEventActions = true
+				var displayEmojisInNames = true
+				var namePriorityPreference = NamePriorityPreference.usernamePreferred
+				var doNotShowIdenticalNames = false
+			}
+			var appearanceSettings = Appearance()
+		}
+		
 		typealias NotificationType = DBUX.Notification
 		static let name = "context-engine.mdb"
 		static let deltaSize = SizeMode.fixed(size_t(1e+6))
@@ -30,7 +45,8 @@ extension DBUX {
 			case badgeStatus = "badge_status" // ViewBadgeStatus
 			case viewMode = "view_mode" // ViewMode
 			case timelineAnchor = "timeline_anchor" // TimelineAnchor
-			case timelineRepliesToggleEnabled = "timeline_replies_toggle_enabled"
+			case timelineRepliesToggleEnabled = "timeline_replies_toggle_enabled" // Bool
+			case userPreferences = "user_prefs"	//UserPreferences
 		}
 
 		fileprivate let encoder:JSONEncoder
@@ -83,6 +99,14 @@ extension DBUX {
 			} catch LMDBError.notFound {
 				_timelineRepliesToggleEnabled = Published(wrappedValue:false)
 			}
+			
+			do {
+				let getPrefData = try context.getEntry(type:Data.self, forKey:Contexts.userPreferences, tx:newTrans)!
+				let decoded = try decoder.decode(UserPreferences.self, from:getPrefData)
+				_userPreferences = Published(wrappedValue: decoded)
+			} catch LMDBError.notFound {
+				_userPreferences = Published(wrappedValue:UserPreferences())
+			}
 
 			try newTrans.commit()
 		}
@@ -103,28 +127,34 @@ extension DBUX {
 		}
 
 		// tab bar related items
-		@Published var badgeStatus:ViewBadgeStatus {
+		@MainActor @Published var badgeStatus:ViewBadgeStatus {
 			willSet {
-				let encoder = JSONEncoder()
 				let encoded = try! encoder.encode(newValue)
 				try! self.userContext.setEntry(value:encoded, forKey:Contexts.badgeStatus, tx:nil)
 				self.logger.debug("successfully updated badge status.", metadata:["badgeStatus": "\(newValue)"])
 			}
 		}
 
-		@Published var viewMode:ViewMode {
+		@MainActor @Published var viewMode:ViewMode {
 			willSet {
-				let encoder = JSONEncoder()
 				let encoded = try! encoder.encode(newValue)
 				try! self.userContext.setEntry(value:encoded, forKey:Contexts.viewMode, tx:nil)
 				self.logger.debug("successfully updated view mode.", metadata:["viewMode": "\(newValue)"])
 			}
 		}
 		
-		@Published var timelineRepliesToggleEnabled:Bool {
+		@MainActor @Published var timelineRepliesToggleEnabled:Bool {
 			willSet {
 				try! self.userContext.setEntry(value:newValue, forKey:Contexts.timelineRepliesToggleEnabled, tx:nil)
 				self.logger.debug("successfully updated toggle reply state.", metadata:["isEnabled": "\(newValue)"])
+			}
+		}
+		
+		@MainActor @Published var userPreferences:UserPreferences {
+			willSet {
+				let encoded = try! encoder.encode(newValue)
+				try! self.userContext.setEntry(value:encoded, forKey:Contexts.userPreferences, tx:nil)
+				self.logger.debug("successfully updated user preferences.")
 			}
 		}
 	}
