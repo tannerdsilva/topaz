@@ -23,7 +23,7 @@ extension UI.Profile {
 					HStack {
 						// Profile picture
 						if let profilePicture = profile?.picture, let url = URL(string: profilePicture) {
-							CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
+							UI.Images.AssetPipeline.AsyncImage(url: url, actor:dbux.storedImageActor) { image in
 								image
 									.resizable()
 									.aspectRatio(contentMode: .fill)

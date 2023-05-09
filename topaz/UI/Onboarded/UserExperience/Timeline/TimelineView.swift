@@ -217,9 +217,13 @@ extension UI {
 		}
 		
 		func addEventsToTimeline(newPosts: [TimelineModel]) {
+			
 			// Filter out events that are already in the timeline
-			let filteredPosts = newPosts.filter { !postUIDs.contains($0.event.uid) }
-
+			var filteredPosts = newPosts.filter { !postUIDs.contains($0.event.uid) }
+			if self.showReplies == false {
+				// remove the replies from the input
+				filteredPosts = filteredPosts.filter { !$0.event.isReply() }
+			}
 			// Add the new event UIDs to the postUIDs set
 			postUIDs.formUnion(filteredPosts.map { $0.event.uid })
 
@@ -367,7 +371,6 @@ extension UI {
 					let followsTX = try self.dbux.eventsEngine.transact(readOnly:true)
 					let myFollows = try self.dbux.eventsEngine.followsEngine.getFollows(pubkey:self.dbux.keypair.pubkey, tx:followsTX)
 					try followsTX.commit()
-					
 					
 					var buildEvents = Set<nostr.Event>()
 					var buildKeys = Set<nostr.Key>()

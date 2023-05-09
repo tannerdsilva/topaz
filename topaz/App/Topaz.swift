@@ -74,7 +74,9 @@ struct Topaz:App, Based {
 		let path = base.appendingPathComponent(type.name, isDirectory: isDirectory)
 
 		if isDirectory {
-			try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true, attributes: nil)
+			if FileManager.default.fileExists(atPath: path.path) == false {
+				try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true, attributes: nil)
+			}
 			let dataMdbPath = path.appendingPathComponent("data.mdb")
 			let increaseSize:size_t
 			switch type.deltaSize {

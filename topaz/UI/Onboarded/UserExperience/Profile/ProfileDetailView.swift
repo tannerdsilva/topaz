@@ -38,12 +38,12 @@ struct ProfileDetailView: View {
 
 struct UpperProfileView: View {
 	struct BannerVisualContentView: View {
-		let imageCache:ImageCache
+		let dbux:DBUX
 		let bannerURL: URL?
 
 		var body: some View {
 			if let url = bannerURL {
-				CachedAsyncImage(url: url, imageCache: imageCache) { image in
+				UI.Images.AssetPipeline.AsyncImage(url: url, actor:dbux.storedImageActor) { image in
 					image.resizable()
 						.scaledToFill()
 				} placeholder: {
@@ -62,7 +62,7 @@ struct UpperProfileView: View {
 		var body: some View {
 			Group {
 				if let url = pictureURL {
-					CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
+					UI.Images.AssetPipeline.AsyncImage(url: url, actor:dbux.storedImageActor) { image in
 						image.resizable()
 							.aspectRatio(contentMode: .fill)
 					} placeholder: {
@@ -205,7 +205,7 @@ struct UpperProfileView: View {
 			GeometryReader { innerGeometry in
 				// can expand beyond safe area
 				ZStack(alignment: .bottom) {
-					BannerVisualContentView(imageCache:dbux.imageCache, bannerURL: profile.banner.flatMap { URL(string: $0) })
+					BannerVisualContentView(dbux:dbux, bannerURL: profile.banner.flatMap { URL(string: $0) })
 						.frame(width: innerGeometry.size.width, height: innerGeometry.size.height).clipped()
 					
 					LinearGradient(gradient: Gradient(colors: [
@@ -231,76 +231,87 @@ struct UpperProfileView: View {
 	@State private var headerOffset: CGFloat = 0
 	var body: some View {
 		 GeometryReader { geometry in
-			 VStack(alignment: .leading) {
-				 
-				 // big mega z stack
-				 ZStack(alignment: .bottom) {
-					 GeometryReader { innerGeometry in
-						 BannerBackgroundWithGradientView(dbux: dbux, pubkey: pubkey, profile: profile)
-						 // VStack with frame inside safe area
-						 VStack(alignment: .trailing) {
-							 if (dbux.keypair.pubkey == pubkey) {
-								 HStack {
-									 NavigationLink(destination: UI.UserExperienceSettingsScreen(dbux:dbux)) { // Replace with the destination view for your settings
-										 Image(systemName: "gear")
-											 .font(.system(size: 18)) // Adjust the font size to make the button smaller
-											 .foregroundColor(.white)
-											 .padding(10) // Adjust padding to match the size of the RoundedRectangle
-											 .background(RoundedRectangle(cornerRadius: 25) // RoundedRectangle with a corner radius matching half of the frame height
-												.fill(Color.black.opacity(0.25))) // Fill the RoundedRectangle with a semi-transparent primary color
-											 .frame(width: 50, height: 50) // Set the frame size of the RoundedRectangle
-										 
-									 }
-									 Spacer()
-									 NavigationLink(destination: UI.Profile.ProfileMetadataEditView(dbux:dbux, profile: profile, pubkey: pubkey.description)) {
-										 Text("Edit")
-											 .font(.system(size: 14))
-											 .foregroundColor(.white)
-											 .padding(.horizontal, 12)
-											 .padding(.vertical, 6)
-											 .background(Color.blue)
-											 .cornerRadius(4)
-									 }
-								 }
-								 .padding(.top, innerGeometry.safeAreaInsets.top)
-								 .padding(.horizontal, 13)
-								 .frame(width: geometry.size.width, alignment: .trailing)
-							 }
-							 Spacer()
-							 HStack(alignment: .center) {
-								 ProfilePictureView(dbux:dbux, pictureURL: URL(string: profile.picture ?? ""))
-									 .padding(.trailing, 8)
-								 
-								 DisplayNameView(dbux:dbux, displayName: profile.display_name, userName: profile.name, isVerified: profile.nip05 != nil)
-								 
-								 HStack {
-									 Spacer()
-
-									 UI.Profile.Actions.BadgeButton(dbux:dbux, pubkey: pubkey, profile:profile, sheetActions:[.dmButton, .sendTextNoteButton, .shareButton], showModal: $showSheet)
-
-								 }.contentShape(Rectangle()).frame(height:50)
-									 .background(Color.clear)
-									 .gesture(
-										 TapGesture()
-											 .onEnded { _ in
-												 showSheet.toggle()
+			 ScrollView {
+				 ScrollViewReader { scrollProxy in
+					 VStack(alignment: .leading) {
+						 
+						 // big mega z stack
+						 ZStack(alignment: .bottom) {
+							 GeometryReader { innerGeometry in
+								 BannerBackgroundWithGradientView(dbux: dbux, pubkey: pubkey, profile: profile)
+								 // VStack with frame inside safe area
+								 VStack(alignment: .trailing) {
+									 if (dbux.keypair.pubkey == pubkey) {
+										 HStack {
+											 NavigationLink(destination: UI.UserExperienceSettingsScreen(dbux:dbux)) { // Replace with the destination view for your settings
+												 Image(systemName: "gear")
+													 .font(.system(size: 18)) // Adjust the font size to make the button smaller
+													 .foregroundColor(.white)
+													 .padding(10) // Adjust padding to match the size of the RoundedRectangle
+													 .background(RoundedRectangle(cornerRadius: 25) // RoundedRectangle with a corner radius matching half of the frame height
+														.fill(Color.black.opacity(0.25))) // Fill the RoundedRectangle with a semi-transparent primary color
+													 .frame(width: 50, height: 50) // Set the frame size of the RoundedRectangle
+												 
 											 }
-									)
-							 }
-							 .padding(.horizontal, 16)
+											 Spacer()
+											 NavigationLink(destination: UI.Profile.ProfileMetadataEditView(dbux:dbux, profile: profile, pubkey: pubkey.description)) {
+												 Text("Edit")
+													 .font(.system(size: 14))
+													 .foregroundColor(.white)
+													 .padding(.horizontal, 12)
+													 .padding(.vertical, 6)
+													 .background(Color.blue)
+													 .cornerRadius(4)
+											 }
+										 }
+										 .padding(.top, innerGeometry.safeAreaInsets.top)
+										 .padding(.horizontal, 13)
+										 .frame(width: geometry.size.width, alignment: .trailing)
+									 }
+									 Spacer()
+									 HStack(alignment: .center) {
+										 ProfilePictureView(dbux:dbux, pictureURL: URL(string: profile.picture ?? ""))
+											 .padding(.trailing, 8)
+										 
+										 DisplayNameView(dbux:dbux, displayName: profile.display_name, userName: profile.name, isVerified: profile.nip05 != nil)
+										 
+										 HStack {
+											 Spacer()
+											 
+											 UI.Profile.Actions.BadgeButton(dbux:dbux, pubkey: pubkey, profile:profile, sheetActions:[.dmButton, .sendTextNoteButton, .shareButton], showModal: $showSheet)
+											 
+										 }.contentShape(Rectangle()).frame(height:50)
+											 .background(Color.clear)
+											 .gesture(
+												TapGesture()
+													.onEnded { _ in
+														showSheet.toggle()
+													}
+											 )
+									 }
+									 .padding(.horizontal, 16)
+								 }
+								 .padding(.top, geometry.safeAreaInsets.top)
+							 }.background(GeometryReader { proxy in
+								 Color.clear.preference(key: HeaderOffsetKey.self, value: proxy.frame(in: .named("scroll")).minY)
+							 })
 						 }
-						 .padding(.top, geometry.safeAreaInsets.top)
-					 }.background(GeometryReader { proxy in
-						 Color.clear.preference(key: HeaderOffsetKey.self, value: proxy.frame(in: .named("scroll")).minY)
-					})
+						 .offset(y: max(-headerOffset, 0))
+						 .edgesIgnoringSafeArea(.top)
+						 .frame(width: geometry.size.width, height: 220)
+						 
+						 ProfileInfoView(profile:profile)
+						 Spacer()
+					 }
+					 // Apply the onPreferenceChange modifier
+								.onPreferenceChange(HeaderOffsetKey.self) { offset in
+									headerOffset = offset
+								}
+								.coordinateSpace(name: "scroll")
 				 }
-				.offset(y: max(-headerOffset, 0))
-				.edgesIgnoringSafeArea(.top)
-				.frame(width: geometry.size.width, height: 220)
-
-				 ProfileInfoView(profile:profile)
-				 Spacer()
 			 }
+			 .offset(y: max(-headerOffset, 0))
+			 .edgesIgnoringSafeArea(.top)
 		 }
 	 }
  }

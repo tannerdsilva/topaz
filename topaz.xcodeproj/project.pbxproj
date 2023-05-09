@@ -41,6 +41,8 @@
 		AE2C0EF229BA7C9E00C0B87C /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE2C0EF129BA7C9E00C0B87C /* Constants.swift */; };
 		AE33F9B22A063D8200C6CEF7 /* AppearanceSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE33F9B12A063D8200C6CEF7 /* AppearanceSettings.swift */; };
 		AE33F9B42A064AAE00C6CEF7 /* String.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE33F9B32A064AAE00C6CEF7 /* String.swift */; };
+		AE33F9B62A07216000C6CEF7 /* MediaUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE33F9B52A07216000C6CEF7 /* MediaUploadService.swift */; };
+		AE33F9B82A07727D00C6CEF7 /* ImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE33F9B72A07727D00C6CEF7 /* ImagePicker.swift */; };
 		AE39020B29B912D600F9D40C /* Delta.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE39020A29B912D600F9D40C /* Delta.swift */; };
 		AE421C6D29BC433B009CB737 /* PostBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C6C29BC433B009CB737 /* PostBlock.swift */; };
 		AE421C7129BC7EED009CB737 /* RelayRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE421C7029BC7EED009CB737 /* RelayRegistrar.swift */; };
@@ -77,6 +79,7 @@
 		AE8E034429EDB14F0030745C /* DBUXNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8E034329EDB14F0030745C /* DBUXNotification.swift */; };
 		AE8ED1C829F310BC00826301 /* CommonRelaysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8ED1C729F310BC00826301 /* CommonRelaysView.swift */; };
 		AE8F05B729CD44CB00D59FEC /* Warnings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8F05B629CD44CB00D59FEC /* Warnings.swift */; };
+		AE96C49E2A09F45300214F54 /* URI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE96C49D2A09F45300214F54 /* URI.swift */; };
 		AEB39B6C29B52B1200F3C92E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB39B6B29B52B1200F3C92E /* OnboardingView.swift */; };
 		AEB39B6E29B52D5900F3C92E /* Topaz.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB39B6D29B52D5900F3C92E /* Topaz.swift */; };
 		AEB39B7529B5403900F3C92E /* npub.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB39B7429B5403900F3C92E /* npub.swift */; };
@@ -186,6 +189,8 @@
 		AE2C0EF129BA7C9E00C0B87C /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		AE33F9B12A063D8200C6CEF7 /* AppearanceSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettings.swift; sourceTree = "<group>"; };
 		AE33F9B32A064AAE00C6CEF7 /* String.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = String.swift; sourceTree = "<group>"; };
+		AE33F9B52A07216000C6CEF7 /* MediaUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaUploadService.swift; sourceTree = "<group>"; };
+		AE33F9B72A07727D00C6CEF7 /* ImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePicker.swift; sourceTree = "<group>"; };
 		AE39020A29B912D600F9D40C /* Delta.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Delta.swift; sourceTree = "<group>"; };
 		AE421C6C29BC433B009CB737 /* PostBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostBlock.swift; sourceTree = "<group>"; };
 		AE421C7029BC7EED009CB737 /* RelayRegistrar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayRegistrar.swift; sourceTree = "<group>"; };
@@ -221,6 +226,7 @@
 		AE8E034329EDB14F0030745C /* DBUXNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DBUXNotification.swift; path = topaz/Model/DBUX/DBUXNotification.swift; sourceTree = SOURCE_ROOT; };
 		AE8ED1C729F310BC00826301 /* CommonRelaysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonRelaysView.swift; sourceTree = "<group>"; };
 		AE8F05B629CD44CB00D59FEC /* Warnings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Warnings.swift; sourceTree = "<group>"; };
+		AE96C49D2A09F45300214F54 /* URI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URI.swift; sourceTree = "<group>"; };
 		AEB39B6B29B52B1200F3C92E /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		AEB39B6D29B52D5900F3C92E /* Topaz.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Topaz.swift; sourceTree = "<group>"; };
 		AEB39B7429B5403900F3C92E /* npub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = npub.swift; path = topaz/UI/Welcome/npub.swift; sourceTree = SOURCE_ROOT; };
@@ -496,6 +502,7 @@
 				AE598F2D29E4DFD700D4CB8F /* Post.swift */,
 				AE598F7829E8CEE800D4CB8F /* KeyPair.swift */,
 				AEBEEAE62A05A0B80089C1D0 /* Link.swift */,
+				AE96C49D2A09F45300214F54 /* URI.swift */,
 			);
 			path = nostr;
 			sourceTree = "<group>";
@@ -529,6 +536,7 @@
 				AEF298E629D4BE2800E50654 /* HTTPTool.swift */,
 				AE598F8629E9E4D400D4CB8F /* Dispatcher.swift */,
 				AE89E98029F6D43A00C916A5 /* StandaloneRelayPool.swift */,
+				AE33F9B52A07216000C6CEF7 /* MediaUploadService.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -554,6 +562,7 @@
 				AEF7DA9329FAF4500036124F /* Images.swift */,
 				AE1A210929FFFD5000A964D4 /* CustomBackButton.swift */,
 				AE1A210B2A000A0000A964D4 /* DragToDismiss.swift */,
+				AE33F9B72A07727D00C6CEF7 /* ImagePicker.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -816,6 +825,7 @@
 				AEF7DA9229FADDC40036124F /* ImageEngine.swift in Sources */,
 				AE598F8129E92C4500D4CB8F /* ContextEngine.swift in Sources */,
 				AE1A59C229B7A20600D21AA0 /* Event.swift in Sources */,
+				AE33F9B82A07727D00C6CEF7 /* ImagePicker.swift in Sources */,
 				AE010B5429C674A600ADECCA /* AllConnectionsScreen.swift in Sources */,
 				AE771EAF29B5166A0019EDA1 /* ContentView.swift in Sources */,
 				AEBEEAE72A05A0B80089C1D0 /* Link.swift in Sources */,
@@ -831,6 +841,7 @@
 				AE8E034429EDB14F0030745C /* DBUXNotification.swift in Sources */,
 				AEF298E729D4BE2800E50654 /* HTTPTool.swift in Sources */,
 				AEB39B8229B5C37800F3C92E /* Relay.swift in Sources */,
+				AE96C49E2A09F45300214F54 /* URI.swift in Sources */,
 				AEF7DA9429FAF4500036124F /* Images.swift in Sources */,
 				AE8E034229ECEC5D0030745C /* RelayProtocolView.swift in Sources */,
 				AE421C7129BC7EED009CB737 /* RelayRegistrar.swift in Sources */,
@@ -855,6 +866,7 @@
 				AE0C437329EC7B88000EC738 /* UIEvents.swift in Sources */,
 				AE598F7B29E9098900D4CB8F /* EventsEngine.swift in Sources */,
 				AE0C436929EC49FA000EC738 /* CustomToggleSwitch.swift in Sources */,
+				AE33F9B62A07216000C6CEF7 /* MediaUploadService.swift in Sources */,
 				AEF7DA9729FBA0EC0036124F /* NotificationsSettingsView.swift in Sources */,
 				AE6CF68329EFC86E00FF17B7 /* ComposeEvent.swift in Sources */,
 				AE598F3329E5B8C100D4CB8F /* ExperienceEngine.swift in Sources */,
@@ -1049,7 +1061,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.6.21;
+				MARKETING_VERSION = 0.6.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1091,7 +1103,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.6.21;
+				MARKETING_VERSION = 0.6.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tannersilva.topaz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;

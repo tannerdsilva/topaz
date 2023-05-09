@@ -9,10 +9,10 @@ import Foundation
 
 extension String {
 	var noEmoji: String {
-		return self.unicodeScalars
+		let noEmoString = self.unicodeScalars
 			.filter { !$0.properties.isEmoji }
-			.filter { !$0.isWhitespace }
 			.string
+		return noEmoString.trimmingCharacters(in: .whitespacesAndNewlines)
 	}
 }
 
@@ -21,4 +21,3 @@ extension Sequence where Iterator.Element == UnicodeScalar {
 		return String(String.UnicodeScalarView(self))
 	}
 }
-

@@ -19,6 +19,10 @@ public class DBUX:Based {
 	let appDispatcher:Dispatcher<Topaz.Notification>
 	let dispatcher:Dispatcher<DBUX.Notification>
 	
+	let profilePicStore:ProfileImageStore
+	let unstoredImageActor:UI.Images.AssetPipeline.RequestActor = UI.Images.AssetPipeline.RequestActor(configuration:UI.Images.AssetPipeline.Configuration(compression: nil, storage: nil))
+	let storedImageActor:UI.Images.AssetPipeline.RequestActor
+	
 	let logger:Logger
 	let base:URL
 	
@@ -27,8 +31,6 @@ public class DBUX:Based {
 	let contextEngine:ContextEngine
 
 	let eventsEngine:EventsEngine
-	
-	let imageCache:ImageCache
 	
 	var mainTask:Task<Void, Never>? = nil
 
@@ -43,11 +45,12 @@ public class DBUX:Based {
 		if FileManager.default.fileExists(atPath: makeBase.path) == false {
 			try FileManager.default.createDirectory(atPath:makeBase.path, withIntermediateDirectories:true)
 		}
-		
+		let makePIStore = try! Topaz.launchExperienceEngine(ProfileImageStore.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
+		self.profilePicStore = makePIStore
+		self.storedImageActor = UI.Images.AssetPipeline.RequestActor(configuration:UI.Images.AssetPipeline.Configuration(compression:UI.Images.AssetPipeline.Configuration.Compression(maxPixelsInLargestDimension: 1200, compressionQuality: 0.4), storage: makePIStore))
 		self.contextEngine = try! Topaz.launchExperienceEngine(ContextEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
 		self.eventsEngine = try! Topaz.launchExperienceEngine(EventsEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
-		self.imageCache = try! Topaz.launchExperienceEngine(ImageCache.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
-		
+
 		self.base = makeBase
 		
 		let relaysTX = try self.eventsEngine.transact(readOnly:false)

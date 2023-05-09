@@ -7,134 +7,162 @@
 
 import Foundation
 import SwiftUI
+import QuickLMDB
 
-struct UnstoredAsyncImage<Content: View, Placeholder: View>: View {
-	@ObservedObject var viewModel: CustomAsyncImageViewModel
-	private let url: URL
-	private let placeholder: () -> Placeholder
-	private let content: (Image) -> Content
-
-	init(url: URL, @ViewBuilder content: @escaping (_ image: Image) -> Content, @ViewBuilder placeholder: @escaping () -> Placeholder) {
-		self.url = url
-		self.placeholder = placeholder
-		self.content = content
-		self.viewModel = ImageRequestActor.globalRequestor.getViewModel(url: url)
-	}
-
-   var body: some View {
-	   Group {
-		   if let image = viewModel.image {
-			   content(image)
-		   } else {
-			   placeholder()
-		   }
-	   }
-	   .task(id: url) { @MainActor in
-
-		   await viewModel.loadImage()
-	   }
-   }
-}
-
-class ImageRequestActor {
-	static let globalRequestor = ImageRequestActor()
-	private var ongoingRequests: [URL: CustomAsyncImageViewModel] = [:]
-
-	@MainActor func getViewModel(url: URL) -> CustomAsyncImageViewModel {
-		if let existingViewModel = ongoingRequests[url] {
-			return existingViewModel
-		} else {
-			let viewModel = CustomAsyncImageViewModel(url: url)
-			ongoingRequests[url] = viewModel
-			return viewModel
+extension UI {
+	struct Images {
+		enum Error:Swift.Error {
+			case invalidImageData
+			case compressionError
 		}
-	}
-}
-
-
-class CustomAsyncImageViewModel: ObservableObject {
-	@Published var image: Image? = nil
-	private let url: URL
-	private static let imageRequestActor = ImageRequestActor()
-	
-	init(url: URL) {
-		self.url = url
-	}
-	
-	func loadImage() async {
-		if image == nil {
-			do {
-				let imageData = try await HTTP.getContent(url: url)
-				if let uiImage = UIImage(data: imageData.0) {
-					image = Image(uiImage: uiImage)
+		struct AssetPipeline {
+			struct Configuration {
+				struct Compression {
+					let maxPixelsInLargestDimension:CGFloat
+					let compressionQuality:Double
 				}
-			} catch {
-				print("Error loading image: \(error)")
+				let compression:Compression?
+				let storage:DBUX.AssetStore?
+			}
+			
+			// manages the logistics of various pipeline requests
+			public class RequestActor {
+				let configuration:Configuration
+				@MainActor private var ongoingRequests: [URL: ViewModel] = [:]
+				public init(configuration:Configuration) {
+					self.configuration = configuration
+				}
+				@MainActor fileprivate func getViewModel(url: URL) -> ViewModel {
+					if let existingViewModel = ongoingRequests[url] {
+						return existingViewModel
+					} else {
+						let viewModel = ViewModel(url: url, configuration:configuration)
+						ongoingRequests[url] = viewModel
+						return viewModel
+					}
+				}
+			}
+			
+			fileprivate class ViewModel: ObservableObject {
+				enum FetchState {
+					case idle
+					case fetching
+					case complete(Result<Image, Swift.Error>)
+				}
+				private let configuration:Configuration
+				@MainActor private var fetchTask:Task<Void, Never>? = nil
+				@MainActor @Published var state:FetchState = .idle
+				private let url: URL
+				
+				fileprivate init(url:URL, configuration:Configuration) {
+					self.url = url
+					self.configuration = configuration
+				}
+				
+				@MainActor func hit() {
+					if let hasConfiguration = self.configuration.storage {
+						Task.detached { [getStore = hasConfiguration, urlstr = url.absoluteString] in
+							let makeURLHash = try DBUX.URLHash(urlstr)
+							let makeHit = DBUX.AssetStore.Hit(urlHash:makeURLHash, date:DBUX.Date())
+							await getStore.holder.append(element: makeHit)
+						}
+					}
+					
+				}
+				
+				@MainActor func loadImage() async {
+					guard case .idle = self.state else { return }
+					print("\(self.url.absoluteString)")
+					let asHash = try! DBUX.URLHash(self.url.absoluteString)
+					self.state = .fetching
+					
+					func launchTask() {
+						self.fetchTask = Task.detached { [weak self, getURL = url, conf = self.configuration, urlH = asHash] in
+							do {
+								let imageData = try await HTTP.getContent(url:getURL)
+								guard let uiImage = UIImage(data:imageData.0) else {
+									throw UI.Images.Error.invalidImageData
+								}
+								let finalImage:UIImage
+								if let hasCompressionSettings = conf.compression {
+									guard let successfulCompression = uiImage.resizedAndCompressedImage(maxPixelsInLargestDimension: hasCompressionSettings.maxPixelsInLargestDimension, compressionQuality:hasCompressionSettings.compressionQuality) else {
+										throw Error.compressionError
+									}
+									finalImage = successfulCompression
+								} else {
+									finalImage = uiImage
+								}
+								if let hasStore = conf.storage, let hasjpgData = finalImage.jpegData(compressionQuality: 1.0) {
+									try hasStore.storeAsset(hasjpgData, for: urlH)
+								}
+								Task.detached { @MainActor [weak self, imgDat = Image(uiImage:finalImage)] in
+									self?.fetchTask = nil
+									self?.state = .complete(.success(imgDat))
+								}
+							} catch let error {
+								Task.detached { @MainActor [weak self, errorFound = error] in
+									self?.fetchTask = nil
+									self?.state = .complete(.failure(errorFound))
+								}
+							}
+						}
+					}
+					
+					if let hasStorage = self.configuration.storage {
+						do {
+							let getAsset = try await hasStorage.getAsset(asHash)
+							if let hasImage = UIImage(data:getAsset) {
+								self.state = .complete(.success(Image(uiImage:hasImage)))
+								return
+							}
+						} catch LMDBError.notFound {
+							launchTask()
+						} catch { return }
+					} else {
+						launchTask()
+					}
+				}
+				
+				deinit {
+					if let hasTask = fetchTask {
+						hasTask.cancel()
+					}
+				}
+			}
+			
+			struct AsyncImage<Content: View, Placeholder: View>: View {
+				@ObservedObject private var viewModel: ViewModel
+				private let url: URL
+				private let placeholder: () -> Placeholder
+				private let content: (Image) -> Content
+				
+				init(url: URL, actor:RequestActor, @ViewBuilder content: @escaping (_ image: Image) -> Content, @ViewBuilder placeholder: @escaping () -> Placeholder) {
+					self.url = url
+					self.placeholder = placeholder
+					self.content = content
+					self.viewModel = actor.getViewModel(url: url)
+				}
+				
+				var body: some View {
+					Group {
+						switch viewModel.state {
+						case .complete(let results):
+							switch results {
+							case .success(let res):
+								content(res)
+							case .failure(_):
+								placeholder()
+							}
+						default:
+							placeholder()
+						}
+					}.onAppear() {
+						self.viewModel.hit()
+					}.task() {
+						await viewModel.loadImage()
+					}
+				}
 			}
 		}
-	}
-}
-
-
-struct CachedAsyncImage<Content: View, Placeholder: View>: View {
-	@StateObject private var viewModel: CachedAsyncImageViewModel
-	private let content: (_ image: Image) -> Content
-	private let placeholder: Placeholder
-
-	init(url: URL, imageCache: ImageCache, @ViewBuilder content: @escaping (_ image: Image) -> Content, @ViewBuilder placeholder: () -> Placeholder) {
-		_viewModel = StateObject(wrappedValue: CachedAsyncImageViewModel(url: url, imageCache: imageCache))
-		self.content = content
-		self.placeholder = placeholder()
-	}
-
-	init(url: URL, imageCache: ImageCache, @ViewBuilder content: @escaping (_ image: Image) -> Content) {
-		self.init(url: url, imageCache: imageCache, content: content, placeholder: { ProgressView() as! Placeholder })
-	}
-
-	var body: some View {
-		Group {
-			if let uiImage = viewModel.image {
-				content(Image(uiImage: uiImage))
-			} else {
-				placeholder
-			}
-		}
-		.onAppear {
-			Task {
-				await viewModel.loadImage()
-			}
-		}
-	}
-}
-
-final class CachedAsyncImageViewModel: ObservableObject {
-	@Published var image: UIImage?
-	private let url: URL
-	private let imageCache: ImageCache
-
-	init(url: URL, imageCache: ImageCache) {
-		self.url = url
-		self.imageCache = imageCache
-	}
-
-	func loadImage() async {
-		guard image == nil else { return }
-		do {
-			let getImage = try await imageCache.loadImage(from: url, using: loadContentTypeAndImageData)
-		Task.detached { @MainActor [weak self, gi = getImage] in
-				guard let self = self else { return }
-				self.image = gi
-			}
-		} catch {
-			print("Error loading image: \(error)")
-		}
-	}
-
-	private func loadContentTypeAndImageData(from url: URL) async throws -> (String, Data) {
-		let (data, contentTypeOptional) = try await HTTP.getContent(url: url)
-		guard let contentType = contentTypeOptional else {
-			throw NSError(domain: "Missing content type", code: -1, userInfo: nil)
-		}
-		return (contentType, data)
 	}
 }

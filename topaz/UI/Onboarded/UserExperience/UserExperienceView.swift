@@ -186,7 +186,7 @@ struct EventViewCell: View {
 		HStack {
 			if let profilePicture = profile?.picture, let url = URL(string: profilePicture) {
 				NavigationLink(destination:ProfileDetailView(dbux: dbux, pubkey:event.pubkey, profile: profile!, showBack:true, profileEngine:dbux.eventsEngine.profilesEngine)) {
-					CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
+					UI.Images.AssetPipeline.AsyncImage(url: url, actor:dbux.storedImageActor) { image in
 						image
 							.resizable()
 							.aspectRatio(contentMode: .fill)
@@ -215,7 +215,7 @@ struct EventViewCell: View {
 	   VStack(alignment: .leading, spacing: 8) {
 		   profileHStack
 
-		   UI.Events.UserFacingTextContentView(event: event)
+		   UI.Events.UserFacingTextContentView(dbux:dbux, event: event)
 
 		   if self.selectedEvent == event {
 			   HStack {
@@ -236,7 +236,7 @@ struct EventViewCell: View {
 		VStack(alignment: .leading, spacing: 8) {
 			profileHStack
 
-			UI.Events.UserFacingTextContentView(event: event)
+			UI.Events.UserFacingTextContentView(dbux:dbux, event: event)
 
 			HStack {
 				ActionBarView()

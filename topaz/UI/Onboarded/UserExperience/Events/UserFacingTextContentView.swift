@@ -49,6 +49,7 @@ extension UI.Events {
 	}
 
 	struct UserFacingTextContentView: View {
+		let dbux:DBUX
 		let event: nostr.Event
 		enum Segment: Hashable {
 			case text(String)
@@ -135,7 +136,7 @@ extension UI.Events {
 								.multilineTextAlignment(.leading)
 							
 							if let imageURL = imageURL.first {
-								UnstoredAsyncImage(url: imageURL) { image in
+								UI.Images.AssetPipeline.AsyncImage(url: imageURL, actor:dbux.unstoredImageActor) { image in
 									image.resizable().aspectRatio(contentMode: .fit)
 								} placeholder: {
 									ProgressView()
