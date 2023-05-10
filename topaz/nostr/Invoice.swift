@@ -6,6 +6,7 @@
 //
 
 import Foundation
+
 typealias Invoice = LightningInvoice<Amount>
 typealias ZapInvoice = LightningInvoice<Int64>
 
@@ -14,7 +15,7 @@ enum Amount:Equatable, Hashable, Codable {
 		case unknownType(UInt8)
 	}
 	case any
-	case specific(Int64)
+	case specific(UInt64)
 
 	// for the codable protocol
 	init(from decoder: Decoder) throws {
@@ -24,7 +25,7 @@ enum Amount:Equatable, Hashable, Codable {
 		case 0:
 			self = .any
 		case 1:
-			let val = try container.decode(Int64.self)
+			let val = try container.decode(UInt64.self)
 			self = .specific(val)
 		default:
 			throw Error.unknownType(type)

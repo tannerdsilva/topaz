@@ -96,9 +96,9 @@ extension UI.Events {
 					.padding(.trailing)
 				}
 				.sheet(isPresented: $attachMedia) {
-					ImagePicker(sourceType: .photoLibrary, pubkey: dbux.keypair.pubkey) { img in
-						// self.mediaToUpload = .image(img)
-					}
+//					ImagePicker(sourceType: .photoLibrary, pubkey: dbux.keypair.pubkey) { img in
+//						// self.mediaToUpload = .image(img)
+//					}
 				}
 				.padding(.bottom)
 			}

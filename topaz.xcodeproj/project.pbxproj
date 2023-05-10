@@ -80,6 +80,7 @@
 		AE8ED1C829F310BC00826301 /* CommonRelaysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8ED1C729F310BC00826301 /* CommonRelaysView.swift */; };
 		AE8F05B729CD44CB00D59FEC /* Warnings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8F05B629CD44CB00D59FEC /* Warnings.swift */; };
 		AE96C49E2A09F45300214F54 /* URI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE96C49D2A09F45300214F54 /* URI.swift */; };
+		AE96C4A02A0A919C00214F54 /* NoteAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE96C49F2A0A919C00214F54 /* NoteAssets.swift */; };
 		AEB39B6C29B52B1200F3C92E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB39B6B29B52B1200F3C92E /* OnboardingView.swift */; };
 		AEB39B6E29B52D5900F3C92E /* Topaz.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB39B6D29B52D5900F3C92E /* Topaz.swift */; };
 		AEB39B7529B5403900F3C92E /* npub.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB39B7429B5403900F3C92E /* npub.swift */; };
@@ -227,6 +228,7 @@
 		AE8ED1C729F310BC00826301 /* CommonRelaysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonRelaysView.swift; sourceTree = "<group>"; };
 		AE8F05B629CD44CB00D59FEC /* Warnings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Warnings.swift; sourceTree = "<group>"; };
 		AE96C49D2A09F45300214F54 /* URI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URI.swift; sourceTree = "<group>"; };
+		AE96C49F2A0A919C00214F54 /* NoteAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteAssets.swift; sourceTree = "<group>"; };
 		AEB39B6B29B52B1200F3C92E /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		AEB39B6D29B52D5900F3C92E /* Topaz.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Topaz.swift; sourceTree = "<group>"; };
 		AEB39B7429B5403900F3C92E /* npub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = npub.swift; path = topaz/UI/Welcome/npub.swift; sourceTree = SOURCE_ROOT; };
@@ -586,6 +588,7 @@
 				AEB39B7F29B5C2E700F3C92E /* UserEnvironment.swift */,
 				AE421C7229BD095B009CB737 /* EventReference.swift */,
 				AE717AC129C014F7002D6A52 /* HomeModel.swift */,
+				AE96C49F2A0A919C00214F54 /* NoteAssets.swift */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -834,6 +837,7 @@
 				AE1A59C629B7B0EA00D21AA0 /* Invoice.swift in Sources */,
 				AEDF45E029F2DB4300028BF7 /* EditWalletsView.swift in Sources */,
 				AE89E97F29F5BB6600C916A5 /* UserExperienceSettingsScreen.swift in Sources */,
+				AE96C4A02A0A919C00214F54 /* NoteAssets.swift in Sources */,
 				AEF4180429EDF97200F02181 /* UIProfile.swift in Sources */,
 				AEE3BD0729EF40FA005A94EF /* BadgeScreen.swift in Sources */,
 				AEFEF92029F8359200CFBD1E /* CGSize.swift in Sources */,
