@@ -14,6 +14,13 @@ import AsyncAlgorithms
 
 extension DBUX {
 	class RelaysEngine:ObservableObject, SharedExperienceEngine {
+		actor Reducer {
+			private var relayInstances = [String:RelayConnection]()
+			
+			init(initialConnections:[String:RelayConnection]) {
+				
+			}
+		}
 		typealias NotificationType = DBUX.Notification
 		static let env_flags:QuickLMDB.Environment.Flags = [.noSubDir, .noSync]
 		let dispatcher: Dispatcher<DBUX.Notification>
@@ -36,6 +43,7 @@ extension DBUX {
 
 		// stores the relay connections for the current user
 		@MainActor @Published public private(set) var userRelayConnections = [String:RelayConnection]()
+		
 		// stores the relay connection states for the current user
 		@MainActor @Published public private(set) var userRelayConnectionStates = [String:RelayConnection.State]()
 		@MainActor public func getConnectionsAndStates() -> ([String:RelayConnection], [String:RelayConnection.State]) {
@@ -190,7 +198,7 @@ extension DBUX {
 									}
 								}
 								Task.detached { @MainActor [weak self, url = curEvent.0.url, be = buildEvent] in
-									await self?.relaySyncStates[url] = be
+									self?.relaySyncStates[url] = be
 								}
 								
 							}
@@ -289,17 +297,19 @@ extension DBUX {
 			}
 			
 			try newTrans.commit()
-			Task.detached { @MainActor [weak self, newConnections = relays] in
-				guard let self = self else { return }
-				let existingConnections = Set(self.userRelayConnections.keys)
-				let connectionsDelta = Delta(start:existingConnections, end:newConnections)
-				for curRelay in connectionsDelta.exclusiveEnd {
-					self.userRelayConnections[curRelay] = RelayConnection(url:curRelay, stateChannel:self.stateChannel, eventChannel:self.eventChannel, subscriptionChannel:self.subscriptionsChannel)
-					self.userRelayConnectionStates[curRelay] = RelayConnection.State.disconnected
-				}
-				for curRelay in connectionsDelta.exclusiveStart {
-					self.userRelayConnections.removeValue(forKey:curRelay)
-					self.userRelayConnectionStates.removeValue(forKey: curRelay)
+			if (pubkey == self.pubkey) {
+				Task.detached { @MainActor [weak self, newConnections = relays] in
+					guard let self = self else { return }
+					let existingConnections = Set(self.userRelayConnections.keys)
+					let connectionsDelta = Delta(start:existingConnections, end:newConnections)
+					for curRelay in connectionsDelta.exclusiveEnd {
+						self.userRelayConnections[curRelay] = RelayConnection(url:curRelay, stateChannel:self.stateChannel, eventChannel:self.eventChannel, subscriptionChannel:self.subscriptionsChannel)
+						self.userRelayConnectionStates[curRelay] = RelayConnection.State.disconnected
+					}
+					for curRelay in connectionsDelta.exclusiveStart {
+						self.userRelayConnections.removeValue(forKey:curRelay)
+						self.userRelayConnectionStates.removeValue(forKey: curRelay)
+					}
 				}
 			}
 		}
