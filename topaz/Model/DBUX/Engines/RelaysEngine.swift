@@ -14,11 +14,25 @@ import AsyncAlgorithms
 
 extension DBUX {
 	class RelaysEngine:ObservableObject, SharedExperienceEngine {
+		// the primary source of truth for all known relay connections
 		actor Reducer {
 			private var relayInstances = [String:RelayConnection]()
 			
 			init(initialConnections:[String:RelayConnection]) {
-				
+				self.relayInstances = initialConnections
+			}
+			
+			func processDelta(_ deltaConns:Delta<RelayConnection>) {
+				for curDrop in deltaConns.exclusiveStart {
+					relayInstances.removeValue(forKey: curDrop.url)
+				}
+				for curAdd in deltaConns.exclusiveStart {
+					relayInstances[curAdd.url] = curAdd
+				}
+			}
+			
+			func existingConnectionCheck(url:String) -> RelayConnection? {
+				return relayInstances[url]
 			}
 		}
 		typealias NotificationType = DBUX.Notification
@@ -56,6 +70,8 @@ extension DBUX {
 		private let subscriptionsChannel:AsyncChannel<RelayConnection.SubscriptionChangeEvent>
 		
 		private var digestTask:Task<Void, Never>? = nil
+		
+		let reducer:Reducer
 		
 		let pubkey_relays_asof:Database
 		let pubkey_relayHash:Database
@@ -121,6 +137,7 @@ extension DBUX {
 				buildStates[curRelay] = .disconnected
 			}
 			_userRelayConnections = Published(wrappedValue:buildConnections)
+			self.reducer = Reducer(initialConnections: buildConnections)
 			_userRelayConnectionStates = Published(wrappedValue:buildStates)
 			try subTrans.commit()
 			try env.sync()
@@ -301,15 +318,21 @@ extension DBUX {
 				Task.detached { @MainActor [weak self, newConnections = relays] in
 					guard let self = self else { return }
 					let existingConnections = Set(self.userRelayConnections.keys)
+					let existingObjects = Set(self.userRelayConnections.values)
+					var newObjects = Set<RelayConnection>()
 					let connectionsDelta = Delta(start:existingConnections, end:newConnections)
 					for curRelay in connectionsDelta.exclusiveEnd {
-						self.userRelayConnections[curRelay] = RelayConnection(url:curRelay, stateChannel:self.stateChannel, eventChannel:self.eventChannel, subscriptionChannel:self.subscriptionsChannel)
+						let newConn = RelayConnection(url:curRelay, stateChannel:self.stateChannel, eventChannel:self.eventChannel, subscriptionChannel:self.subscriptionsChannel)
+						self.userRelayConnections[curRelay] = newConn
 						self.userRelayConnectionStates[curRelay] = RelayConnection.State.disconnected
+						newObjects.update(with:newConn)
 					}
 					for curRelay in connectionsDelta.exclusiveStart {
 						self.userRelayConnections.removeValue(forKey:curRelay)
 						self.userRelayConnectionStates.removeValue(forKey: curRelay)
 					}
+					let objectsDelta = Delta(start:existingObjects, end:newObjects)
+					await self.reducer.processDelta(objectsDelta)
 				}
 			}
 		}
