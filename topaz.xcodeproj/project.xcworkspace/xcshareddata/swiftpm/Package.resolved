@@ -58,7 +58,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tannerdsilva/hummingbird-websocket.git",
       "state" : {
-        "revision" : "75d994ff67d6b4bcae0fc08fa824ab7a1ca5c241"
+        "revision" : "0ee77a697c2d5179b605331452648b86a31d84af"
       }
     },
     {
@@ -66,7 +66,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tannerdsilva/QuickLMDB",
       "state" : {
-        "revision" : "85e2b552e7a325df04938395b9dd8b92dc643e2f"
+        "revision" : "6454f034d5e03fbd9bb4b6b1fe1635a8471bf0e8"
       }
     },
     {
@@ -112,15 +112,6 @@
       "state" : {
         "revision" : "937e904258d22af6e447a0b72c0bc67583ef64a2",
         "version" : "1.0.4"
-      }
-    },
-    {
-      "identity" : "swift-crypto",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-crypto.git",
-      "state" : {
-        "revision" : "da0fe44138ab86e380f40a2acbd8a611b07d3f64",
-        "version" : "2.4.0"
       }
     },
     {

@@ -196,7 +196,7 @@ func invoice_to_zap_invoice(_ invoice:Invoice) -> ZapInvoice? {
 		return nil
 	}
 	
-	return ZapInvoice(description:invoice.description, amount: amt, string: invoice.string, expiry: invoice.expiry, payment_hash: invoice.payment_hash, created_on:invoice.created_on)
+	return ZapInvoice(description:invoice.description, amount: Int64(amt), string: invoice.string, expiry: invoice.expiry, payment_hash: invoice.payment_hash, created_on:invoice.created_on)
 }
 
 func preimage_matches_invoice<T>(_ preimage: String, inv: LightningInvoice<T>) -> Bool {

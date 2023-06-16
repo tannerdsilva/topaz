@@ -33,7 +33,7 @@ extension DBUX {
 		let pubkey_date:Database			// stores the last time that the user profile information was updated.			[nostr.Key:DBUX.Date]
 		let pubkey_following:Database		// stores the list of pubkeys that the user is following						[nostr.Key:nostr.Key?] * DUP * (value will be \0 if an account follows nobody)
 
-		required init(env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher: Dispatcher<DBUX.Notification>) throws {
+		required init(env: QuickLMDB.Environment, keyPair:nostr.KeyPair, dispatcher: Dispatcher<DBUX.Notification>) throws {
 			self.dispatcher = dispatcher
 			let newTrans = try Transaction(env, readOnly:false)
 			self.pubkey_date = try env.openDatabase(named:Databases.pubkey_refreshDate.rawValue, flags:[.create], tx:newTrans)
@@ -45,7 +45,7 @@ extension DBUX {
 				self.pubkey_following = try env.openDatabase(named:Databases.user_following.rawValue, flags:[.create, .dupSort], tx:newTrans)
 			}
 			
-			self.pubkey = publicKey
+			self.pubkey = keyPair.pubkey
 			self.env = env
 			self.logger = Logger(label: "follows-engine.mdb")
 			try newTrans.commit()
@@ -80,7 +80,7 @@ extension DBUX {
 		}
 
 
-		func getFriends(_ pubkeys:Set<nostr.Key>, tx someTrans:QuickLMDB.Transaction) throws -> [nostr.Key:Set<nostr.Key>] {
+		func getFollows(_ pubkeys:Set<nostr.Key>, tx someTrans:QuickLMDB.Transaction) throws -> [nostr.Key:Set<nostr.Key>] {
 			let followsCursor = try pubkey_following.cursor(tx:someTrans)
 			var buildRet = [nostr.Key:Set<nostr.Key>]()
 			for curPubkey in pubkeys {
@@ -120,7 +120,7 @@ extension DBUX.FollowsEngine {
 	func isFriendOfFriend(pubkey:nostr.Key) throws -> Bool {
 		return try self.env.transact(readOnly:true) { newTrans in
 			let myFriends = try self.getFollows(pubkey:self.pubkey, tx:newTrans)
-			let allFriendFollows = try self.getFriends(myFriends, tx:newTrans)
+			let allFriendFollows = try self.getFollows(myFriends, tx:newTrans)
 			var allUIDs = Set<nostr.Key>()
 			for (_, curFollows) in allFriendFollows {
 				allUIDs.formUnion(curFollows)
@@ -133,7 +133,7 @@ extension DBUX.FollowsEngine {
 		try self.env.transact(readOnly:true) { followTrans in
 			let isf = try self.isFriend(pubkey:self.pubkey, with:pubkey, tx:followTrans)
 			let myFriends = try self.getFollows(pubkey:self.pubkey, tx:followTrans)
-			let allFriendFollows = try self.getFriends(myFriends, tx:followTrans)
+			let allFriendFollows = try self.getFollows(myFriends, tx:followTrans)
 			var allUIDs = Set<nostr.Key>()
 			for (_, curFollows) in allFriendFollows {
 				allUIDs.formUnion(curFollows)

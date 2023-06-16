@@ -174,7 +174,7 @@ extension nostr {
 			self.privkey = privkey
 		}
 
-		// MDB_convertible
+		// RAW_convertible
 		@usableFromInline internal init?(_ value: MDB_val) {
 			guard value.mv_size == MemoryLayout<Self>.size else {
 				return nil

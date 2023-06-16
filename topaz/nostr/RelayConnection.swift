@@ -12,7 +12,6 @@ import HummingbirdWSClient
 import NIO
 import Logging
 import AsyncAlgorithms
-import QuickLMDB
 
 /// Primary interface for interacting with a nostr relay
 final actor RelayConnection:ObservableObject {
@@ -20,6 +19,9 @@ final actor RelayConnection:ObservableObject {
     public typealias StateChangeEvent = (RelayConnection, State)
     /// the type of tuple that is passed to the event handler
 	public typealias EventCapture = (String, nostr.Subscription)
+	/// the type of typle tht is passed to the subscription change event handler
+	public typealias SubscriptionChangeEvent = (RelayConnection, Set<String>, Set<String>)
+
     /// the errors that can be thrown by a relay connection interface
 	enum Error:Swift.Error {
         /// the interface was in an invalid state for the requested operation
@@ -43,32 +45,10 @@ final actor RelayConnection:ObservableObject {
 		case connecting
         /// There is an active connection to the relay
 		case connected
-		
-//		public static func == (lhs: State, rhs: State) -> Bool {
-//			switch (lhs, rhs) {
-//			case (.disconnected, .disconnected),
-//				 (.connecting, .connecting):
-//				return true
-//			case let (.connected(leftValue), .connected(rightValue)):
-//				return leftValue == rightValue
-//			default:
-//				return false
-//			}
-//		}
-		
-//		public func hash(into hasher: inout Hasher) {
-//			switch self {
-//			case .disconnected:
-//				hasher.combine(0)
-//			case .connecting:
-//				hasher.combine(1)
-//			case .connected:
-//				hasher.combine(2)
-//				hasher.combine(value)
-//			}
-//		}
 	}
-
+	
+	let kp:nostr.KeyPair
+	
     /// the multi-threaded event loop group used for this connection
     fileprivate let loopGroup:MultiThreadedEventLoopGroup = Topaz.defaultPool
 
@@ -83,10 +63,23 @@ final actor RelayConnection:ObservableObject {
 	public var reconnectionDelayTimeNanoseconds:UInt64 = 30_000_000_000 // (default: 30 seconds)
 
     /// the state of the relay connection
-    @Published public private(set) var state:State = .disconnected
-
+    public private(set) var state:State = .disconnected {
+		didSet {
+			self.logger.info("state changed to 'disconnected'.")
+			switch state {
+			case .disconnected:
+				self.clearAllSubs()
+			default:
+				break;
+			}
+		}
+	}
+	/// events are written here
 	fileprivate let eventChannel:AsyncChannel<EventCapture>
+	/// state changes are written here
     fileprivate let stateChannel:AsyncChannel<StateChangeEvent>
+	/// subscription changes are written here
+	fileprivate let subscriptionChangeChannel:AsyncChannel<SubscriptionChangeEvent>
 
     /// whether or not the instance should ignore user requests to reconnect to the relay
     /// - when `true`, the connection will NEVER reconnect to the relay after a connection is closed
@@ -97,17 +90,75 @@ final actor RelayConnection:ObservableObject {
 
 	fileprivate let encoder = JSONEncoder()
 	
-	fileprivate var subscriptions = Set<String>()
-	fileprivate var endedSubs = Set<String>()
+	// sync state
+	fileprivate var subFilters = [String:Set<nostr.Filter>]()
+	fileprivate var subs = Set<String>()
+	fileprivate var eoses = Set<String>()
+
+	// clears all subscriptions
+	private func clearAllSubs() {
+		let oldSubs = self.subs
+		let oldEOS = self.eoses
+		self.subs = Set<String>()
+		self.eoses = Set<String>()
+		self.subFilters = [String:Set<nostr.Filter>]()
+		self.logger.info("cleared all subscriptions.")
+	}
+
+	// documents that a new subscription was written out to the relay
+	func wroteSub(_ name:String, filters:Set<nostr.Filter>) async {
+		let oldSubs = self.subs
+		let oldEOS = self.eoses
+		if let hasExistingValue = self.subFilters[name] {
+			guard hasExistingValue != filters else {
+				// return if the filters are the same, this is a no-op
+				self.logger.info("subscription '\(name)' already exists with the same filters.")
+				return
+			}
+		}
+		self.subs.update(with:name)
+		self.subFilters[name] = filters
+		if eoses.contains(name) {
+			eoses.remove(name)
+		}
+		self.logger.info("wrote subscription '\(name)' to relay.")
+		if self.subs != oldSubs || self.eoses != oldEOS {
+			await self.subscriptionChangeChannel.send((self, self.subs, self.eoses))
+		}
+		
+	}
+
+	func gotEOSE(_ name:String) async {
+		let oldEOSes = self.eoses
+		self.eoses.update(with:name)
+		self.logger.info("got EOS for subscription '\(name)'.")
+		if oldEOSes != self.eoses {
+			await self.subscriptionChangeChannel.send((self, self.subs, self.eoses))
+		}
+	}
+
+	func removeSub(_ name:String) async {
+		let oldSubs = self.subs
+		let oldEOS = self.eoses
+		self.subFilters.removeValue(forKey:name)
+		self.subs.remove(name)
+		self.eoses.remove(name)
+		self.logger.info("removed subscription '\(name)' from relay.")
+		if self.subs != oldSubs || self.eoses != oldEOS {
+			await self.subscriptionChangeChannel.send((self, self.subs, self.eoses))
+		}
+	}
 
     /// initialize a new relay connection. the connection will be started immediately.
-	init(url:String, stateChannel:AsyncChannel<StateChangeEvent>, eventChannel:AsyncChannel<EventCapture>) {
+	init(kp:nostr.KeyPair, url:String, stateChannel:AsyncChannel<StateChangeEvent>, eventChannel:AsyncChannel<EventCapture>, subscriptionChannel:AsyncChannel<SubscriptionChangeEvent>) {
         self.url = url
+		self.kp = kp
         var logger = Logger(label: "relay-ctx")
 		logger.logLevel = .trace
 		self.logger = logger
 		self.stateChannel = stateChannel
         self.eventChannel = eventChannel
+		self.subscriptionChangeChannel = subscriptionChannel
         // connect to the relay in the background
 		self.reconnectionTask = Task.detached { [weak self] in
             guard let self = self else { return }
@@ -130,7 +181,7 @@ final actor RelayConnection:ObservableObject {
 		}
 		await stateChannel.send((self, .disconnected))
         // launch a task to reconnect to the relay if specified to do so
-        guard reconnectOverride == true || retry == true else { return }
+        guard retry == true && reconnectOverride == false else { return }
         self.reconnectionTask = Task.detached { [weak self, time = reconnectionDelayTimeNanoseconds, reconn = retry] in
             // sleep for the configured amount of time
             try await Task.sleep(nanoseconds:time)
@@ -159,7 +210,7 @@ final actor RelayConnection:ObservableObject {
             self.state = .connecting
 			await self.stateChannel.send((self, .connecting))
             let newURL = HBURL(self.url)
-			let newWS = try await HBWebSocketClient.connect(url:newURL, configuration: HBWebSocketClient.Configuration(redirectCount: 5), on:loopGroup.next())
+			let newWS = try await HBWebSocketClient.connect(url:newURL, configuration: HBWebSocketClient.Configuration(), on:loopGroup.next())
             // cancel the connection if the state was changed during the connection attempt
 			let shouldExit:Bool
 			switch self.state {
@@ -234,8 +285,24 @@ final actor RelayConnection:ObservableObject {
 							let decodedItem = try decoder.decode(nostr.Subscription.self, from:capData)
 							await ec.send((self.url, decodedItem))
 							switch decodedItem {
-							case .endOfStoredEvents(let sub): break
-//								await self.subscriptionReachedEnd(sub)
+								
+							case .endOfStoredEvents(let sub):
+								await self.gotEOSE(sub)
+								
+							case .authentication(let authString):
+								
+								var buildResponse = nostr.Event()
+								buildResponse.kind = .auth_response
+								buildResponse.created = DBUX.Date()
+								buildResponse.tags = [nostr.Event.Tag(["relay", "ws://nip42.escalante.golf"]), nostr.Event.Tag(["challenge", authString])]
+								buildResponse.pubkey = kp.pubkey
+								try buildResponse.computeUID()
+								try buildResponse.sign(privateKey:kp.privkey)
+								
+								Task.detached { [br = buildResponse] in
+									try await self.send(br)
+									print("SEND THE AUTH RESPONSE \(br.uid)")
+								}
 							default:
 								break;
 							}
@@ -294,11 +361,9 @@ final actor RelayConnection:ObservableObject {
 		
 		switch req {
 		case let .subscribe(subEvent):
-			self.subscriptions.update(with:subEvent.sub_id)
-			self.endedSubs.remove(subEvent.sub_id)
+			await self.wroteSub(subEvent.sub_id, filters:subEvent.filters)
 		case let .unsubscribe(unsubString):
-			self.subscriptions.remove(unsubString)
-			self.endedSubs.remove(unsubString)
+			await self.removeSub(unsubString)
 		default:
 			break;
 		}
@@ -315,6 +380,7 @@ final actor RelayConnection:ObservableObject {
 		do {
 			let getData = try encoder.encode(nostr.Subscription.event("", ev))
 			try await hasSocket.write(.text(String(data:getData, encoding:.utf8)!)).get()
+
 		} catch let error {
 			self.logger.error("failed to send event to relay.", metadata:["url":"\(self.url)", "error":"\(error)"])
 			throw error

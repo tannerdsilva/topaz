@@ -11,5 +11,6 @@ extension Topaz {
 	enum Notifications {
 		case applicationOpened
 		case applicationClosed
+		case memoryPressureWarning
 	}
 }

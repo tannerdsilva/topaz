@@ -19,6 +19,10 @@ public class DBUX:Based {
 	let appDispatcher:Dispatcher<Topaz.Notification>
 	let dispatcher:Dispatcher<DBUX.Notification>
 	
+	let profilePicStore:ProfileImageStore
+	let unstoredImageActor:UI.Images.AssetPipeline.RequestActor = UI.Images.AssetPipeline.RequestActor(configuration:UI.Images.AssetPipeline.Configuration(compression:UI.Images.AssetPipeline.Configuration.Compression(maxPixelsInLargestDimension: 1200, compressionQuality: 0.6), storage: nil))
+	let storedImageActor:UI.Images.AssetPipeline.RequestActor
+	
 	let logger:Logger
 	let base:URL
 	
@@ -27,8 +31,6 @@ public class DBUX:Based {
 	let contextEngine:ContextEngine
 
 	let eventsEngine:EventsEngine
-	
-	let imageCache:ImageCache
 	
 	var mainTask:Task<Void, Never>? = nil
 
@@ -43,11 +45,12 @@ public class DBUX:Based {
 		if FileManager.default.fileExists(atPath: makeBase.path) == false {
 			try FileManager.default.createDirectory(atPath:makeBase.path, withIntermediateDirectories:true)
 		}
-		
-		self.contextEngine = try! Topaz.launchExperienceEngine(ContextEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
-		self.eventsEngine = try! Topaz.launchExperienceEngine(EventsEngine.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
-		self.imageCache = try! Topaz.launchExperienceEngine(ImageCache.self, from:makeBase, for:keypair.pubkey, dispatcher:dispatcher)
-		
+		let makePIStore = try! Topaz.launchExperienceEngine(ProfileImageStore.self, from:makeBase, for:keypair, dispatcher:dispatcher)
+		self.profilePicStore = makePIStore
+		self.storedImageActor = UI.Images.AssetPipeline.RequestActor(configuration:UI.Images.AssetPipeline.Configuration(compression:UI.Images.AssetPipeline.Configuration.Compression(maxPixelsInLargestDimension: 1200, compressionQuality: 0.4), storage: makePIStore))
+		self.contextEngine = try! Topaz.launchExperienceEngine(ContextEngine.self, from:makeBase, for:keypair, dispatcher:dispatcher)
+		self.eventsEngine = try! Topaz.launchExperienceEngine(EventsEngine.self, from:makeBase, for:keypair, dispatcher:dispatcher)
+
 		self.base = makeBase
 		
 		let relaysTX = try self.eventsEngine.transact(readOnly:false)
@@ -261,32 +264,29 @@ public class DBUX:Based {
 		let myFriends = try self.eventsEngine.followsEngine.getFollows(pubkey:self.keypair.pubkey, tx:newTransaction)
 		try newTransaction.commit()
 		
-		let friendString = myFriends.compactMap({ $0.description })
-		
 		// build the contacts filter
+		var metadataFilter = nostr.Filter()
+		metadataFilter.authors = myFriends
+		metadataFilter.kinds = [.metadata]
+		
 		var contactsFilter = nostr.Filter()
-		contactsFilter.authors = Array(friendString)
-		contactsFilter.kinds = [.metadata, .contacts]
+		contactsFilter.authors = myFriends
+		contactsFilter.kinds = [.contacts]
 		
 		var homeFilter = nostr.Filter()
-		homeFilter.kinds = [.text_note, .like, .boost]
-		homeFilter.authors = Array(friendString)
+		homeFilter.kinds = [.text_note]
+		homeFilter.authors = myFriends
 		
 		// build "blocklist" filter
 		var blocklistFilter = nostr.Filter()
 		blocklistFilter.kinds = [.list_categorized]
 		blocklistFilter.parameter = ["mute"]
-		blocklistFilter.authors = [self.keypair.pubkey.description]
-
-		// build "dms" filter
-		var dmsFilter = nostr.Filter()
-		dmsFilter.kinds = [.dm]
-		dmsFilter.authors = [self.keypair.pubkey.description]
+		blocklistFilter.authors = Set([self.keypair.pubkey])
 
 		// build "our" dms filter
 		var ourDMsFilter = nostr.Filter()
 		ourDMsFilter.kinds = [.dm]
-		ourDMsFilter.authors = [self.keypair.pubkey.description]
+		ourDMsFilter.authors = Set([self.keypair.pubkey])
 
 		// // create "notifications" filter
 		// var notificationsFilter = nostr.Filter()
@@ -294,7 +294,7 @@ public class DBUX:Based {
 		// notificationsFilter.limit = 500
 
 		// return [contactsFilter]
-		return [contactsFilter, blocklistFilter, dmsFilter, ourDMsFilter, homeFilter]
+		return [metadataFilter, contactsFilter, blocklistFilter, ourDMsFilter, homeFilter]
 	}
 	
 	deinit {
@@ -650,10 +650,19 @@ extension DBUX {
 
 extension DBUX {
 	static func generateMainSubscription(pubkey:nostr.Key, following:Set<nostr.Key>) -> nostr.Subscribe {
+		// build the contacts filter
+		var metadataFilter = nostr.Filter()
+		metadataFilter.authors = following
+		metadataFilter.kinds = [.metadata]
+		
+		var contactsFilter = nostr.Filter()
+		contactsFilter.authors = following
+		contactsFilter.kinds = [.contacts]
+		
 		var homeFilter = nostr.Filter()
-		homeFilter.kinds = [.text_note, .like, .boost, .metadata, .contacts]
-		homeFilter.authors = Array(following.compactMap { $0.description })
-		return nostr.Subscribe(sub_id: "_ux_home_\(pubkey.description.prefix(10))", filters: [homeFilter])
+		homeFilter.kinds = [.text_note]
+		homeFilter.authors = following
+		return nostr.Subscribe(sub_id: "_ux_home_\(pubkey.description.prefix(10))", filters: [metadataFilter, contactsFilter, homeFilter])
 	}
 }
 

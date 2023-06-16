@@ -188,7 +188,7 @@ func convert_invoice_block(_ b: invoice_block) -> nostr.Event.Block? {
 		return nil
 	}
 	
-	let amount: Amount = maybe_pointee(b11.msat).map { .specific(Int64($0.millisatoshis)) } ?? .any
+	let amount: Amount = maybe_pointee(b11.msat).map { .specific(UInt64($0.millisatoshis)) } ?? .any
 	let payment_hash = Data(bytes: &b11.payment_hash, count: 32)
 	let created_at = b11.timestamp
 	

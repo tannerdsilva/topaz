@@ -93,15 +93,16 @@ extension nostr {
 			case channel_create = 8
 			case channel_meta = 9
 			case chat = 42
-			case group_dm = 2467
 			case list = 40000 // (?)
 			case zap = 9735
 			case zap_request = 9734
 			case private_zap = 9733 // I think?
 			case list_mute = 10000
 			case list_pin = 10001
+			case auth_response = 22242
 			case list_categorized = 30000
 			case list_categorized_bookmarks = 30001
+			
 
 			@usableFromInline init?(_ value:MDB_val) {
 				guard MemoryLayout<Int>.size == value.mv_size else {

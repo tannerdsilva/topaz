@@ -34,10 +34,10 @@ extension DBUX {
 
 		@MainActor @Published var currentUserProfile:nostr.Profile
 
-		required init(env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher: Dispatcher<DBUX.Notification>) throws {
+		required init(env: QuickLMDB.Environment, keyPair:nostr.KeyPair, dispatcher: Dispatcher<DBUX.Notification>) throws {
 			self.dispatcher = dispatcher
 			self.env = env
-			self.pubkey = publicKey
+			self.pubkey = keyPair.pubkey
 			self.logger = Topaz.makeDefaultLogger(label:"profile-engine.mdb")
 			let newTrans = try Transaction(env, readOnly:false)
 			self.profilesDB = try env.openDatabase(named:Databases.profiles.rawValue, flags:[.create], tx:newTrans)

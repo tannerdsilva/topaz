@@ -70,7 +70,7 @@ struct HomeView: View {
 		VStack {
 			CustomTitleBar(dbux:dbux)
 			Spacer()
-			UI.TimelineView(dbux:dbux, postsOnlyModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor, showReplies: false), withRepliesModel:UI.TimelineViewModel(dbux:dbux, anchorDate:dbux.contextEngine.timelineAnchor, showReplies: true))
+			UI.TimelineView(dbux:dbux, postsOnlyModel:UI.TimelineViewModel(dbux:dbux, showReplies: false), withRepliesModel:UI.TimelineViewModel(dbux:dbux, showReplies: true))
 		}
 	}
 }
@@ -125,14 +125,14 @@ struct ActionBarView: View {
 			}) {
 				Image(systemName: "arrowshape.turn.up.left")
 			}
-			.buttonStyle(PlainButtonStyle())
+			.foregroundColor(.blue)
 			Spacer()
 			Button(action: {
 				print("Repost tapped")
 			}) {
 				Image(systemName: "arrow.2.squarepath")
 			}
-			.buttonStyle(PlainButtonStyle())
+			.foregroundColor(.blue)
 			Spacer()
 			Button(action: {
 				isLiked.toggle()
@@ -140,7 +140,7 @@ struct ActionBarView: View {
 			}) {
 				Image(systemName: isLiked ? "heart.fill" : "heart")
 			}
-			.buttonStyle(PlainButtonStyle())
+			.foregroundColor(.blue)
 			Spacer()
 			Button(action: {
 				walletAction.toggle()
@@ -148,16 +148,20 @@ struct ActionBarView: View {
 			}) {
 				Image(systemName: "dollarsign.circle")
 			}
-			.buttonStyle(PlainButtonStyle())
+			.foregroundColor(.blue)
 			Spacer()
 			Button(action: {
 				print("Share tapped")
 			}) {
 				Image(systemName: "square.and.arrow.up")
 			}
-			.buttonStyle(PlainButtonStyle())
+			.foregroundColor(.blue)
 		}
 		.font(.system(size: 20))
+				.padding(.horizontal, 8)
+				.padding(.vertical, 4)
+//				.background(BubbleShape().fill(Color.gray.opacity(0.15)))
+				.shadow(radius: 8)
 	}
 }
 
@@ -166,7 +170,11 @@ struct EventViewCell: View {
 	let dbux:DBUX
 	let event: nostr.Event
 	let profile: nostr.Profile?
-
+	let showActions:Bool
+	@Binding var selectedEvent:nostr.Event?
+	
+	@Environment(\.colorScheme) var colorScheme
+	
 	var dateFormatter: DateFormatter {
 		let formatter = DateFormatter()
 		formatter.dateStyle = .medium
@@ -178,7 +186,7 @@ struct EventViewCell: View {
 		HStack {
 			if let profilePicture = profile?.picture, let url = URL(string: profilePicture) {
 				NavigationLink(destination:ProfileDetailView(dbux: dbux, pubkey:event.pubkey, profile: profile!, showBack:true, profileEngine:dbux.eventsEngine.profilesEngine)) {
-					CachedAsyncImage(url: url, imageCache: dbux.imageCache) { image in
+					UI.Images.AssetPipeline.AsyncImage(url: url, actor:dbux.storedImageActor) { image in
 						image
 							.resizable()
 							.aspectRatio(contentMode: .fill)
@@ -197,37 +205,64 @@ struct EventViewCell: View {
 			}
 			
 			VStack(alignment: .leading, spacing: 2) {
-				HStack(spacing: 4) {
-					DisplayNameText(text: profile?.display_name ?? profile?.name ?? "Unknown")
-					
-					if profile?.nip05 != nil {
-						Image(systemName: "checkmark.circle.fill")
-							.foregroundColor(.blue)
-							.font(.system(size: 18))
-					}
-				}
-				
-				Text("@\(profile?.name ?? "unknown")")
-					.font(.subheadline)
-					.foregroundColor(.gray)
+				UpperProfileView.DisplayNameView(dbux:dbux, displayName:profile?.display_name, userName:profile?.name, isVerified:profile?.nip05 != nil)
 			}
 			Spacer()
 			RelativeDateDisplay(date: event.created)
 		}
 	}
-	var body: some View {
+	var withHiddenActionButton: some View {
+	   VStack(alignment: .leading, spacing: 8) {
+		   profileHStack
+
+		   UI.Events.UserFacingTextContentView(dbux:dbux, event: event)
+
+		   if self.selectedEvent == event {
+			   HStack {
+				   ActionBarView()
+			   }
+		   }
+	   }
+	   .padding()
+	   .background(selectedEvent == event ? highlightColor : Color.clear)
+		.onTapGesture {
+		   withAnimation {
+			   self.selectedEvent = self.selectedEvent == event ? nil : event
+		   }
+	   }
+   }
+	
+	var withAlwaysShownActionButtons: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			profileHStack
-			
-			UI.Events.UserFacingTextContentView(content: event.content)
-			
+
+			UI.Events.UserFacingTextContentView(dbux:dbux, event: event)
+
 			HStack {
 				ActionBarView()
 			}
 		}
 		.padding()
-		.background(Color(.systemBackground))
 	}
+	
+	var body:some View {
+		if self.showActions {
+			withAlwaysShownActionButtons
+		} else {
+			withHiddenActionButton
+		}
+	}
+	
+	var highlightColor: Color {
+			switch colorScheme {
+			case .dark:
+				return Color.white.opacity(0.15)
+			case .light:
+				return Color.black.opacity(0.15)
+			@unknown default:
+				return Color.black.opacity(0.15)
+			}
+		}
 }
 
 struct CustomTitleBar: View {
@@ -255,7 +290,7 @@ struct CustomTitleBar: View {
 		.frame(height: 44) // Set the height of the title bar
 		.background(Color(.systemBackground))
 		.sheet(isPresented:$showingCompose) {
-			UI.Events.NewPostView(dbux:dbux, isShowingSheet: $showingCompose)
+			UI.Events.NewPostView(dbux:dbux, profile: dbux.eventsEngine.profilesEngine.currentUserProfile, publicKey:dbux.keypair.pubkey, isShowingSheet: $showingCompose)
 		}
 	}
 }

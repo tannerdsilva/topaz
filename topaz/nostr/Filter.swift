@@ -22,20 +22,20 @@ extension nostr {
 			case limit
 		}
 
-		var ids:[String]?
-		var kinds:[nostr.Event.Kind]?
-		var referenced_ids:[String]?
-		var pubkeys:[String]?
+		var ids:Set<String>?
+		var kinds:Set<nostr.Event.Kind>?
+		var referenced_ids:Set<String>?
+		var pubkeys:Set<nostr.Key>?
 		var since:Date?
 		var until:Date?
 		var limit:UInt32?
 
 		/// The public keys of the authors of the messages to be returned.
-		var authors:[String]?
-		var hashtag:[String]?
-		var parameter:[String]?
+		var authors:Set<nostr.Key>?
+		var hashtag:Set<String>?
+		var parameter:Set<String>?
 
-		init(ids:[String]? = nil, kinds:[nostr.Event.Kind]? = nil, referenced_ids:[String]? = nil, pubkeys:[String]? = nil, since:Date? = nil, until:Date? = nil, limit:UInt32? = nil, authors:[String]? = nil, hashtag:[String]? = nil, parameter:[String]? = nil) {
+		init(ids:Set<String>? = nil, kinds:Set<nostr.Event.Kind>? = nil, referenced_ids:Set<String>? = nil, pubkeys:Set<nostr.Key>? = nil, since:Date? = nil, until:Date? = nil, limit:UInt32? = nil, authors:Set<nostr.Key>? = nil, hashtag:Set<String>? = nil, parameter:Set<String>? = nil) {
 			self.ids = ids
 			self.kinds = kinds
 			self.referenced_ids = referenced_ids
@@ -51,16 +51,24 @@ extension nostr {
 		// initialize from a decoder
 		init(from decoder:Decoder) throws {
 			let container = try decoder.container(keyedBy: CodingKeys.self)
-			ids = try container.decodeIfPresent([String].self, forKey: .ids)
-			kinds = try container.decodeIfPresent([nostr.Event.Kind].self, forKey: .kinds)
-			referenced_ids = try container.decodeIfPresent([String].self, forKey: .referenced_ids)
-			pubkeys = try container.decodeIfPresent([String].self, forKey: .pubkeys)
-			since = try container.decodeIfPresent(Date.self, forKey: .since)
-			until = try container.decodeIfPresent(Date.self, forKey: .until)
+			ids = try container.decodeIfPresent(Set<String>.self, forKey: .ids)
+			kinds = try container.decodeIfPresent(Set<nostr.Event.Kind>.self, forKey: .kinds)
+			referenced_ids = try container.decodeIfPresent(Set<String>.self, forKey: .referenced_ids)
+			pubkeys = try container.decodeIfPresent(Set<nostr.Key>.self, forKey: .pubkeys)
+			if let sinceTI = try container.decodeIfPresent(Int.self, forKey: .since) {
+				since = Date(timeIntervalSince1970:Double(sinceTI))
+			} else {
+				since = nil
+			}
+			if let untilTI = try container.decodeIfPresent(Int.self, forKey: .until) {
+				until = Date(timeIntervalSince1970:Double(untilTI))
+			} else {
+				until = nil
+			}
 			limit = try container.decodeIfPresent(UInt32.self, forKey: .limit)
-			authors = try container.decodeIfPresent([String].self, forKey: .authors)
-			hashtag = try container.decodeIfPresent([String].self, forKey: .hashtag)
-			parameter = try container.decodeIfPresent([String].self, forKey: .parameter)
+			authors = try container.decodeIfPresent(Set<nostr.Key>.self, forKey: .authors)
+			hashtag = try container.decodeIfPresent(Set<String>.self, forKey: .hashtag)
+			parameter = try container.decodeIfPresent(Set<String>.self, forKey: .parameter)
 		}
 		
 		// encode
@@ -70,8 +78,12 @@ extension nostr {
 			try container.encodeIfPresent(kinds, forKey: .kinds)
 			try container.encodeIfPresent(referenced_ids, forKey: .referenced_ids)
 			try container.encodeIfPresent(pubkeys, forKey: .pubkeys)
-			try container.encodeIfPresent(since, forKey: .since)
-			try container.encodeIfPresent(until, forKey: .until)
+			if let hasSince = since {
+				try container.encodeIfPresent(Int(hasSince.timeIntervalSince1970), forKey: .since)
+			}
+			if let hasUntil = until {
+				try container.encodeIfPresent(Int(hasUntil.timeIntervalSince1970), forKey: .until)
+			}
 			try container.encodeIfPresent(limit, forKey: .limit)
 			try container.encodeIfPresent(authors, forKey: .authors)
 			try container.encodeIfPresent(hashtag, forKey: .hashtag)
@@ -85,7 +97,7 @@ extension nostr.Filter {
 		return nostr.Filter(hashtag: [hashtag])
 	}
 
-	public static func makeAuthorFilter(_ author:String) -> nostr.Filter {
+	public static func makeAuthorFilter(_ author:nostr.Key) -> nostr.Filter {
 		return nostr.Filter(authors: [author])
 	}
 	public static func makeSinceFilter(_ since:Date) -> nostr.Filter {

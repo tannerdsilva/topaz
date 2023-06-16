@@ -27,7 +27,7 @@ protocol ExperienceEngine: Based {
 	var dispatcher: Dispatcher<NotificationType> { get }
 	var env: QuickLMDB.Environment { get }
 	var pubkey: nostr.Key { get }
-	init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws
+	init(base: URL, env: QuickLMDB.Environment, keyPair:nostr.KeyPair, dispatcher:Dispatcher<NotificationType>) throws
 }
 
 protocol SharedExperienceEngine {
@@ -35,7 +35,7 @@ protocol SharedExperienceEngine {
 	var dispatcher: Dispatcher<NotificationType> { get }
 	var env: QuickLMDB.Environment { get }
 	var pubkey: nostr.Key { get }
-	init(env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws
+	init(env: QuickLMDB.Environment, keyPair:nostr.KeyPair, dispatcher:Dispatcher<NotificationType>) throws
 }
 
 

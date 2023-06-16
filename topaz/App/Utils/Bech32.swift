@@ -1,6 +1,7 @@
 //
 //  Bech32.swift
 //
+//  Modified by Tanner Silva in 2023.
 //  Modified by William Casarin in 2022
 //  Created by Evolution Group Ltd on 12.02.2018.
 //  Copyright © 2018 Evolution Group Ltd. All rights reserved.
@@ -28,6 +29,68 @@ fileprivate let decCharset: [Int8] = [
 	1,  0,  3, 16, 11, 28, 12, 14,  6,  4,  2, -1, -1, -1, -1, -1
 ]
 	
+struct Bech32 {
+	enum Error:Swift.Error {
+		case nonUTF8String
+		case nonPrintableCharacter
+		case invalidCase
+		case noChecksumMarker
+		case incorrectHrpSize
+		case incorrectChecksumSize
+		case stringLengthExceeded
+		case invalidPadding
+		case invalidCharacter
+		case checksumMismatch
+		
+		public var errorDescription: String? {
+			switch self {
+			case .checksumMismatch:
+				return "Checksum doesn't match"
+			case .incorrectChecksumSize:
+				return "Checksum size too low"
+			case .incorrectHrpSize:
+				return "Human-readable-part is too small or empty"
+			case .invalidCase:
+				return "String contains mixed case characters"
+			case .invalidCharacter:
+				return "Invalid character met on decoding"
+			case .noChecksumMarker:
+				return "Checksum delimiter not found"
+			case .nonPrintableCharacter:
+				return "Non printable character in input string"
+			case .nonUTF8String:
+				return "String cannot be decoded by utf8 decoder"
+			case .stringLengthExceeded:
+				return "Input string is too long"
+			case .invalidPadding:
+				return "Invalid padding"
+			}
+		}
+	}
+	enum Object {
+		enum Error:Swift.Error {
+			case unknownHRP(String)
+		}
+		
+		case nsec(String)
+		
+		case npub(String)
+		
+		case note(String)
+		
+		static func parse(_ str: String) throws -> Self {
+			let decoded = try bech32_decode(str)
+			if decoded.hrp == "npub" {
+				return .npub(hex_encode(decoded.data))
+			} else if decoded.hrp == "nsec" {
+				return .nsec(hex_encode(decoded.data))
+			} else if decoded.hrp == "note" {
+				return .note(hex_encode(decoded.data))
+			}
+			throw Error.unknownHRP(decoded.hrp)
+		}
+	}
+}
 	/// Find the polynomial with value coefficients mod the generator as 30-bit.
 public func bech32_polymod(_ values: Data) -> UInt32 {
 		var chk: UInt32 = 1
@@ -92,7 +155,7 @@ func bech32_checksum(hrp: String, data: [UInt8]) -> [UInt8] {
 	return result.map { UInt8($0) }
 }
 
-func bech32_convert_bits(outbits: Int, input: Data, inbits: Int, pad: Int) -> Data? {
+func bech32_convert_bits(outbits: Int, input: Data, inbits: Int, pad: Int) throws -> Data {
 	let maxv: UInt32 = ((UInt32(1)) << outbits) - 1;
 	var val: UInt32 = 0
 	var bits: Int = 0
@@ -112,7 +175,7 @@ func bech32_convert_bits(outbits: Int, input: Data, inbits: Int, pad: Int) -> Da
 			out.append(UInt8(val << (outbits - bits) & maxv))
 		}
 	} else if 0 != ((val << (outbits - bits)) & maxv) || bits >= inbits {
-		return nil
+		throw Bech32.Error.invalidPadding
 	}
 	
 	return out
@@ -144,19 +207,19 @@ func eightToFiveBits(_ input: [UInt8]) -> [UInt8] {
 	
 	/// Decode Bech32 string
 @discardableResult
-public func bech32_decode(_ str: String) throws -> (hrp: String, data: Data)? {
+public func bech32_decode(_ str: String) throws -> (hrp: String, data: Data) {
 	guard let strBytes = str.data(using: .utf8) else {
-		throw Bech32Error.nonUTF8String
+		throw Bech32.Error.nonUTF8String
 	}
 	guard strBytes.count <= 2024 else {
-		throw Bech32Error.stringLengthExceeded
+		throw Bech32.Error.stringLengthExceeded
 	}
 	var lower: Bool = false
 	var upper: Bool = false
 	for c in strBytes {
 		// printable range
 		if c < 33 || c > 126 {
-			throw Bech32Error.nonPrintableCharacter
+			throw Bech32.Error.nonPrintableCharacter
 		}
 		// 'a' to 'z'
 		if c >= 97 && c <= 122 {
@@ -168,17 +231,17 @@ public func bech32_decode(_ str: String) throws -> (hrp: String, data: Data)? {
 		}
 	}
 	if lower && upper {
-		throw Bech32Error.invalidCase
+		throw Bech32.Error.invalidCase
 	}
 	guard let pos = str.range(of: checksumMarker, options: .backwards)?.lowerBound else {
-		throw Bech32Error.noChecksumMarker
+		throw Bech32.Error.noChecksumMarker
 	}
 	let intPos: Int = str.distance(from: str.startIndex, to: pos)
 	guard intPos >= 1 else {
-		throw Bech32Error.incorrectHrpSize
+		throw Bech32.Error.incorrectHrpSize
 	}
 	guard intPos + 7 <= str.count else {
-		throw Bech32Error.incorrectChecksumSize
+		throw Bech32.Error.incorrectChecksumSize
 	}
 	let vSize: Int = str.count - 1 - intPos
 	var values: Data = Data(repeating: 0x00, count: vSize)
@@ -186,53 +249,16 @@ public func bech32_decode(_ str: String) throws -> (hrp: String, data: Data)? {
 		let c = strBytes[i + intPos + 1]
 		let decInt = decCharset[Int(c)]
 		if decInt == -1 {
-			throw Bech32Error.invalidCharacter
+			throw Bech32.Error.invalidCharacter
 		}
 		values[i] = UInt8(decInt)
 	}
 	let hrp = String(str[..<pos]).lowercased()
 	guard bech32_verify(hrp: hrp, checksum: values) else {
-		throw Bech32Error.checksumMismatch
+		throw Bech32.Error.checksumMismatch
 	}
 	let out = Data(values[..<(vSize-6)])
-	guard let converted = bech32_convert_bits(outbits: 8, input: out, inbits: 5, pad: 0) else {
-		return nil
-	}
+	let converted = try bech32_convert_bits(outbits: 8, input: out, inbits: 5, pad: 0)
 	return (hrp, converted)
 }
 
-public enum Bech32Error: LocalizedError {
-	case nonUTF8String
-	case nonPrintableCharacter
-	case invalidCase
-	case noChecksumMarker
-	case incorrectHrpSize
-	case incorrectChecksumSize
-	case stringLengthExceeded
-	
-	case invalidCharacter
-	case checksumMismatch
-	
-	public var errorDescription: String? {
-		switch self {
-		case .checksumMismatch:
-			return "Checksum doesn't match"
-		case .incorrectChecksumSize:
-			return "Checksum size too low"
-		case .incorrectHrpSize:
-			return "Human-readable-part is too small or empty"
-		case .invalidCase:
-			return "String contains mixed case characters"
-		case .invalidCharacter:
-			return "Invalid character met on decoding"
-		case .noChecksumMarker:
-			return "Checksum delimiter not found"
-		case .nonPrintableCharacter:
-			return "Non printable character in input string"
-		case .nonUTF8String:
-			return "String cannot be decoded by utf8 decoder"
-		case .stringLengthExceeded:
-			return "Input string is too long"
-		}
-	}
-}

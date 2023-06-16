@@ -44,7 +44,7 @@ extension UI {
 				GeometryReader { geometry in
 					ZStack {
 						if let profileImgUrl = profileIndicate?.picture, let hasURL = URL(string:profileImgUrl) {
-							CachedAsyncImage(url:hasURL, imageCache: dbux.imageCache, content: { image in
+							UI.Images.AssetPipeline.AsyncImage(url:hasURL, actor:dbux.storedImageActor, content: { image in
 								image
 									.resizable()
 									.aspectRatio(contentMode: .fill)
@@ -54,6 +54,7 @@ extension UI {
 								ProgressView()
 									.frame(width: imageSize, height: imageSize)
 							})
+							
 						} else {
 							Image(systemName: icon)
 								.resizable()

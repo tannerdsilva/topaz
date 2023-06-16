@@ -60,10 +60,10 @@ extension DBUX.EventsEngine {
 		// stores the kind associated with the given UID
 		let uid_kind:Database
 
-		init(env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+		init(env:QuickLMDB.Environment, keyPair:nostr.KeyPair, dispatcher:Dispatcher<NotificationType>) throws {
 			self.dispatcher = dispatcher
 			self.env = env
-			self.pubkey = publicKey
+			self.pubkey = keyPair.pubkey
 			self.logger = try Topaz.makeDefaultLogger(label:"event-engine-kind-id.mdb")
 			let someTrans = try Transaction(env, readOnly:false)
 			self.kind_uid = try env.openDatabase(named:Databases.kind_uid.rawValue, flags:[.create, .dupSort], tx:someTrans)
@@ -143,10 +143,10 @@ extension DBUX {
 		// stores the date associated with the given UID
 		let uid_date:Database	// [nostr.Event.UID:DBUX.Date]
 
-		init(env:QuickLMDB.Environment, publicKey:nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+		init(env:QuickLMDB.Environment, keyPair:nostr.KeyPair, dispatcher:Dispatcher<NotificationType>) throws {
 			self.dispatcher = dispatcher
 			self.env = env
-			self.pubkey = publicKey
+			self.pubkey = keyPair.pubkey
 			self.logger = Topaz.makeDefaultLogger(label:"event-engine-date-id.mdb")
 			let someTrans = try Transaction(env, readOnly:false)
 			self.date_uid = try env.openDatabase(named:Databases.date_uid.rawValue, flags:[.create, .dupSort], tx:someTrans)
@@ -186,10 +186,10 @@ extension DBUX {
 		// stores the key associated with the given UID
 		let uid_key: Database // [nostr.Event.UID: nostr.Key]
 
-		init(env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+		init(env: QuickLMDB.Environment, keyPair: nostr.KeyPair, dispatcher:Dispatcher<NotificationType>) throws {
 			self.dispatcher = dispatcher
 			self.env = env
-			self.pubkey = publicKey
+			self.pubkey = keyPair.pubkey
 			self.logger = Topaz.makeDefaultLogger(label: "event-engine-key-uid.mdb")
 			let someTrans = try Transaction(env, readOnly: false)
 			self.key_uid = try env.openDatabase(named: Databases.key_uid.rawValue, flags: [.create, .dupSort], tx: someTrans)
@@ -231,17 +231,17 @@ extension DBUX {
 		let relaysEngine:RelaysEngine
 		let profilesEngine:ProfilesEngine
 		
-		init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher: Dispatcher<DBUX.Notification>) throws {
+		init(base: URL, env: QuickLMDB.Environment, keyPair: nostr.KeyPair, dispatcher: Dispatcher<DBUX.Notification>) throws {
 			self.base = base
 			self.dispatcher = dispatcher
 //			self.dateIDs = try Topaz.launchSharedExperienceEngine(DatesEngine.self, base:base, env:env, for:publicKey, dispatcher: dispatcher)
 //			self.publishers = try Topaz.launchSharedExperienceEngine(PublishersEngine.self, base:base, env:env, for:publicKey, dispatcher: dispatcher)
-			self.timelineEngine = try Topaz.launchExperienceEngine(TimelineEngine.self, from:base.deletingLastPathComponent(), for:publicKey, dispatcher: dispatcher)
-			self.followsEngine = try Topaz.launchSharedExperienceEngine(FollowsEngine.self, base: base, env:env, for:publicKey, dispatcher: dispatcher)
-			self.relaysEngine = try Topaz.launchSharedExperienceEngine(RelaysEngine.self, base:base, env:env, for:publicKey, dispatcher:dispatcher)
-			self.profilesEngine = try Topaz.launchSharedExperienceEngine(ProfilesEngine.self, base:base, env: env, for: publicKey, dispatcher: dispatcher)
+			self.timelineEngine = try Topaz.launchExperienceEngine(TimelineEngine.self, from:base.deletingLastPathComponent(), for:keyPair, dispatcher: dispatcher)
+			self.followsEngine = try Topaz.launchSharedExperienceEngine(FollowsEngine.self, base: base, env:env, for:keyPair, dispatcher: dispatcher)
+			self.relaysEngine = try Topaz.launchSharedExperienceEngine(RelaysEngine.self, base:base, env:env, for:keyPair, dispatcher:dispatcher)
+			self.profilesEngine = try Topaz.launchSharedExperienceEngine(ProfilesEngine.self, base:base, env: env, for: keyPair, dispatcher: dispatcher)
 			self.env = env
-			self.pubkey = publicKey
+			self.pubkey = keyPair.pubkey
 			self.base = base
 			self.logger = Topaz.makeDefaultLogger(label: "events-engine")
 		}
@@ -269,11 +269,11 @@ extension DBUX.EventsEngine {
 		
 		let allDB: Database // database structure [DBUX.DatedNostrEventUID: nostr.Event]
 
-		required init(base: URL, env: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher: Dispatcher<DBUX.Notification>) throws {
+		required init(base: URL, env: QuickLMDB.Environment, keyPair: nostr.KeyPair, dispatcher: Dispatcher<DBUX.Notification>) throws {
 			self.dispatcher = dispatcher
 			self.env = env
 			self.base = base
-			self.pubkey = publicKey
+			self.pubkey = keyPair.pubkey
 			self.logger = Topaz.makeDefaultLogger(label: "timeline-engine.mdb")
 			let someTrans = try Transaction(env, readOnly: false)
 			self.allDB = try env.openDatabase(named:Databases.timelineMain_DB.rawValue, flags:[.create], tx: someTrans)

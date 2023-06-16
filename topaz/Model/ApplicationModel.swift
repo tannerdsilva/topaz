@@ -92,13 +92,13 @@ class ApplicationModel:ObservableObject, ExperienceEngine {
 	
 	@Published public private(set) var currentUX:DBUX?
 
-	required init(base: URL, env docEnv: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+	required init(base: URL, env docEnv: QuickLMDB.Environment, keyPair:nostr.KeyPair, dispatcher:Dispatcher<NotificationType>) throws {
 		self.dispatcher = dispatcher
-		self.pubkey = publicKey
+		self.pubkey = keyPair.pubkey
 		self.env = docEnv
 		self.base = base
 		let subTrans = try Transaction(docEnv, readOnly:false)
-		self.userStore = try Topaz.launchExperienceEngine(UserStore.self, from:self.base.deletingLastPathComponent(), for:nostr.Key.nullKey(), dispatcher:dispatcher)
+		self.userStore = try Topaz.launchExperienceEngine(UserStore.self, from:self.base.deletingLastPathComponent(), for:nostr.KeyPair(pubkey: nostr.Key.nullKey(), privkey: nostr.Key.nullKey()), dispatcher:dispatcher)
 		let getMetadata = try docEnv.openDatabase(named:Databases.app_metadata.rawValue, flags:[.create], tx:subTrans)
 		self.app_metadata = getMetadata
 		// load the app state
@@ -215,7 +215,7 @@ extension ApplicationModel {
 		/// all the users in the store
 		@Published public private(set) var users:[Topaz.Account]
 
-		required init(base: URL, env docEnv: QuickLMDB.Environment, publicKey: nostr.Key, dispatcher:Dispatcher<NotificationType>) throws {
+		required init(base: URL, env docEnv: QuickLMDB.Environment, keyPair:nostr.KeyPair, dispatcher:Dispatcher<NotificationType>) throws {
 			self.dispatcher = dispatcher
 			self.env = docEnv
 			self.base = base
@@ -232,7 +232,7 @@ extension ApplicationModel {
 				users.append(Topaz.Account(key:nkey, profile: parsed))
 			}
 			_users = Published(wrappedValue:users)
-			self.pubkey = publicKey
+			self.pubkey = keyPair.pubkey
 			try subTrans.commit()
 			
 		}

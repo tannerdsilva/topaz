@@ -28,7 +28,7 @@ extension nostr {
 		/// The subscription ID
 		let sub_id:String
 		/// The filters to apply to the subscription
-		let filters:[Filter]
+		let filters:Set<Filter>
 	}
 
 	enum Subscription:Codable {
@@ -47,6 +47,10 @@ extension nostr {
 		
 		/// the end of a stored event list
 		case endOfStoredEvents(String)
+		
+		case authentication(String)
+		
+		case ok(String)
 
 		init(from decoder:Decoder) throws {
 			var container = try decoder.unkeyedContainer()
@@ -58,7 +62,7 @@ extension nostr {
 					while container.isAtEnd == false {
 						filters.append(try container.decode(Filter.self))
 					}
-					self = .subscribe(Subscribe(sub_id: sub_id, filters:filters))
+					self = .subscribe(Subscribe(sub_id: sub_id, filters:Set(filters)))
 				case "CLOSE":
 					let sub_id = try container.decode(String.self)
 					self = .unsubscribe(sub_id)
@@ -69,6 +73,13 @@ extension nostr {
 				case "EOSE":
 					let subID = try container.decode(String.self)
 					self = .endOfStoredEvents(subID)
+				case "AUTH":
+					let authChallenge = try container.decode(String.self)
+					self = .authentication(authChallenge)
+				case "OK":
+					let proof = try container.decode(String.self)
+					self = .ok(proof)
+					print("OK GOT EVENT ID \(proof)")
 			default:
 				throw Error.unknownRequestInstruction(type)
 			}
@@ -92,6 +103,11 @@ extension nostr {
 				case .endOfStoredEvents(let subID):
 					try container.encode("EOSE")
 					try container.encode(subID)
+				case .authentication(let challenge):
+					try container.encode("AUTH")
+					try container.encode("foo")
+				default:
+					break;
 			}
 		}
 	}

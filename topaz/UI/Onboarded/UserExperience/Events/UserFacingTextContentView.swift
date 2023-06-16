@@ -49,12 +49,47 @@ extension UI.Events {
 	}
 
 	struct UserFacingTextContentView: View {
-		let content: String
+		let dbux:DBUX
+		let event: nostr.Event
 		enum Segment: Hashable {
-			case text(String)
-			case url(String)
-			case hashtag(String)
+			case text(String, AttributedString)
+			case url(String, AttributedString)
+			case image(URL)
+			case hashtag(String, AttributedString)
 		}
+		struct SegmentView: View {
+			let dbux:DBUX
+			var segment: Segment
+
+			var body: some View {
+				switch segment {
+				case .text(let content, let attributedContent):
+					Text(attributedContent)
+						.font(.body)
+						.foregroundColor(.primary)
+						.multilineTextAlignment(.leading)
+				case .url(let url, _):
+					if let url = URL(string: url) {
+						Link(url.absoluteString, destination: url)
+							.font(.body)
+							.foregroundColor(.blue)
+							.underline()
+					}
+				case .hashtag(let hashtag, let attributedHashtag):
+					Text(attributedHashtag)
+						.font(.body)
+						.foregroundColor(.primary)
+				case .image(let imgURL):
+					UI.Images.AssetPipeline.AsyncImage(url: imgURL, actor: dbux.unstoredImageActor, content: { image in
+						image.resizable()
+							.scaledToFill()
+					}, placeholder: {
+						Text("loading")
+					})
+				}
+			}
+		}
+
 		
 		static func fontSize(for sizeCategory: ContentSizeCategory, availableWidth: CGFloat) -> CGFloat {
 			let baseFontSize: CGFloat
@@ -72,40 +107,133 @@ extension UI.Events {
 			return baseFontSize * widthFactor
 		}
 
-		private func renderRichText() -> Result<AttributedString, Swift.Error> {
+		private func renderRichText() -> Result<[Segment], Swift.Error> {
 			do {
-				var attributedString = AttributedString(content)
-				let urlRegex = try Regex("((https|http)://)((\\w|-)+)(([.]|[/])((\\w|-)+))+")
-				let hashtagPattern = try Regex("#[\\p{L}0-9_]*")
+				var content: String = event.content
+				let urlRegex = try Regex("(https?://[\\w-]+(\\.[\\w-]+)+([\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])?)")
+
+				var segments: [Segment] = []
+
+				var currentWord: String = ""
+				var currentAttributedString: AttributedString = AttributedString("")
 				
-				for curHTTPMatch in content.matches(of:urlRegex) {
-					let asAttributedRange = Range<AttributedString.Index>(curHTTPMatch.range, in: attributedString)!
-					attributedString[asAttributedRange].foregroundColor = .blue
-					attributedString[asAttributedRange].underlineStyle = .thick
+				for character in content {
+					if character.isWhitespace {
+						if !currentWord.isEmpty {
+							processWord(&currentWord, &currentAttributedString, &segments, urlRegex)
+						}
+					} else {
+						currentWord.append(character)
+						currentAttributedString.append(AttributedString(String(character)))
+					}
 				}
-				for curHashTagMatch in content.matches(of:hashtagPattern) {
-					let asAttributedRange = Range<AttributedString.Index>(curHashTagMatch.range, in: attributedString)!
-					attributedString[asAttributedRange].foregroundColor = .purple
+				
+				// Process last word
+				if !currentWord.isEmpty {
+					processWord(&currentWord, &currentAttributedString, &segments, urlRegex)
 				}
-				return .success(attributedString)
+				
+				return .success(segments)
 			} catch let error {
 				return .failure(error)
 			}
 		}
+
+
+
+		private func processWord(_ word: inout String, _ attributedWord: inout AttributedString, _ segments: inout [Segment], _ urlRegex:Regex<AnyRegexOutput>) {
+			// Check if word is a URL
+			
+			if let urlMatch = word.firstMatch(of: urlRegex), let url = URL(string: String(word[urlMatch.range])) {
+				let urlExtension = url.pathExtension.lowercased()
+				let imageExtensions = Set(["jpg", "jpeg", "png", "gif"])
+				if imageExtensions.contains(urlExtension) {
+					// Handle image URLs if needed
+					attributedWord = AttributedString("")
+				} else {
+					attributedWord.foregroundColor = .blue
+					attributedWord.underlineStyle = .thick
+				}
+				if imageExtensions.contains(urlExtension) {
+					segments.append(.image(url))
+				} else {
+					segments.append(.url(word, attributedWord))
+				}
+			}
+			// Check if word is a hashtag
+			else if word.hasPrefix("#") {
+				attributedWord.foregroundColor = .blue
+				segments.append(.hashtag(word, attributedWord))
+			}
+			// If word is just text
+			else {
+				if let lastSegment = segments.last, case .text(var previousText, var previousAttributedText) = lastSegment {
+					// Add a space before appending the word
+					previousText.append(" \(word)")
+					previousAttributedText.append(AttributedString(" "))
+					previousAttributedText.append(attributedWord)
+					segments[segments.count - 1] = .text(previousText, previousAttributedText)
+				} else {
+					segments.append(.text(word, attributedWord))
+				}
+			}
+			
+			// Reset word and attributed word
+			word = ""
+			attributedWord = AttributedString("")
+		}
+		
+		func consolidatedRT() -> Result<[Segment], Swift.Error> {
+			switch renderRichText() {
+			case .success(let segments):
+				var segs = [Segment]()
+				var curString = AttributedString()
+				for curSeg in segments {
+					switch curSeg {
+					case .text(_, let attText):
+						if curString.description.count > 0 {
+							curString += AttributedString(" ") + attText
+						} else {
+							curString += attText
+						}
+						
+					case .hashtag(_, let getURL):
+						if curString.description.count > 0 {
+							curString += AttributedString(" ") + getURL
+						} else {
+							curString += getURL
+						}
+					default:
+						if curString.description.count > 0 {
+							segs.append(.text("", curString))
+							curString = AttributedString()
+						}
+						segs.append(curSeg)
+					}
+				}
+				if curString.description.count > 0 {
+					segs.append(.text("", curString))
+					curString = AttributedString()
+				}
+				return .success(segs)
+			case .failure(let err):
+				return .failure(err)
+			}
+		}
 		
 		var body: some View {
-			Group {
-				switch renderRichText() {
-				case .success(let richText):
-					Text(richText)
-						.font(.body)
-						.foregroundColor(.primary)
-						.multilineTextAlignment(.leading)
+			Group() {
+				switch consolidatedRT() {
+				case .success(let segments):
+					ForEach(segments, id: \.self) { segment in
+						SegmentView(dbux: dbux, segment: segment)
+					}
 				case .failure:
-					Text(content) // Fallback to plain text if rich text rendering fails
+					Text(event.content).border(.green) // Fallback to plain text if rich text rendering fails
 				}
 			}
 		}
+
 	}
 }
 

@@ -66,15 +66,31 @@ struct Topaz:App, Based {
 	}
 	
 	static func findApplicationBase() throws -> URL {
-		try FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true)
+		
+		
+		var event = nostr.Event()
+				event.content = "Test content"
+				event.tags = []
+		event.pubkey = nostr.Key("035ff097e48189cd26e98d65991c7a3cf95b4c87a6b2f636a69c1738ff5dd229")!
+		event.created = DBUX.Date()
+				event.kind = nostr.Event.Kind.text_note
+				
+				try event.computeUID()
+				let uidString = event.uid.description
+		print(uidString)
+		print("FOO")
+		
+		return try FileManager.default.url(for:.libraryDirectory, in: .userDomainMask, appropriateFor:nil, create:true)
 	}
 	
-	static func launchExperienceEngine<T>(_ type: T.Type, from base: URL, for publicKey: nostr.Key, dispatcher:Dispatcher<T.NotificationType>) throws -> T where T: ExperienceEngine {
+	static func launchExperienceEngine<T>(_ type: T.Type, from base: URL, for keyPair: nostr.KeyPair, dispatcher:Dispatcher<T.NotificationType>) throws -> T where T: ExperienceEngine {
 		let isDirectory = type.env_flags.contains(.noSubDir) ? false : true
 		let path = base.appendingPathComponent(type.name, isDirectory: isDirectory)
 
 		if isDirectory {
-			try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true, attributes: nil)
+			if FileManager.default.fileExists(atPath: path.path) == false {
+				try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true, attributes: nil)
+			}
 			let dataMdbPath = path.appendingPathComponent("data.mdb")
 			let increaseSize:size_t
 			switch type.deltaSize {
@@ -84,7 +100,7 @@ struct Topaz:App, Based {
 				increaseSize = size_t(dataMdbPath.getFileSize()) + assSize
 			}
 			let makeEnv = try QuickLMDB.Environment(path: path.path, flags: type.env_flags, mapSize: increaseSize, maxDBs: type.maxDBs)
-			return try type.init(base: path, env: makeEnv, publicKey: publicKey, dispatcher: dispatcher)
+			return try type.init(base: path, env: makeEnv, keyPair: keyPair, dispatcher: dispatcher)
 		} else {
 			let increaseSize:size_t
 			switch type.deltaSize {
@@ -94,12 +110,12 @@ struct Topaz:App, Based {
 				increaseSize = size_t(path.getFileSize()) + assSize
 			}
 			let makeEnv = try QuickLMDB.Environment(path: path.path, flags: type.env_flags, mapSize: increaseSize, maxDBs: type.maxDBs)
-			return try type.init(base: path, env: makeEnv, publicKey: publicKey, dispatcher: dispatcher)
+			return try type.init(base: path, env: makeEnv, keyPair:keyPair, dispatcher: dispatcher)
 		}
 	}
 	
-	static func launchSharedExperienceEngine<T>(_ type: T.Type, base:URL, env environment:QuickLMDB.Environment, for publicKey: nostr.Key, dispatcher:Dispatcher<T.NotificationType>) throws -> T where T:SharedExperienceEngine {
-		return try type.init(env:environment, publicKey:publicKey, dispatcher:dispatcher)
+	static func launchSharedExperienceEngine<T>(_ type: T.Type, base:URL, env environment:QuickLMDB.Environment, for keyPair:nostr.KeyPair, dispatcher:Dispatcher<T.NotificationType>) throws -> T where T:SharedExperienceEngine {
+		return try type.init(env:environment, keyPair:keyPair, dispatcher:dispatcher)
 	}
 
 	
@@ -143,7 +159,7 @@ struct Topaz:App, Based {
 	
 	init() {
 		do {
-			let appModel = try Topaz.launchExperienceEngine(ApplicationModel.self, from:self.base, for:nostr.Key.nullKey(), dispatcher:Self.applicationDispatcher)
+			let appModel = try Topaz.launchExperienceEngine(ApplicationModel.self, from:self.base, for:nostr.KeyPair(pubkey: nostr.Key.nullKey(), privkey: nostr.Key.nullKey()), dispatcher:Self.applicationDispatcher)
 			_localData = ObservedObject(wrappedValue: appModel)
 		} catch _ {
 			fatalError("false")

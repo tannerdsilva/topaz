@@ -7,5 +7,4 @@
 
 import Foundation
 
-@usableFromInline struct nostr {
-}
+@usableFromInline struct nostr {}
